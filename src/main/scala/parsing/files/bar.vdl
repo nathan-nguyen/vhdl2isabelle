@@ -1,0 +1,51 @@
+library ieee;
+use ieee.std_logic_1164.all;
+
+entity counter is
+
+  port (
+    clk : in std_logic;
+    o : out std_logic);
+
+end entity counter;
+
+architecture sim of counter is
+
+begin  -- architecture sim
+
+  o <= not clk;
+
+end architecture sim;
+
+library ieee;
+use ieee.std_logic_1164.all;
+
+entity test is
+
+end entity test;
+
+architecture t of test is
+
+  component counter is
+    port (
+      clk : in std_logic;
+      o : out std_logic);
+  end component counter;
+
+  signal clk : std_logic := '0';
+  signal o : std_logic;
+
+begin  -- architecture t
+
+  c : counter
+    port map (
+      clk => clk,
+      o   => o);
+
+  x: process is
+  begin  -- process x
+    clk <= not clk;
+    wait for 200 ms;
+  end process x;
+
+end architecture t;
