@@ -1,6 +1,7 @@
 package parsing
 
 import org.slf4j.LoggerFactory
+import parsing.VVRange._
 import sg.edu.ntu.hchen.VHDLParser.{Context_itemContext, _}
 import sg.edu.ntu.hchen.{VHDLBaseVisitor, VHDLParser}
 
@@ -137,7 +138,26 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
 
   override def visitConfiguration_specification(ctx: Configuration_specificationContext): Unit = super.visitConfiguration_specification(ctx)
 
-  override def visitConstant_declaration(ctx: Constant_declarationContext): Unit = super.visitConstant_declaration(ctx)
+  override def visitConstant_declaration(ctx: Constant_declarationContext): Unit = {
+    val idList = for{
+      id<-ctx.identifier_list().identifier()
+    } yield id.getText
+    val names = for {
+      name<-ctx.subtype_indication().selected_name()
+    } yield name.getText
+    val name = names.head
+    val expr = for {
+      relation <- ctx.expression().relation()
+    } yield  {
+      relation.getText
+    }
+    for{
+      id <- idList
+    } {
+      logger.info(s"${id}, ${name}, ${expr}")
+    }
+    super.visitConstant_declaration(ctx)
+  }
 
   override def visitConstrained_array_definition(ctx: Constrained_array_definitionContext): Unit = super.visitConstrained_array_definition(ctx)
 
@@ -502,7 +522,42 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
 
   override def visitRecord_nature_definition(ctx: Record_nature_definitionContext): Unit = super.visitRecord_nature_definition(ctx)
 
-  override def visitRecord_type_definition(ctx: Record_type_definitionContext): Unit = super.visitRecord_type_definition(ctx)
+  override def visitRecord_type_definition(ctx: Record_type_definitionContext): Unit = {
+    val items = for {
+      ed <- ctx.element_declaration()
+      sub = ed.element_subtype_definition().subtype_indication()
+      name <- sub.selected_name()
+      id <- ed.identifier_list().identifier()
+    } yield {
+      val constraint = sub.constraint()
+      val ranges = if (constraint != null) {
+        val (index_constraint, range_constraint) = (constraint.index_constraint, constraint.range_constraint)
+        for (discrete_range <- index_constraint.discrete_range()) yield {
+          val explicit_range = discrete_range.range().explicit_range()
+          val singleRangeValues = for {
+            expr <- explicit_range.simple_expression()
+            term <- expr.term()
+            factor <- term.factor()
+            primary <- factor.primary()
+          } yield primary.literal().getText
+          val direction = explicit_range.direction().getText
+          VVExplicitRange(direction, singleRangeValues)
+        }
+      } else {
+        mutable.Buffer.empty[VVExplicitRange]
+      }
+      val recordItem = VRecordItem(id.getText, name.getText, ranges)
+      logger.info(s"record: ${recordItem}")
+      recordItem
+    }
+    val id = {
+      val type_declaration = ctx.getParent.getParent.getParent.asInstanceOf[Type_declarationContext]
+      type_declaration.identifier().getText
+    }
+    val record = VRecord(id, items)
+    logger.info(s"record: ${record}")
+    super.visitRecord_type_definition(ctx)
+  }
 
   override def visitRelation(ctx: RelationContext): Unit = super.visitRelation(ctx)
 

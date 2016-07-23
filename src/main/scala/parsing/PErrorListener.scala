@@ -5,21 +5,22 @@ import java.util.Collections
 
 import org.antlr.v4.runtime.atn.ATNConfigSet
 import org.antlr.v4.runtime.dfa.DFA
-import org.antlr.v4.runtime.{ANTLRErrorListener, Parser, RecognitionException, Recognizer}
+import org.antlr.v4.runtime._
 import org.slf4j.LoggerFactory
 
-final class PErrorListener extends ANTLRErrorListener {
+final class PErrorListener extends BaseErrorListener {
+
   val logger = LoggerFactory.getLogger(classOf[PErrorListener])
   override def reportContextSensitivity(recognizer: Parser, dfa: DFA, startIndex: Int, stopIndex: Int, prediction: Int, configs: ATNConfigSet): Unit = {
-    logger.error(s"[reportContextSensitivity]: ${dfa}")
+    logger.debug(s"[reportContextSensitivity]: ${recognizer.getCurrentToken}")
   }
 
   override def reportAmbiguity(recognizer: Parser, dfa: DFA, startIndex: Int, stopIndex: Int, exact: Boolean, ambigAlts: util.BitSet, configs: ATNConfigSet): Unit = {
-    logger.error(s"[reportAmbiguity]: ${dfa}")
+    logger.debug(s"[reportAmbiguity]: ${recognizer.getCurrentToken}")
   }
 
   override def reportAttemptingFullContext(recognizer: Parser, dfa: DFA, startIndex: Int, stopIndex: Int, conflictingAlts: util.BitSet, configs: ATNConfigSet): Unit = {
-    logger.error(s"[reportAttemptingFullContext]: ${dfa}")
+    logger.debug(s"[reportAttemptingFullContext]: ${recognizer.getCurrentToken}")
   }
 
   override def syntaxError(recognizer: Recognizer[_, _], offendingSymbol: scala.Any, line: Int, charPositionInLine: Int, msg: String, e: RecognitionException): Unit = {

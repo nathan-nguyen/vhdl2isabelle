@@ -131,32 +131,32 @@ XNOR : X N O R;
 XOR : X O R;
 
 // case insensitive chars
-A:'a'|'A';
-B:'b'|'B';
-C:'c'|'C';
-D:'d'|'D';
-E:'e'|'E';
-F:'f'|'F';
-G:'g'|'G';
-H:'h'|'H';
-I:'i'|'I';
-J:'j'|'J';
-K:'k'|'K';
-L:'l'|'L';
-M:'m'|'M';
-N:'n'|'N';
-O:'o'|'O';
-P:'p'|'P';
-Q:'q'|'Q';
-R:'r'|'R';
-S:'s'|'S';
-T:'t'|'T';
-U:'u'|'U';
-V:'v'|'V';
-W:'w'|'W';
-X:'x'|'X';
-Y:'y'|'Y';
-Z:'z'|'Z';
+fragment A:'a'|'A';
+fragment B:'b'|'B';
+fragment C:'c'|'C';
+fragment D:'d'|'D';
+fragment E:'e'|'E';
+fragment F:'f'|'F';
+fragment G:'g'|'G';
+fragment H:'h'|'H';
+fragment I:'i'|'I';
+fragment J:'j'|'J';
+fragment K:'k'|'K';
+fragment L:'l'|'L';
+fragment M:'m'|'M';
+fragment N:'n'|'N';
+fragment O:'o'|'O';
+fragment P:'p'|'P';
+fragment Q:'q'|'Q';
+fragment R:'r'|'R';
+fragment S:'s'|'S';
+fragment T:'t'|'T';
+fragment U:'u'|'U';
+fragment V:'v'|'V';
+fragment W:'w'|'W';
+fragment X:'x'|'X';
+fragment Y:'y'|'Y';
+fragment Z:'z'|'Z';
 
 
 //------------------------------------------Parser----------------------------------------
@@ -1597,6 +1597,11 @@ BASIC_IDENTIFIER
    :   LETTER ( '_' ( LETTER | DIGIT ) | LETTER | DIGIT )*
    ;
 
+//BASIC_IDENTIFIER
+//   :  [A-Za-z] | [A-Za-z] ( '_' ( [A-Za-z] | [0-9] ) | [A-Za-z] | [0-9] )*
+//   ;
+
+
 EXTENDED_IDENTIFIER
   : '\\' ( 'a'..'z' | '0'..'9' | '&' | '\'' | '(' | ')'
     | '+' | ',' | '-' | '.' | '/' | ':' | ';' | '<' | '=' | '>' | '|'
@@ -1604,9 +1609,7 @@ EXTENDED_IDENTIFIER
     | '#' | '[' | ']' | '_' )+ '\\'
   ;
 
-LETTER
-  :  'a'..'z' | 'A'..'Z'
-  ;
+LETTER:  [A-Za-z];
 
 COMMENT
   : '--' ( ~'\n' )*
@@ -1688,18 +1691,14 @@ EXPONENT
   ;
 
 
-HEXDIGIT
-    :	('A'..'F'|'a'..'f')
-    ;
+HEXDIGIT :	('A'..'F'|'a'..'f');
 
 
 INTEGER
   :  DIGIT ( '_' | DIGIT )*
   ;
 
-DIGIT
-  :  '0'..'9'
-  ;
+DIGIT :  [0-9];
 
 BASED_INTEGER
   : EXTENDED_DIGIT ('_' | EXTENDED_DIGIT)*
