@@ -19,6 +19,4 @@ object Antlr2VTy {
     names.head
   }
 
-
-
 }

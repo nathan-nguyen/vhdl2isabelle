@@ -1,17 +1,17 @@
 package parsing
 
 import org.slf4j.LoggerFactory
-import parsing.TVExp._
-import sg.edu.ntu.hchen.VHDLParser.{Context_itemContext, _}
-import sg.edu.ntu.hchen.{VHDLBaseVisitor, VHDLParser}
+import sg.edu.ntu.hchen.VHDLBaseVisitor
+import sg.edu.ntu.hchen.VHDLParser._
 
 import scala.collection.JavaConversions._
-import Antlr2VTy._
 import scala.collection.mutable
 
 final class TVisitor extends VHDLBaseVisitor[Unit] {
 
-  val defs = mutable.ArrayBuffer.empty[String]
+  val defs = mutable.Map.empty[String, String]
+
+  val typeDeclTbl = mutable.Map.empty[String, Map[String, VSubtypeIndication]]
 
   val logger = LoggerFactory.getLogger(classOf[TVisitor])
 
@@ -140,18 +140,13 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
   override def visitConfiguration_specification(ctx: Configuration_specificationContext): Unit = super.visitConfiguration_specification(ctx)
 
   override def visitConstant_declaration(ctx: Constant_declarationContext): Unit = {
-    val idList=getIdList(ctx.identifier_list())
-    val name = selectedNameFromSubtypeInd(ctx.subtype_indication())
-    val expr = for {
-      relation <- ctx.expression().relation()
-    } yield {
-      relation.getText
+    val constDecl = VConstDecl(ctx)
+    logger.info(s"${constDecl.idList}")
+    constDecl.vExp match {
+      case Some(exp) => logger.info(s"${exp.repr}")
+      case None => logger.info("---")
     }
-    for {
-      id <- idList
-    } {
-      logger.info(s"${id}, ${name}, ${expr}")
-    }
+    //    logger.info(s"$constDecl")
     super.visitConstant_declaration(ctx)
   }
 
@@ -280,45 +275,17 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
   override def visitInstantiation_list(ctx: Instantiation_listContext): Unit = super.visitInstantiation_list(ctx)
 
   override def visitInterface_constant_declaration(ctx: Interface_constant_declarationContext): Unit = {
-    val subtype_indicationContext = ctx.subtype_indication()
-    val names = for {
-      nameContext <- subtype_indicationContext.selected_name
-    } yield nameContext.identifier().getText
-    val valType = names.head
-
-    val idList = for {
-      r <- ctx.identifier_list().identifier()
-    } yield r.getText
-    val id = idList.head
-
-    val strList = for {
-      relationContext <- ctx.expression().relation()
-      shiftRelation <- relationContext.shift_expression()
-      simple <- shiftRelation.simple_expression()
-      term <- simple.term()
-      factor <- term.factor()
-      primary <- factor.primary()
-    } yield {
-      val literal = primary.literal().numeric_literal().abstract_literal()
-      val (integerL, realL, baseL) = (literal.INTEGER(), literal.REAL_LITERAL(), literal.BASE_LITERAL())
-      val valString = if (integerL != null) {
-        require(realL == null && baseL == null, "integerL")
-        integerL.getText
-      } else if (realL != null) {
-        require(integerL == null && baseL == null, "realL")
-        realL.getText
-      } else if (baseL != null) {
-        require(integerL == null && realL == null, "baseL")
-        baseL.getText
-      } else {
-        throw new RuntimeException("all null")
-      }
-      valString
+    val interfaceConstDecl = VInterfaceConstDecl(ctx)
+    for {
+      id <- interfaceConstDecl.idList
+    } {
+      val name = interfaceConstDecl.subtypeIndication.selectedName
+      val initVal = interfaceConstDecl.vExp.map(_.repr)
+      val iVal = IVariable(id, "variable", name, initVal)
+      logger.info(s"${iVal.definition}")
+      defs += (id->iVal.definition)
     }
-    val initVal = strList.head
-    val iVal = IVariable(id, "variable", valType, Some(initVal))
-    defs += iVal.definition
-    super.visitInterface_constant_declaration(ctx)
+    //    super.visitInterface_constant_declaration(ctx)
   }
 
   override def visitInterface_declaration(ctx: Interface_declarationContext): Unit = super.visitInterface_declaration(ctx)
@@ -340,18 +307,15 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
   override def visitInterface_port_declaration(ctx: Interface_port_declarationContext): Unit = super.visitInterface_port_declaration(ctx)
 
   override def visitInterface_signal_declaration(ctx: Interface_signal_declarationContext): Unit = {
-    val idList = for {
-      id <- ctx.identifier_list().identifier()
-    } yield id.getText
-    val selectedName = {
-      val subtype_indicationContext = ctx.subtype_indication()
-      val names = for {
-        selectedName <- subtype_indicationContext.selected_name()
-      } yield selectedName.getText
-      names.head
+
+    val interfaceSignalDecl = VInterfaceSignalDecl(ctx)
+    interfaceSignalDecl.vExp match {
+      case Some(exp) => logger.info(s"${exp.repr}")
+      case _ => logger.info("---")
     }
-    val expressionContext = ctx.expression()
-    super.visitInterface_signal_declaration(ctx)
+    //    logger.info(s"${interfaceSignalDecl}")
+
+    //    super.visitInterface_signal_declaration(ctx)
   }
 
   override def visitInterface_terminal_declaration(ctx: Interface_terminal_declarationContext): Unit = super.visitInterface_terminal_declaration(ctx)
@@ -431,64 +395,21 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
   override def visitPort_clause(ctx: Port_clauseContext): Unit = super.visitPort_clause(ctx)
 
   override def visitPort_list(ctx: Port_listContext): Unit = {
-    logger.info(s"${ctx.getText}")
-
     for {
       port_declaration <- ctx.interface_port_list().interface_port_declaration()
+      interfacePortDecl = VInterfacePortDecl(port_declaration)
+      id <- interfacePortDecl.idList
     } yield {
-
-      val idName = {
-        val idList = for {
-          id <- port_declaration.identifier_list().identifier()
-        } yield id.getText
-        idList.head
-      }
-
-      val mode = {
-        val signal_modeContext = port_declaration.signal_mode()
-        val signalOption = (for {
-          s <- List(VHDLParser.IN, VHDLParser.OUT, VHDLParser.INOUT, VHDLParser.BUFFER, VHDLParser.LINKAGE)
-        } yield signal_modeContext.getToken(s, 0)).find(_ != null)
-        signalOption match {
-          case Some(name) => name.getText
-          case None => throw new RuntimeException("no signal_mode name")
-        }
-      }
-
-      val valType = {
-        val valTypeList = for {
-          selected_name <- port_declaration.subtype_indication().selected_name()
-        } yield selected_name.identifier().getText
-        valTypeList.head
-      }
-
-      val initScalarVal = {
-        val expression = port_declaration.expression()
-        if (expression == null) {
-          None
-        } else {
-          val init = for {
-            relation <- expression.relation()
-            shiftRelation <- relation.shift_expression()
-            simple <- shiftRelation.simple_expression()
-            term <- simple.term()
-            factor <- term.factor()
-            primary <- factor.primary()
-          } yield {
-            primary.literal().enumeration_literal().getText
-          }
-          Some(init.head)
-        }
-      }
-
-      val idType = IType.decoratedType("port", valType)
-      //      FIXME
-      val expr = IExp_con(IVariable("", "", valType, initScalarVal))
-      val port = IPort(idName, idType, valType, mode, expr)
-      logger.info(s"${port.definition}")
-
+      val mode = interfacePortDecl.mode
+      val selectedName = interfacePortDecl.subtypeIndication.selectedName
+      val initVal = interfacePortDecl.vExp.map(_.repr)
+      val iVal = IVariable("", "", selectedName, initVal)
+      val exp = IExp_con(iVal)
+      val iPort = IPort(id, "port", VIType.VHDLize(selectedName), mode, exp)
+      defs += (id->iPort.definition)
+      logger.info(s"${iPort.definition}")
     }
-    super.visitPort_list(ctx)
+    //    super.visitPort_list(ctx)
   }
 
   override def visitPort_map_aspect(ctx: Port_map_aspectContext): Unit = super.visitPort_map_aspect(ctx)
@@ -532,39 +453,13 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
   override def visitRecord_nature_definition(ctx: Record_nature_definitionContext): Unit = super.visitRecord_nature_definition(ctx)
 
   override def visitRecord_type_definition(ctx: Record_type_definitionContext): Unit = {
+    val recordTypeDef = VRecordTypeDef(ctx)
     val items = for {
-      ed <- ctx.element_declaration()
-      sub = ed.element_subtype_definition().subtype_indication()
-      name <- sub.selected_name()
-      id <- ed.identifier_list().identifier()
-    } yield {
-      val constraint = sub.constraint()
-      val ranges = if (constraint != null) {
-        val (index_constraint, range_constraint) = (constraint.index_constraint, constraint.range_constraint)
-        for (discrete_range <- index_constraint.discrete_range()) yield {
-          val explicit_range = discrete_range.range().explicit_range()
-          val singleRangeValues = for {
-            expr <- explicit_range.simple_expression()
-            term <- expr.term()
-            factor <- term.factor()
-            primary <- factor.primary()
-          } yield primary.literal().getText
-          val direction = explicit_range.direction().getText
-          TVExplicitRange(direction, singleRangeValues)
-        }
-      } else {
-        mutable.Buffer.empty[TVExplicitRange]
-      }
-      val recordItem = TVRecordItem(id.getText, name.getText, ranges)
-      logger.info(s"record: ${recordItem}")
-      recordItem
-    }
-    val id = {
-      val type_declaration = ctx.getParent.getParent.getParent.asInstanceOf[Type_declarationContext]
-      type_declaration.identifier().getText
-    }
-    val record = TVRecord(id, items)
-    logger.info(s"record: ${record}")
+      elementDecl <- recordTypeDef.elementDecls
+      flattened <- elementDecl.flatten
+    } yield flattened
+    val typeDeclId = ctx.getParent.getParent.getParent.asInstanceOf[Type_declarationContext].identifier().getText
+    typeDeclTbl += (typeDeclId -> items.toMap)
     super.visitRecord_type_definition(ctx)
   }
 

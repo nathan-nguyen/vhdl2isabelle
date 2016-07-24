@@ -1,5 +1,7 @@
 package parsing
 
+import VIType._
+
 sealed trait IUop
 
 final class IAbs extends IUop
@@ -79,7 +81,7 @@ abstract class IVal(id:String, idType:String) {
 
 final case class ISignal(id:String, idType:String) extends IVal(id, idType)
 
-final case class IPort(id: String, idType:String, valType: String, mode: String, expr:IExp, conn: String = "connection") extends IVal(id, idType) {
+final case class IPort(id: String, idType:String, valType: String, mode: String, expr:IExp, conn: String = "connected") extends IVal(id, idType) {
   override def toString = {
     s"""(''${id}'', ${valType}, mode_${mode}, ${conn}, ${expr})"""
   }
@@ -87,21 +89,20 @@ final case class IPort(id: String, idType:String, valType: String, mode: String,
 
 final case class IVariable(id: String, idType: String, valType: String, initVal: Option[String]) extends IVal(id, idType) {
   override def toString = {
-    def PREFIX(vhdlType: String) = s"vhdl_${vhdlType}"
     valType match {
       case "integer" => {
         val init = initVal match {
           case Some(v) => v
           case None => "0"
         }
-        s"""(''${id}'', ${PREFIX(valType)}, (val_i ${init}))"""
+        s"""(''${id}'', ${VHDLize(valType)}, (val_i ${init}))"""
       }
       case "real" => {
         val init = initVal match {
           case Some(v) => v
           case None => "0.0"
         }
-        s"""(''${id}'', ${PREFIX(valType)}, (val_r ${init}))\""""
+        s"""(''${id}'', ${VHDLize(valType)}, (val_r ${init}))\""""
       }
       case "character" => {
         val init = initVal match {
@@ -115,14 +116,14 @@ final case class IVariable(id: String, idType: String, valType: String, initVal:
           case Some(v) => v
           case None => "'0'"
         }
-        s"""(${PREFIX(valType)}, (val_c (CHR '${init}')))"""
+        s"""(${VHDLize(valType)}, (val_c (CHR '${init}')))"""
       }
       case "std_logic" => {
         val init = initVal match {
           case Some(v) => v
           case None => "'0'"
         }
-        s"""(${PREFIX(valType)}, (val_c (CHR '${init}')))"""
+        s"""(${VHDLize(valType)}, (val_c (CHR '${init}')))"""
       }
       case "BOOLEAN" => {
         s"""???"""
@@ -151,7 +152,9 @@ sealed trait IExp {
   }
 }
 
-case class IExp_con(const: IVariable) extends IExp
+case class IExp_con(const: IVariable) extends IExp {
+  override def toString = s"""(exp_con ${const})"""
+}
 
 case class IExp_var(variable: IVariable) extends IExp
 

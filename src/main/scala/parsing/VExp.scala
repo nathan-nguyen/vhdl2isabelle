@@ -6,7 +6,11 @@ import scala.collection.JavaConversions._
 
 object VError extends Throwable
 
-case class VLiteral(s: String)
+import parsing.Antlr2VTy._
+
+case class VLiteral(s: String) {
+  def repr = s
+}
 
 //////////////////////////////////////////////////////////////
 
@@ -33,16 +37,36 @@ abstract class VCompositeTypeDecl extends VTypeDef
 
 abstract class VArrayTypeDecl extends VCompositeTypeDecl
 
-case class VUArrayDecl(indexSubtypeDecl: VIndexSubtypeDecl, others: Seq[VIndexSubtypeDecl]) extends VArrayTypeDecl
+case class VIndexSubtypeDef(name: String)
 
-case class VCArrayDecl(indexConstraint: VIndexConstraint, subtypeIndication: VSubtypeIndication) extends VArrayTypeDecl
+case class VUArrayDef(indexSubtypeDef: Seq[VIndexSubtypeDef], subtypeIndication: VSubtypeIndication) extends VArrayTypeDecl
+
+case class VCArrayDef(indexConstraint: VIndexConstraint, subtypeIndication: VSubtypeIndication) extends VArrayTypeDecl
 
 // no element_subtype_definition
-case class VElementDecl(ids: Seq[String], subtypeIndication: VSubtypeIndication)
+case class VElementDecl(ids: Seq[String], subtypeIndication: VSubtypeIndication) {
+  def flatten = for (id <- ids) yield (id -> subtypeIndication)
+}
 
-case class VRecordTypeDecl(elementDecls: Seq[VElementDecl], id: Option[String]) extends VCompositeTypeDecl
+object VElementDecl {
+  def apply(ctx: Element_declarationContext): VElementDecl = {
+    val idList = getIdList(ctx.identifier_list())
+    val subtypeIndication = VSubtypeIndication(ctx.element_subtype_definition().subtype_indication())
+    new VElementDecl(idList, subtypeIndication)
+  }
+}
 
-case class VIndexSubtypeDecl(name: String)
+case class VRecordTypeDef(elementDecls: Seq[VElementDecl], id: Option[String]) extends VCompositeTypeDecl
+
+object VRecordTypeDef {
+  def apply(ctx: Record_type_definitionContext): VRecordTypeDef = {
+    val elementDecls = for {
+      ed <- ctx.element_declaration()
+    } yield VElementDecl(ed)
+    val id = Option(ctx.identifier()).map(_.getText)
+    new VRecordTypeDef(elementDecls, id)
+  }
+}
 
 //////////////////////////////////////////////////////////////
 
@@ -61,12 +85,15 @@ object VChoice {
     val id = ctx.identifier()
     val discrete_range = ctx.discrete_range()
     val simple_expression = ctx.simple_expression()
+    val others = ctx.OTHERS()
     if (id != null) {
       VChoiceId(id.getText)
     } else if (discrete_range != null) {
       VChoiceR(VDiscreteRange(discrete_range))
     } else if (simple_expression != null) {
       VChoiceE(VSimpleExp(simple_expression))
+    } else if (others != null) {
+      VChoiceOthers
     } else throw VError
   }
 }
@@ -77,7 +104,7 @@ case class VChoiceR(discreteRange: VDiscreteRange) extends VChoice
 
 case class VChoiceE(simpleExpr: VSimpleExp) extends VChoice
 
-case class VChoiceOthers() extends VChoice
+case object VChoiceOthers extends VChoice
 
 final case class VChoices(choice: VChoice, others: Seq[VChoice])
 
@@ -151,7 +178,16 @@ object VAllocator {
   }
 }
 
-abstract class VPrimary
+abstract class VPrimary {
+  def repr: String = this match {
+    case VPrimaryLiteral(literal) => literal.repr
+    case VPrimaryQExp(vQExp) => s"(??? ${vQExp.getClass.getName})"
+    case VPrimaryExpLR(vExp) => s"(??? ${vExp.getClass.getName})"
+    case VPrimaryAllocator(allocator) => s"(??? ${allocator.getClass.getName})"
+    case VPrimaryAggregate(aggregate) => s"(??? ${aggregate.getClass.getName})"
+    case VPrimaryName(name) => s"<??? ${name}>"
+  }
+}
 
 object VPrimary {
   def apply(ctx: PrimaryContext): VPrimary = {
@@ -249,7 +285,6 @@ case class VDiscreteRangeSub(subtypeIndication: VSubtypeIndication) extends VDis
 
 sealed trait VConstraint {
   def apply(ctx: ConstraintContext): VConstraint = {
-    require(ctx != null, "ctx should not be null")
     val (index_constraint, range_constraint) = (ctx.index_constraint(), ctx.range_constraint())
     if (index_constraint != null) {
       VIndexConstraint(index_constraint)
@@ -296,7 +331,18 @@ object VExplicitRange {
 
 ////////////////////////////////////////////////////////////
 
-abstract class VFactor
+abstract class VFactor {
+  def repr: String = this match {
+    case VFFactor(primary, primaryOption) => {
+      primaryOption match {
+        case Some(p) => primary.repr + " " + p.repr
+        case None => primary.repr
+      }
+    }
+    case VAbsFactor(primary) => s"abs (${primary.repr})"
+    case VNotFactor(primary) => s"not (${primary.repr}"
+  }
+}
 
 object VFactor {
   def apply(ctx: FactorContext): VFactor = {
@@ -311,7 +357,6 @@ object VFactor {
       require(primaryList.length == 1, "not")
       VNotFactor(primaryList.head)
     } else {
-      require(ctx.DOUBLESTAR() != null, "double start")
       VFFactor(primaryList.head, primaryList.lift(1))
     }
   }
@@ -323,7 +368,14 @@ case class VAbsFactor(primary: VPrimary) extends VFactor
 
 case class VNotFactor(primary: VPrimary) extends VFactor
 
-case class VTerm(factor: VFactor, ops: Seq[VFactorOp.Ty], others: Seq[VFactor])
+case class VTerm(factor: VFactor, ops: Seq[VFactorOp.Ty], others: Seq[VFactor]) {
+  def repr: String = {
+    val factorRepr = factor.repr
+    val opReprs = ops.map(_.toString)
+    val othersReprs = others.map(_.repr)
+    opReprs.zip(othersReprs).foldLeft(factorRepr)((acc, cur) => s"(${acc} ${cur._1} ${cur._2})")
+  }
+}
 
 object VTerm {
   def apply(ctx: TermContext): VTerm = {
@@ -347,6 +399,7 @@ object VTermOp extends Enumeration {
     else if (ctx.AMPERSAND() != null) ampersand
     else throw VError
   }
+
 }
 
 object VFactorOp extends Enumeration {
@@ -364,7 +417,18 @@ object VFactorOp extends Enumeration {
 
 ////////////////////////////////////////////////////////////
 
-case class VSimpleExp(termOpSymbol: Option[String], term: VTerm, ops: Seq[VTermOp.Ty], tails: Seq[VTerm])
+case class VSimpleExp(termSign: Option[String], term: VTerm, ops: Seq[VTermOp.Ty], others: Seq[VTerm]) {
+  def repr: String = {
+    val sign = termSign match {
+      case Some("-") => "-"
+      case _ => ""
+    }
+    val termRepr = sign + term.repr
+    val opsRepr = ops.map(_.toString)
+    val termsRepr = others.map(_.repr)
+    opsRepr.zip(termsRepr).foldLeft(termRepr)((acc, cur) => s"(${acc} ${cur._1} ${cur._2})")
+  }
+}
 
 object VSimpleExp {
   def apply(ctx: Simple_expressionContext): VSimpleExp = {
@@ -432,7 +496,12 @@ object VRelationOp extends Enumeration {
   }
 }
 
-case class VShiftExp(vSimpleExpr: VSimpleExp, op: Option[VShiftOp.Ty], other: Option[VSimpleExp])
+case class VShiftExp(vSimpleExpr: VSimpleExp, op: Option[VShiftOp.Ty], other: Option[VSimpleExp]) {
+  def repr: String = (op, other) match {
+    case (Some(opV), Some(simpleExpV)) => s"(${vSimpleExpr.repr} ${op.toString} ${simpleExpV.repr})"
+    case _ => vSimpleExpr.repr
+  }
+}
 
 object VShiftExp {
   def apply(ctx: Shift_expressionContext): VShiftExp = {
@@ -441,11 +510,16 @@ object VShiftExp {
     } yield VSimpleExp(simple_expression)
     val op = Option(ctx.shift_operator()).map(VShiftOp(_))
     val other = simple_expressionList.lift(1)
-    VShiftExp(simple_expressionList.head, op, other)
+    new VShiftExp(simple_expressionList.head, op, other)
   }
 }
 
-case class VRelation(vShiftExpr: VShiftExp, op: Option[VRelationOp.Ty], other: Option[VShiftExp])
+case class VRelation(vShiftExpr: VShiftExp, op: Option[VRelationOp.Ty], other: Option[VShiftExp]) {
+  def repr: String = (op, other) match {
+    case (Some(opV), Some(otherV)) => s"${vShiftExpr.repr} ${opV.toString} ${otherV.repr}"
+    case _ => vShiftExpr.repr
+  }
+}
 
 object VRelation {
   def apply(ctx: RelationContext): VRelation = {
@@ -458,7 +532,14 @@ object VRelation {
   }
 }
 
-case class VExp(relation: VRelation, ops: Seq[VLogicOp.Ty], others: Seq[VRelation])
+case class VExp(relation: VRelation, ops: Seq[VLogicOp.Ty], others: Seq[VRelation]) {
+  def repr: String = {
+    val relationRepr = relation.repr
+    val opReprs = ops.map(_.toString)
+    val othersReprs = others.map(_.repr)
+    opReprs.zip(othersReprs).foldLeft(relationRepr)((acc, cur) => s"(${acc} ${cur._1} ${cur._2})")
+  }
+}
 
 object VExp {
   def apply(ctx: ExpressionContext): VExp = {
@@ -472,3 +553,55 @@ object VExp {
   }
 
 }
+
+///////////////////////////////////////////////////////////////////////
+
+case class VConstDecl(idList: Seq[String], subtypeIndication: VSubtypeIndication, vExp: Option[VExp])
+
+object VConstDecl {
+  def apply(ctx: Constant_declarationContext): VConstDecl = {
+    val idList = getIdList(ctx.identifier_list())
+    val subtypeIndication = VSubtypeIndication(ctx.subtype_indication())
+    val vExp = Option(ctx.expression()).map(VExp(_))
+    new VConstDecl(idList, subtypeIndication, vExp)
+  }
+}
+
+
+///////////////////////////////////////////////////////////////////////
+
+case class VInterfaceSignalDecl(idList: Seq[String], subtypeIndication: VSubtypeIndication, vExp: Option[VExp])
+
+object VInterfaceSignalDecl {
+  def apply(ctx: Interface_signal_declarationContext): VInterfaceSignalDecl = {
+    val idList = getIdList(ctx.identifier_list())
+    val subtypeIndication = VSubtypeIndication(ctx.subtype_indication())
+    val vExp = Option(ctx.expression()).map(VExp(_))
+    new VInterfaceSignalDecl(idList, subtypeIndication, vExp)
+  }
+}
+
+case class VInterfaceConstDecl(idList: Seq[String], subtypeIndication: VSubtypeIndication, vExp: Option[VExp])
+
+object VInterfaceConstDecl {
+  def apply(ctx: Interface_constant_declarationContext): VInterfaceConstDecl = {
+    val idList = getIdList(ctx.identifier_list())
+    val subtypeIndication = VSubtypeIndication(ctx.subtype_indication())
+    val vExp = Option(ctx.expression()).map(VExp(_))
+    new VInterfaceConstDecl(idList, subtypeIndication, vExp)
+  }
+}
+
+case class VInterfacePortDecl(idList: Seq[String], mode: String, subtypeIndication: VSubtypeIndication, vExp: Option[VExp])
+
+object VInterfacePortDecl {
+  def apply(ctx: Interface_port_declarationContext): VInterfacePortDecl = {
+    val idList = getIdList(ctx.identifier_list())
+    val mode = ctx.signal_mode().getText
+    val subtypeIndication = VSubtypeIndication(ctx.subtype_indication())
+    val vExp = Option(ctx.expression()).map(VExp(_))
+    new VInterfacePortDecl(idList, mode, subtypeIndication, vExp)
+  }
+}
+
+case class VPortList(interfacePortDecls: Seq[VInterfacePortDecl])

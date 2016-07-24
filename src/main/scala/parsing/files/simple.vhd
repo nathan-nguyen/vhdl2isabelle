@@ -1,20 +1,33 @@
+entity div32 is
+generic (scantest  : integer := 0);
+port (
+    rst     : in  std_ulogic;
+    clk     : in  std_ulogic;
+    holdn   : in  std_ulogic;
+    divi    : in  div32_in_type;
+    divo    : out div32_out_type;
+    testen  : in  std_ulogic := '0';
+    testrst : in  std_ulogic := '1'
+);
+end;
+
 architecture rtl of div32 is
 
---type div_regtype is record
---  x      : std_logic_vector(64 downto 0);
---  state  : std_logic_vector(2 downto 0);
---  zero   : std_logic;
---  zero2  : std_logic;
---  qcorr  : std_logic;
---  zcorr  : std_logic;
---  qzero  : std_logic;
---  qmsb   : std_logic;
---  ovf    : std_logic;
---  neg    : std_logic;
---  cnt    : std_logic_vector(4 downto 0);
---end record;
+type div_regtype is record
+  x      : std_logic_vector(64 downto 0);
+  state  : std_logic_vector(2 downto 0);
+  zero   : std_logic;
+  zero2  : std_logic;
+  qcorr  : std_logic;
+  zcorr  : std_logic;
+  qzero  : std_logic;
+  qmsb   : std_logic;
+  ovf    : std_logic;
+  neg    : std_logic;
+  cnt    : std_logic_vector(4 downto 0);
+end record;
 
--- constant definition ???
+-- constant definition
 constant RESET_ALL : boolean := GRLIB_CONFIG_ARRAY(grlib_sync_reset_enable_all) = 1;
 constant ASYNC_RESET : boolean := GRLIB_CONFIG_ARRAY(grlib_async_reset_enable) = 1;
 constant RRES : div_regtype := (

@@ -1,6 +1,8 @@
 package parsing
 
-object IType {
+object VIType {
+
+  def VHDLize(vhdlType: String) = s"vhdl_${vhdlType}"
 
   abstract class IType
 
@@ -17,4 +19,10 @@ object IType {
     else rawIdType
   }
 
+  case class TVRecordItem(id: String, valType: String, range: Seq[VExplicitRange])
+
+  case class TVRecord(id: String, items: Seq[TVRecordItem])
+
 }
+
+
