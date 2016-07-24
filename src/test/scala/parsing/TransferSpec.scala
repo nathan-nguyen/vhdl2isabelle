@@ -8,7 +8,7 @@ class TransferSpec extends BaseSpec {
 
   val fileName = "simple.vhd"
   val absFileName = System.getProperty("user.home") + File.separator + s"src/vhdl_parser/src/main/scala/parsing/files/${fileName}"
-  val transfer = new Transfer(absFileName)
+  val transfer = new TImpl(absFileName)
 
   ignore should "have header" in {
     transfer.header should be("theory vhdl_simpl\nimports Main vhdl_component vhdl_syntax_complex\n")

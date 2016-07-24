@@ -1,11 +1,12 @@
 package parsing
 
 import org.slf4j.LoggerFactory
-import parsing.VVRange._
+import parsing.TVExp._
 import sg.edu.ntu.hchen.VHDLParser.{Context_itemContext, _}
 import sg.edu.ntu.hchen.{VHDLBaseVisitor, VHDLParser}
 
 import scala.collection.JavaConversions._
+import Antlr2VTy._
 import scala.collection.mutable
 
 final class TVisitor extends VHDLBaseVisitor[Unit] {
@@ -139,19 +140,14 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
   override def visitConfiguration_specification(ctx: Configuration_specificationContext): Unit = super.visitConfiguration_specification(ctx)
 
   override def visitConstant_declaration(ctx: Constant_declarationContext): Unit = {
-    val idList = for{
-      id<-ctx.identifier_list().identifier()
-    } yield id.getText
-    val names = for {
-      name<-ctx.subtype_indication().selected_name()
-    } yield name.getText
-    val name = names.head
+    val idList=getIdList(ctx.identifier_list())
+    val name = selectedNameFromSubtypeInd(ctx.subtype_indication())
     val expr = for {
       relation <- ctx.expression().relation()
-    } yield  {
+    } yield {
       relation.getText
     }
-    for{
+    for {
       id <- idList
     } {
       logger.info(s"${id}, ${name}, ${expr}")
@@ -343,7 +339,20 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
 
   override def visitInterface_port_declaration(ctx: Interface_port_declarationContext): Unit = super.visitInterface_port_declaration(ctx)
 
-  override def visitInterface_signal_declaration(ctx: Interface_signal_declarationContext): Unit = super.visitInterface_signal_declaration(ctx)
+  override def visitInterface_signal_declaration(ctx: Interface_signal_declarationContext): Unit = {
+    val idList = for {
+      id <- ctx.identifier_list().identifier()
+    } yield id.getText
+    val selectedName = {
+      val subtype_indicationContext = ctx.subtype_indication()
+      val names = for {
+        selectedName <- subtype_indicationContext.selected_name()
+      } yield selectedName.getText
+      names.head
+    }
+    val expressionContext = ctx.expression()
+    super.visitInterface_signal_declaration(ctx)
+  }
 
   override def visitInterface_terminal_declaration(ctx: Interface_terminal_declarationContext): Unit = super.visitInterface_terminal_declaration(ctx)
 
@@ -541,12 +550,12 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
             primary <- factor.primary()
           } yield primary.literal().getText
           val direction = explicit_range.direction().getText
-          VVExplicitRange(direction, singleRangeValues)
+          TVExplicitRange(direction, singleRangeValues)
         }
       } else {
-        mutable.Buffer.empty[VVExplicitRange]
+        mutable.Buffer.empty[TVExplicitRange]
       }
-      val recordItem = VRecordItem(id.getText, name.getText, ranges)
+      val recordItem = TVRecordItem(id.getText, name.getText, ranges)
       logger.info(s"record: ${recordItem}")
       recordItem
     }
@@ -554,7 +563,7 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
       val type_declaration = ctx.getParent.getParent.getParent.asInstanceOf[Type_declarationContext]
       type_declaration.identifier().getText
     }
-    val record = VRecord(id, items)
+    val record = TVRecord(id, items)
     logger.info(s"record: ${record}")
     super.visitRecord_type_definition(ctx)
   }
