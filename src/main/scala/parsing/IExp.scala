@@ -4,7 +4,10 @@ import parsing.V2I._
 
 object IUop extends Enumeration {
   type Ty = Value
-  val abs, not, neg, pos = Value
+  val abs = Value("[abs]")
+  val not = Value("[not]")
+  val neg = Value("[-:]")
+  val pos = Value("[+:]")
 }
 
 object ILop extends Enumeration {
@@ -50,31 +53,76 @@ object IAop extends Enumeration {
 
 sealed trait IVal
 
-final case class ISignal(valType: String, iExp: IExp, signalKind: String) extends IVal {
+final case class ISignal(valType: String, iExp: IExp, signalKind: String) extends IVal
+
+final case class IPort(valType: String, mode: String, iExp: IExp, conn: String = "connected") extends IVal
+
+final case class IVariable(valType: String, iExp: IExp) extends IVal with IExp
+
+//////////////////////////////////////////////////////////////////////////////
+
+sealed trait IDef
+
+case class IVarDef(id: String, valType: String, iExp: IExp) extends IDef {
+  override def toString = {
+    s"""definition ${id}:: \"variable\" where
+        | \"${id} ≡ (''${id}'', ${VHDLize(valType)}, ${iExp})\"""".stripMargin
+  }
+
+  def asItem = s"""(''${id}'', ${VHDLize(valType)}, ${iExp})"""
 }
 
-final case class IPort(valType: String, mode: String, iExp: IExp, conn: String = "connected") extends IVal {
-  override def toString = s"""(${valType}, mode_${mode}, ${conn}, ${iExp})"""
-
-  def definition(id: String, idType: String) = {
-    require(id.nonEmpty && idType.nonEmpty, "id and idType should not be empty")
-    s"""definition ${id}:: \"${idType}\" where \"${id} ≡ (''${id}'', ${valType}, mode_${mode}, ${conn}, ${iExp})\""""
+case class IVarListDef(id: String, varDefs: List[IVarDef]) extends IDef {
+  override def toString = {
+    val itemsRepr = varDefs.map(_.asItem).mkString("[\n ", ",\n", "\n]")
+    s"""definition ${id}:: ≡ \"variable list\" where
+        |\"${id} ≡ ${itemsRepr}
+     """.stripMargin
   }
 }
 
-final case class IVariable(valType: String, iExp: IExp) extends IVal with IExp {
-  def repr = s"""(${VHDLize(valType)}, ${iExp})"""
+case class IPortDef(id: String, valType: String, iExp: IExp, mode: String, conn: String = "connected") extends IDef {
+  override def toString = {
+    s"""definition ${id}:: \"port\" where
+        | \"${id} ≡ (''${id}'', ${VHDLize(valType)}, mode_${mode}, ${conn}, ${iExp})\"""".stripMargin
+  }
 
-  def definition(id: String, idType: String) = {
-    require(id.nonEmpty && idType.nonEmpty, "id and idType should not be empty")
-    s"""definition ${id}:: \"${idType}\" where \"${id} ≡ (''${id}'', ${VHDLize(valType)}, ${iExp})\""""
+  def asItem = s"""(${id}, ${VHDLize(valType)}, mode_${mode}, ${conn}, ${iExp})"""
+}
+
+case class IPortListDef(id: String, portDefs: List[IPortDef]) extends IDef {
+  override def toString = {
+    val itemsRepr = portDefs.map(_.asItem).mkString("[\n ", ",\n", "\n]")
+    s"""definition ${id}:: ≡ \"port list\" where
+        |\"${id} ≡ ${itemsRepr}
+     """.stripMargin
   }
 }
+
+case class ISignalDef(id: String, valType: String, iExp: IExp, signalKind: String) extends IDef {
+  override def toString = {
+    s"""definition ${id}:: \"variable\" where
+        | \"${id} ≡ (''${id}'', ${VHDLize(valType)}, ${signalKind}, ${iExp})\"""".stripMargin
+  }
+
+  def asItem = s"""(${id}, ${VHDLize(valType)}, ${signalKind}, ${iExp})"""
+}
+
+case class ISignalListDef(id: String, signalDefs: List[ISignalDef]) extends IDef {
+  override def toString = {
+    val itemsRepr = signalDefs.map(_.asItem).mkString("[\n ", ",\n", "\n]")
+    s"""definition ${id}:: ≡ \"signal list\" where
+        |\"${id} ≡ ${itemsRepr}
+     """.stripMargin
+  }
+}
+
 
 ////////////////////////////////////////////////////////////////////////////
 
 sealed trait IExp {
   override def toString = this match {
+    case ival: IVariable => s"""${ival}"""
     case IExp_con(const) => s"""(exp_con ${const})"""
     case IExp_var(variable) => s"""(exp_var ${variable})"""
     case IExp_sig(signal) => s"""(exp_sig ${signal})"""
@@ -91,13 +139,9 @@ sealed trait IExp {
   }
 }
 
-case class IExp_con(const: IVariable) extends IExp {
-  override def toString = s"""(exp_con ${const})"""
-}
+case class IExp_con(const: IVariable) extends IExp
 
-case class IExp_var(variable: IVariable) extends IExp {
-  override def toString = s"""(exp_var ${variable})"""
-}
+case class IExp_var(variable: IVariable) extends IExp
 
 case class IExp_sig(signal: ISignal) extends IExp
 
