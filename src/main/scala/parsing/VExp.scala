@@ -6,6 +6,23 @@ import scala.collection.JavaConversions._
 
 object VError extends Throwable
 
+object Antlr2VTy {
+
+  def getIdList(ctx: Identifier_listContext) = {
+    for {
+      id <- ctx.identifier()
+    } yield id.getText
+  }
+
+  def selectedNameFromSubtypeInd(ctx: Subtype_indicationContext) = {
+    val names = for {
+      name <- ctx.selected_name()
+    } yield name.getText
+    names.head
+  }
+
+}
+
 import parsing.Antlr2VTy._
 
 case class VLiteral(s: String) {
@@ -567,6 +584,20 @@ object VConstDecl {
   }
 }
 
+
+///////////////////////////////////////////////////////////////////////
+
+case class VSignalDecl(idList:Seq[String], subtypeIndication: VSubtypeIndication, signalKind:Option[String], exp:Option[VExp])
+
+object VSignalDecl {
+  def apply(ctx: Signal_declarationContext): VSignalDecl = {
+    val idList = getIdList(ctx.identifier_list())
+    val subtypeIndication = VSubtypeIndication(ctx.subtype_indication())
+    val signalKind = Option(ctx.signal_kind()).map(_.getText.toLowerCase)
+    val exp = Option(ctx.expression()).map(VExp(_))
+    new VSignalDecl(idList, subtypeIndication, signalKind, exp)
+  }
+}
 
 ///////////////////////////////////////////////////////////////////////
 

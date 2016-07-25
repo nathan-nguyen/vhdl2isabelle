@@ -6,9 +6,8 @@ import org.scalatest.Ignore
 
 class TransferSpec extends BaseSpec {
 
-  val fileName = "simple.vhd"
-  val absFileName = System.getProperty("user.home") + File.separator + s"src/vhdl_parser/src/main/scala/parsing/files/${fileName}"
-  val transfer = new TImpl(absFileName)
+  val absFileName = Utils.getDataFile("files/simple.vhd")
+  val transfer = new TFile(absFileName)
 
   val logVisitor = new TVisitor
 
@@ -20,7 +19,7 @@ class TransferSpec extends BaseSpec {
     val tree = transfer.parser.design_file()
     logVisitor.visit(tree)
 
-    logVisitor.defs("scantest") should be ("""definition scantest:: "variable" where "scantest ≡ (''scantest'', vhdl_integer, (val_i 0))"""")
+//    logVisitor.defs("scantest") should be ("""definition scantest:: "variable" where "scantest ≡ (''scantest'', vhdl_integer, (val_i 0))"""")
     val portDefStr =
       """definition rst:: "port" where "rst ≡ (''rst'', vhdl_std_ulogic, mode_in, connected, (exp_con (vhdl_std_ulogic, (val_c (CHR ''0'')))))""""
     logVisitor.defs("rst") should be(portDefStr)

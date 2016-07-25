@@ -1,154 +1,93 @@
 package parsing
 
-import VIType._
+import parsing.V2I._
 
-sealed trait IUop
+object IUop extends Enumeration {
+  type Ty = Value
+  val abs, not, neg, pos = Value
+}
 
-final class IAbs extends IUop
+object ILop extends Enumeration {
+  type Ty = Value
+  val and = Value("[and]")
+  val or = Value("[or]")
+  val nand = Value("[nand]")
+  val nor = Value("[nor]")
+  val xor = Value("[xor]")
+  val xnor = Value("[xnor]")
+}
 
-final class INot extends IUop
+object IRop extends Enumeration {
+  type Ty = Value
+  val eq = Value("[=]")
+  val neq = Value("['/=]")
+  val lt = Value("[<]")
+  val le = Value("[<=]")
+  val gt = Value("[>]")
+  val ge = Value("[>=]")
+}
 
-final class INeg extends IUop
+object ISop extends Enumeration {
+  type Ty = Value
+  val sll = Value("[sll]")
+  val srl = Value("[srl]")
+  val sla = Value("[sla]")
+  val sra = Value("[sra]")
+  val rol = Value("[rol]")
+  val ror = Value("[ror]")
+}
 
-final class IPos extends IUop
+object IAop extends Enumeration {
+  type Ty = Value
+  val add = Value("[+]")
+  val sub = Value("[-]")
+  val concat = Value("[&]")
+  val mul = Value("[*]")
+  val div = Value("[/=]")
+  val rem = Value("[mod]")
+  val exp = Value("[**]")
+}
 
-sealed trait IBop
+sealed trait IVal
 
-class ILop extends IBop
+final case class ISignal(valType: String, iExp: IExp, signalKind: String) extends IVal {
+}
 
-final class IL_and extends ILop
+final case class IPort(valType: String, mode: String, iExp: IExp, conn: String = "connected") extends IVal {
+  override def toString = s"""(${valType}, mode_${mode}, ${conn}, ${iExp})"""
 
-final class IL_or extends ILop
-
-final class IL_nand extends ILop
-
-final class IL_nor extends ILop
-
-final class IL_xor extends ILop
-
-final class IL_xnor extends ILop
-
-class IRop extends IBop
-
-final class IR_eq extends IRop
-
-final class IR_neq extends IRop
-
-final class IR_lt extends IRop
-
-final class IR_le extends IRop
-
-final class IR_gt extends IRop
-
-final class IR_ge extends IRop
-
-class ISop extends IBop
-
-final class IS_sll extends ISop
-
-final class IS_srl extends ISop
-
-final class IS_sla extends ISop
-
-final class IS_sra extends ISop
-
-final class IR_sol extends ISop
-
-final class IR_sor extends ISop
-
-class IAop extends IBop
-
-final class IA_add extends IAop
-
-final class IA_sub extends IAop
-
-final class IA_concat extends IAop
-
-final class IA_mul extends IAop
-
-final class IA_div extends IAop
-
-final class IA_rem extends IAop
-
-final class IA_exp extends IAop
-
-abstract class IVal(id:String, idType:String) {
-  def definition = {
+  def definition(id: String, idType: String) = {
     require(id.nonEmpty && idType.nonEmpty, "id and idType should not be empty")
-    s"""definition ${id}:: \"${idType}\" where \"${id} ≡ ${toString}\""""
+    s"""definition ${id}:: \"${idType}\" where \"${id} ≡ (''${id}'', ${valType}, mode_${mode}, ${conn}, ${iExp})\""""
   }
 }
 
-final case class ISignal(id:String, idType:String) extends IVal(id, idType)
+final case class IVariable(valType: String, iExp: IExp) extends IVal with IExp {
+  def repr = s"""(${VHDLize(valType)}, ${iExp})"""
 
-final case class IPort(id: String, idType:String, valType: String, mode: String, expr:IExp, conn: String = "connected") extends IVal(id, idType) {
-  override def toString = {
-    s"""(''${id}'', ${valType}, mode_${mode}, ${conn}, ${expr})"""
+  def definition(id: String, idType: String) = {
+    require(id.nonEmpty && idType.nonEmpty, "id and idType should not be empty")
+    s"""definition ${id}:: \"${idType}\" where \"${id} ≡ (''${id}'', ${VHDLize(valType)}, ${iExp})\""""
   }
 }
 
-final case class IVariable(id: String, idType: String, valType: String, initVal: Option[String]) extends IVal(id, idType) {
-  override def toString = {
-    valType match {
-      case "integer" => {
-        val init = initVal match {
-          case Some(v) => v
-          case None => "0"
-        }
-        s"""(''${id}'', ${VHDLize(valType)}, (val_i ${init}))"""
-      }
-      case "real" => {
-        val init = initVal match {
-          case Some(v) => v
-          case None => "0.0"
-        }
-        s"""(''${id}'', ${VHDLize(valType)}, (val_r ${init}))\""""
-      }
-      case "character" => {
-        val init = initVal match {
-          case Some(v) => v
-          case None => "'0'"
-        }
-        s"""???"""
-      }
-      case "std_ulogic" => {
-        val init = initVal match {
-          case Some(v) => v
-          case None => "'0'"
-        }
-        s"""(${VHDLize(valType)}, (val_c (CHR '${init}')))"""
-      }
-      case "std_logic" => {
-        val init = initVal match {
-          case Some(v) => v
-          case None => "'0'"
-        }
-        s"""(${VHDLize(valType)}, (val_c (CHR '${init}')))"""
-      }
-      case "BOOLEAN" => {
-        s"""???"""
-      }
-      case _ => s"[[TODO ${valType}]]"
-    }
-  }
-
-}
+////////////////////////////////////////////////////////////////////////////
 
 sealed trait IExp {
   override def toString = this match {
     case IExp_con(const) => s"""(exp_con ${const})"""
     case IExp_var(variable) => s"""(exp_var ${variable})"""
-    case IExp_sig(signal) => s"""???"""
-    case IExp_prt(port) => s"""???"""
-    case IUexp(op, e) => s"""???"""
-    case IBexpl(e1, lop, e2) => s"""???"""
-    case IBexpr(e1, rop, e2) => s"""???"""
-    case IBexps(e1, sop, e2) => s"""???"""
-    case IBexpa(e1, aop, e2) => s"""???"""
-    case IExp_nth(e1, e2) => s"""???"""
-    case IExp_sl(e1, e2, e3) => s"""???"""
-    case IExp_tl(e1, e2) => s"""???"""
-    case IExp_trl(e) => s"""???"""
+    case IExp_sig(signal) => s"""(exp_sig ${signal})"""
+    case IExp_prt(port) => s"""(exp_prt ${port})"""
+    case IUexp(op, e) => s"""(uexp ${op} ${e})"""
+    case IBexpl(e1, lop, e2) => s"""(bexpl ${e1} ${lop} ${e2})"""
+    case IBexpr(e1, rop, e2) => s"""(bexpr ${e1} ${rop} ${e2})"""
+    case IBexps(e1, sop, e2) => s"""(bexps ${e1} ${sop} ${e2})"""
+    case IBexpa(e1, aop, e2) => s"""(bexpa ${e1} ${aop} ${e2})"""
+    case IExp_nth(e1, e2) => s"""(exp_nth ${e1} ${e2})"""
+    case IExp_sl(e1, e2, e3) => s"""(exp_sl ${e1} ${e2} ${e3})"""
+    case IExp_tl(e1, e2) => s"""(exp_tl ${e1} ${e2})"""
+    case IExp_trl(e) => s"""(exp_trl ${e})"""
   }
 }
 
@@ -156,21 +95,23 @@ case class IExp_con(const: IVariable) extends IExp {
   override def toString = s"""(exp_con ${const})"""
 }
 
-case class IExp_var(variable: IVariable) extends IExp
+case class IExp_var(variable: IVariable) extends IExp {
+  override def toString = s"""(exp_var ${variable})"""
+}
 
 case class IExp_sig(signal: ISignal) extends IExp
 
 case class IExp_prt(port: IPort) extends IExp
 
-case class IUexp(op: IUop, e: IExp) extends IExp
+case class IUexp(op: IUop.Ty, e: IExp) extends IExp
 
-case class IBexpl(e1: IExp, op: ILop, e2: IExp) extends IExp
+case class IBexpl(e1: IExp, op: ILop.Ty, e2: IExp) extends IExp
 
-case class IBexpr(e1: IExp, op: IRop, e2: IExp) extends IExp
+case class IBexpr(e1: IExp, op: IRop.Ty, e2: IExp) extends IExp
 
-case class IBexps(e1: IExp, op: ISop, e2: IExp) extends IExp
+case class IBexps(e1: IExp, op: ISop.Ty, e2: IExp) extends IExp
 
-case class IBexpa(e1: IExp, op: IAop, e2: IExp) extends IExp
+case class IBexpa(e1: IExp, op: IAop.Ty, e2: IExp) extends IExp
 
 case class IExp_nth(e1: IExp, e2: IExp) extends IExp
 

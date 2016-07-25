@@ -5,7 +5,7 @@ import java.nio.file.{Files, Paths}
 import org.antlr.v4.runtime.{ANTLRFileStream, CommonTokenStream}
 import sg.edu.ntu.hchen.{VHDLLexer, VHDLParser}
 
-class TImpl(file: String) {
+class TFile(file: String) {
 
   val filePath = Paths.get(file)
   require(Files.exists(filePath), s"${filePath} not exists")

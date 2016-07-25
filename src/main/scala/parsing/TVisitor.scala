@@ -280,10 +280,6 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
       id <- interfaceConstDecl.idList
     } {
       val name = interfaceConstDecl.subtypeIndication.selectedName
-      val initVal = interfaceConstDecl.vExp.map(_.repr)
-      val iVal = IVariable(id, "variable", name, initVal)
-      logger.info(s"${iVal.definition}")
-      defs += (id->iVal.definition)
     }
     //    super.visitInterface_constant_declaration(ctx)
   }
@@ -307,15 +303,7 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
   override def visitInterface_port_declaration(ctx: Interface_port_declarationContext): Unit = super.visitInterface_port_declaration(ctx)
 
   override def visitInterface_signal_declaration(ctx: Interface_signal_declarationContext): Unit = {
-
-    val interfaceSignalDecl = VInterfaceSignalDecl(ctx)
-    interfaceSignalDecl.vExp match {
-      case Some(exp) => logger.info(s"${exp.repr}")
-      case _ => logger.info("---")
-    }
-    //    logger.info(s"${interfaceSignalDecl}")
-
-    //    super.visitInterface_signal_declaration(ctx)
+    super.visitInterface_signal_declaration(ctx)
   }
 
   override def visitInterface_terminal_declaration(ctx: Interface_terminal_declarationContext): Unit = super.visitInterface_terminal_declaration(ctx)
@@ -402,12 +390,6 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
     } yield {
       val mode = interfacePortDecl.mode
       val selectedName = interfacePortDecl.subtypeIndication.selectedName
-      val initVal = interfacePortDecl.vExp.map(_.repr)
-      val iVal = IVariable("", "", selectedName, initVal)
-      val exp = IExp_con(iVal)
-      val iPort = IPort(id, "port", VIType.VHDLize(selectedName), mode, exp)
-      defs += (id->iPort.definition)
-      logger.info(s"${iPort.definition}")
     }
     //    super.visitPort_list(ctx)
   }
@@ -497,7 +479,11 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
 
   override def visitSignal_assignment_statement(ctx: Signal_assignment_statementContext): Unit = super.visitSignal_assignment_statement(ctx)
 
-  override def visitSignal_declaration(ctx: Signal_declarationContext): Unit = super.visitSignal_declaration(ctx)
+  override def visitSignal_declaration(ctx: Signal_declarationContext): Unit = {
+    val signalDecl = VSignalDecl(ctx)
+    logger.info(s"${signalDecl}")
+    super.visitSignal_declaration(ctx)
+  }
 
   override def visitSignal_kind(ctx: Signal_kindContext): Unit = super.visitSignal_kind(ctx)
 
