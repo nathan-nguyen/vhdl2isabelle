@@ -26,7 +26,11 @@ object Antlr2VTy {
 import parsing.Antlr2VTy._
 
 case class VLiteral(s: String) {
-  def repr = s
+  //  FIXME if s is numeric literal, it should be transfered to decimal firstly
+
+  def asExp = s
+
+  def asVal = s
 }
 
 //////////////////////////////////////////////////////////////
@@ -196,13 +200,18 @@ object VAllocator {
 }
 
 abstract class VPrimary {
-  def repr: String = this match {
-    case VPrimaryLiteral(literal) => literal.repr
+  def asExp: String = this match {
+    case VPrimaryLiteral(literal) => literal.asExp
     case VPrimaryQExp(vQExp) => s"(??? ${vQExp.getClass.getName})"
     case VPrimaryExpLR(vExp) => s"(??? ${vExp.getClass.getName})"
     case VPrimaryAllocator(allocator) => s"(??? ${allocator.getClass.getName})"
     case VPrimaryAggregate(aggregate) => s"(??? ${aggregate.getClass.getName})"
     case VPrimaryName(name) => s"<??? ${name}>"
+  }
+
+  def asVal: String = this match {
+    case VPrimaryLiteral(literal) => literal.asVal
+    case _ => s"""(??? ${this.getClass.getName})"""
   }
 }
 
@@ -249,7 +258,13 @@ sealed trait VAliasIndication
 case class VSubtypeIndication(selectedName: String,
                               constraint: Option[VConstraint],
                               tolerance: Option[VToleranceAspect]
-                             ) extends VAliasIndication
+                             ) extends VAliasIndication {
+  //  TODO currently suppose it is a (Int, Int)
+  def getRange = constraint.map {
+    case VRangeConstraint(range) =>
+    case VIndexConstraint(discreteRanges) =>
+  }
+}
 
 object VSubtypeIndication {
   def apply(ctx: Subtype_indicationContext): VSubtypeIndication = {
@@ -336,18 +351,22 @@ object VRangeConstraint {
   }
 }
 
-case class VIndexConstraint(discreteRange: VDiscreteRange, composite: Seq[VDiscreteRange]) extends VConstraint
+case class VIndexConstraint(discreteRange: Seq[VDiscreteRange]) extends VConstraint
 
 object VIndexConstraint {
   def apply(ctx: Index_constraintContext): VIndexConstraint = {
     val discrete_rangeList = for {
       discrete_range <- ctx.discrete_range()
     } yield VDiscreteRange(discrete_range)
-    new VIndexConstraint(discrete_rangeList.head, discrete_rangeList.tail)
+    new VIndexConstraint(discrete_rangeList)
   }
 }
 
-case class VExplicitRange(l: VSimpleExp, d: String, r: VSimpleExp)
+case class VExplicitRange(l: VSimpleExp, d: String, r: VSimpleExp) {
+  def getRange = {
+
+  }
+}
 
 object VExplicitRange {
   def apply(ctx: Explicit_rangeContext): VExplicitRange = {
@@ -364,16 +383,41 @@ object VExplicitRange {
 ////////////////////////////////////////////////////////////
 
 abstract class VFactor {
-  def repr: String = this match {
+  def asExp: String = this match {
     case VFFactor(primary, primaryOption) => {
       primaryOption match {
-        case Some(p) => primary.repr + " " + p.repr
-        case None => primary.repr
+        case Some(p) => primary.asExp + " " + p.asExp
+        case None => primary.asExp
       }
     }
-    case VAbsFactor(primary) => s"abs (${primary.repr})"
-    case VNotFactor(primary) => s"not (${primary.repr}"
+    case VAbsFactor(primary) => s"abs (${primary.asExp})"
+    case VNotFactor(primary) => s"not (${primary.asExp}"
   }
+
+  def computeE(v: String, n: String): String = {
+    def power(v: Int, n: Int) = Array.fill(n)(v).product
+    try {
+      power(v.toInt, n.toInt).toString
+    } catch {
+      case e: Exception => "???"
+    }
+  }
+
+  def asVal: String = this match {
+    case VFFactor(primary, primaryOption) => primaryOption match {
+      case Some(p) => computeE(primary.asVal, p.asVal)
+      case None => primary.asVal
+    }
+    case VAbsFactor(primary) => {
+      try {
+        Math.abs(primary.asVal.toInt).toString
+      } catch {
+        case e: Exception => "???absFactor"
+      }
+    }
+    case VNotFactor(primary) => "???notFactor"
+  }
+
 }
 
 object VFactor {
@@ -401,11 +445,29 @@ case class VAbsFactor(primary: VPrimary) extends VFactor
 case class VNotFactor(primary: VPrimary) extends VFactor
 
 case class VTerm(factor: VFactor, ops: Seq[VFactorOp.Ty], others: Seq[VFactor]) {
-  def repr: String = {
-    val factorRepr = factor.repr
+  def asExp: String = {
+    val factorRepr = factor.asExp
     val opReprs = ops.map(_.toString)
-    val othersReprs = others.map(_.repr)
+    val othersReprs = others.map(_.asExp)
     opReprs.zip(othersReprs).foldLeft(factorRepr)((acc, cur) => s"(${acc} ${cur._1} ${cur._2})")
+  }
+
+  def asVal: String = {
+    import VFactorOp._
+    try {
+      ops.zip(others).foldLeft(factor.asVal.toInt)((acc, cur) => {
+        val f = cur._2.asVal.toInt
+        cur._1 match {
+          case `mul` => acc * f
+          case `div` => acc / f
+          case `mod` => acc % f
+          //        FIXME  rem is incorrect
+          case `rem` => acc % f
+        }
+      }).toString
+    } catch {
+      case e: Exception => "???"
+    }
   }
 }
 
@@ -450,15 +512,31 @@ object VFactorOp extends Enumeration {
 ////////////////////////////////////////////////////////////
 
 case class VSimpleExp(termSign: Option[String], term: VTerm, ops: Seq[VTermOp.Ty], others: Seq[VTerm]) {
-  def repr: String = {
+  def asIExp: String = {
     val sign = termSign match {
       case Some("-") => "-"
-      case _ => ""
+      case None => ""
     }
-    val termRepr = sign + term.repr
+    val termRepr = sign + term.asExp
     val opsRepr = ops.map(_.toString)
-    val termsRepr = others.map(_.repr)
+    val termsRepr = others.map(_.asExp)
     opsRepr.zip(termsRepr).foldLeft(termRepr)((acc, cur) => s"(${acc} ${cur._1} ${cur._2})")
+  }
+
+  def asValue: String = {
+    import VTermOp._
+    try {
+      ops.zip(others).foldLeft((termSign + term.asVal).toInt)((acc, cur) => {
+        val f = cur._2.asVal.toInt
+        cur._1 match {
+          case `plus` => acc * f
+          case `minus` => acc / f
+          case `ampersand` => throw VError
+        }
+      }).toString
+    } catch {
+      case e: Throwable => "???simpleExp"
+    }
   }
 }
 
@@ -530,8 +608,8 @@ object VRelationOp extends Enumeration {
 
 case class VShiftExp(vSimpleExpr: VSimpleExp, op: Option[VShiftOp.Ty], other: Option[VSimpleExp]) {
   def repr: String = (op, other) match {
-    case (Some(opV), Some(simpleExpV)) => s"(${vSimpleExpr.repr} ${op.toString} ${simpleExpV.repr})"
-    case _ => vSimpleExpr.repr
+    case (Some(opV), Some(simpleExpV)) => s"(${vSimpleExpr.asIExp} ${op.toString} ${simpleExpV.asIExp})"
+    case _ => vSimpleExpr.asIExp
   }
 }
 
