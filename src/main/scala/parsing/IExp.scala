@@ -51,14 +51,6 @@ object IAop extends Enumeration {
   val exp = Value("[**]")
 }
 
-sealed trait IVal
-
-final case class ISignal(valType: String, iExp: IExp, signalKind: String) extends IVal
-
-final case class IPort(valType: String, mode: String, iExp: IExp, conn: String = "connected") extends IVal
-
-final case class IVariable(valType: String, iExp: IExp) extends IVal with IExp
-
 //////////////////////////////////////////////////////////////////////////////
 
 sealed trait IDef
@@ -72,8 +64,13 @@ case class IVarDef(id: String, valType: String, iExp: IExp) extends IDef {
   def asItem = s"""(''${id}'', ${VHDLize(valType)}, ${iExp})"""
 }
 
-case class IVarListDef(id: String, varDefs: List[IVarDef]) extends IDef {
+case class IVarListDef(id: String, iVals: List[IValue]) extends IDef {
   override def toString = {
+    val varDefs = for {
+      iVal <- iVals
+    } yield {
+      IVarDef(iVal.itemId, iVal.valType, iVal.initVal)
+    }
     val itemsRepr = varDefs.map(_.asItem).mkString("[\n ", ",\n", "\n]")
     s"""definition ${id}:: ≡ \"variable list\" where
         |\"${id} ≡ ${itemsRepr}
@@ -90,11 +87,20 @@ case class IPortDef(id: String, valType: String, iExp: IExp, mode: String, conn:
   def asItem = s"""(${id}, ${VHDLize(valType)}, mode_${mode}, ${conn}, ${iExp})"""
 }
 
-case class IPortListDef(id: String, portDefs: List[IPortDef]) extends IDef {
+case class IPortListDef(id: String, iVals: List[IValue], mode: String, conn: String = "connected") extends IDef {
   override def toString = {
+    val portDefs = for {
+      iVal <- iVals
+    } yield {
+      val initValue = iVal.initVal match {
+        case iVariable: IVariable => IExp_con(iVal.valType, iVariable)
+        case _ => iVal.initVal
+      }
+      IPortDef(iVal.itemId, iVal.valType, initValue, mode, conn)
+    }
     val itemsRepr = portDefs.map(_.asItem).mkString("[\n ", ",\n", "\n]")
     s"""definition ${id}:: ≡ \"port list\" where
-        |\"${id} ≡ ${itemsRepr}
+        |\"${id} ≡ ${itemsRepr}\"
      """.stripMargin
   }
 }
@@ -108,8 +114,17 @@ case class ISignalDef(id: String, valType: String, iExp: IExp, signalKind: Strin
   def asItem = s"""(${id}, ${VHDLize(valType)}, ${signalKind}, ${iExp})"""
 }
 
-case class ISignalListDef(id: String, signalDefs: List[ISignalDef]) extends IDef {
+case class ISignalListDef(id: String, iVals: List[IValue], signalKind: String) extends IDef {
   override def toString = {
+    val signalDefs = for {
+      iVal <- iVals
+    } yield {
+      val initValue = iVal.initVal match {
+        case iVariable: IVariable => IExp_con(iVal.valType, iVariable)
+        case _ => iVal.initVal
+      }
+      ISignalDef(iVal.itemId, iVal.valType, initValue, signalKind)
+    }
     val itemsRepr = signalDefs.map(_.asItem).mkString("[\n ", ",\n", "\n]")
     s"""definition ${id}:: ≡ \"signal list\" where
         |\"${id} ≡ ${itemsRepr}
@@ -117,16 +132,26 @@ case class ISignalListDef(id: String, signalDefs: List[ISignalDef]) extends IDef
   }
 }
 
+////////////////////////////////////////////////////////////////////////////
+
+final case class IValue(itemId: String, valType: String, initVal: IExp)
+
 
 ////////////////////////////////////////////////////////////////////////////
 
+final case class ISignal(valType: String, iExp: IExp, signalKind: String)
+
+final case class IPort(valType: String, mode: String, iExp: IExp, conn: String = "connected")
+
+final case class IVariable(isarType: String, initVal: String) extends IExp
+
 sealed trait IExp {
   override def toString = this match {
-    case ival: IVariable => s"""${ival}"""
-    case IExp_con(const) => s"""(exp_con ${const})"""
-    case IExp_var(variable) => s"""(exp_var ${variable})"""
-    case IExp_sig(signal) => s"""(exp_sig ${signal})"""
-    case IExp_prt(port) => s"""(exp_prt ${port})"""
+    case IVariable(isarType, initVal) => s"""(${isarType} ${initVal})"""
+    case IExp_con(valType, const) => s"""(exp_con (${VHDLize(valType)}, ${const}))"""
+    case IExp_var(valType, variable) => s"""(exp_var (${VHDLize(valType)}, ${variable}))"""
+    case IExp_sig(valType, signal) => s"""(exp_sig ${signal})"""
+    case IExp_prt(valType, port) => s"""(exp_prt ${port})"""
     case IUexp(op, e) => s"""(uexp ${op} ${e})"""
     case IBexpl(e1, lop, e2) => s"""(bexpl ${e1} ${lop} ${e2})"""
     case IBexpr(e1, rop, e2) => s"""(bexpr ${e1} ${rop} ${e2})"""
@@ -139,13 +164,13 @@ sealed trait IExp {
   }
 }
 
-case class IExp_con(const: IVariable) extends IExp
+case class IExp_con(valType: String, const: IVariable) extends IExp
 
-case class IExp_var(variable: IVariable) extends IExp
+case class IExp_var(valType: String, variable: IVariable) extends IExp
 
-case class IExp_sig(signal: ISignal) extends IExp
+case class IExp_sig(valType: String, signal: ISignal) extends IExp
 
-case class IExp_prt(port: IPort) extends IExp
+case class IExp_prt(valType: String, port: IPort) extends IExp
 
 case class IUexp(op: IUop.Ty, e: IExp) extends IExp
 

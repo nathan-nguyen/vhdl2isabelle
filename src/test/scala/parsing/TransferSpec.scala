@@ -21,7 +21,8 @@ class TransferSpec extends BaseSpec {
 
 //    logVisitor.defs("scantest") should be ("""definition scantest:: "variable" where "scantest ≡ (''scantest'', vhdl_integer, (val_i 0))"""")
     val portDefStr =
-      """definition rst:: "port" where "rst ≡ (''rst'', vhdl_std_ulogic, mode_in, connected, (exp_con (vhdl_std_ulogic, (val_c (CHR ''0'')))))""""
+      """definition rst:: "port" where
+        | "rst ≡ (''rst'', vhdl_std_ulogic, mode_in, connected, (exp_con (vhdl_std_ulogic, (val_c (CHR ''0'')))))"""".stripMargin
     logVisitor.defs("rst") should be(portDefStr)
   }
 

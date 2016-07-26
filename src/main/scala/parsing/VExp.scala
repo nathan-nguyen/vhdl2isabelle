@@ -246,12 +246,26 @@ case class VPrimaryName(name: String) extends VPrimary
 
 sealed trait VAliasIndication
 
-case class VSubtypeIndication(selectedName: String) extends VAliasIndication
+case class VSubtypeIndication(selectedName: String,
+                              constraint: Option[VConstraint],
+                              tolerance: Option[VToleranceAspect]
+                             ) extends VAliasIndication
 
 object VSubtypeIndication {
   def apply(ctx: Subtype_indicationContext): VSubtypeIndication = {
     val selectedName = Antlr2VTy.selectedNameFromSubtypeInd(ctx)
-    new VSubtypeIndication(selectedName)
+    val constraint = Option(ctx.constraint()).map(VConstraint(_))
+    val tolerance = Option(ctx.tolerance_aspect()).map(VToleranceAspect(_))
+    new VSubtypeIndication(selectedName, constraint, tolerance)
+  }
+}
+
+case class VToleranceAspect(vExp: VExp)
+
+object VToleranceAspect {
+  def apply(ctx: Tolerance_aspectContext): VToleranceAspect = {
+    val vExp = VExp(ctx.expression())
+    new VToleranceAspect(vExp)
   }
 }
 
@@ -300,7 +314,9 @@ case class VDiscreteRangeSub(subtypeIndication: VSubtypeIndication) extends VDis
 ////////////////////////////////////////////////////////////
 
 
-sealed trait VConstraint {
+sealed trait VConstraint
+
+object VConstraint {
   def apply(ctx: ConstraintContext): VConstraint = {
     val (index_constraint, range_constraint) = (ctx.index_constraint(), ctx.range_constraint())
     if (index_constraint != null) {
@@ -308,7 +324,6 @@ sealed trait VConstraint {
     } else if (range_constraint != null) {
       VRangeConstraint(range_constraint)
     } else throw VError
-
   }
 }
 
@@ -587,7 +602,7 @@ object VConstDecl {
 
 ///////////////////////////////////////////////////////////////////////
 
-case class VSignalDecl(idList:Seq[String], subtypeIndication: VSubtypeIndication, signalKind:Option[String], exp:Option[VExp])
+case class VSignalDecl(idList: Seq[String], subtypeIndication: VSubtypeIndication, signalKind: Option[String], exp: Option[VExp])
 
 object VSignalDecl {
   def apply(ctx: Signal_declarationContext): VSignalDecl = {

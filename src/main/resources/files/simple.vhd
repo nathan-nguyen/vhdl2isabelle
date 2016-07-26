@@ -1,17 +1,20 @@
-entity div32 is
-generic (scantest  : integer := 0);
-port (
-    rst     : in  std_ulogic;
-    clk     : in  std_ulogic;
-    holdn   : in  std_ulogic;
-    divi    : in  div32_in_type;
-    divo    : out div32_out_type;
-    testen  : in  std_ulogic := '0';
-    testrst : in  std_ulogic := '1'
-);
-end;
-
 architecture rtl of div32 is
+
+type div32_in_type is record
+  y                : std_logic_vector(32 downto 0); -- Y (MSB divident)
+  op1              : std_logic_vector(32 downto 0); -- operand 1 (LSB divident)
+  op2              : std_logic_vector(32 downto 0); -- operand 2 (divisor)
+  flush            : std_logic;
+  signed           : std_logic;
+  start            : std_logic;
+end record;
+
+type div32_out_type is record
+  ready           : std_logic;
+  nready          : std_logic;
+  icc             : std_logic_vector(3 downto 0); -- ICC
+  result          : std_logic_vector(31 downto 0); -- div result
+end record;
 
 type div_regtype is record
   x      : std_logic_vector(64 downto 0);
@@ -174,4 +177,18 @@ begin
     end process;
   end generate asyncrregs;
 
+end;
+
+
+entity div32 is
+generic (scantest  : integer := 0);
+port (
+    rst     : in  std_ulogic;
+    clk     : in  std_ulogic;
+    holdn   : in  std_ulogic;
+    divi    : in  div32_in_type;
+    divo    : out div32_out_type;
+    testen  : in  std_ulogic := '0';
+    testrst : in  std_ulogic := '1'
+);
 end;

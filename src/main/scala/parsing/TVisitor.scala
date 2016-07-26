@@ -1,6 +1,7 @@
 package parsing
 
 import org.slf4j.LoggerFactory
+import parsing.V2I._
 import sg.edu.ntu.hchen.VHDLBaseVisitor
 import sg.edu.ntu.hchen.VHDLParser._
 
@@ -11,7 +12,7 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
 
   val defs = mutable.Map.empty[String, String]
 
-  val typeDeclTbl = mutable.Map.empty[String, Map[String, VSubtypeIndication]]
+  val typeInfo = new TypeInfo
 
   val logger = LoggerFactory.getLogger(classOf[TVisitor])
 
@@ -141,12 +142,27 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
 
   override def visitConstant_declaration(ctx: Constant_declarationContext): Unit = {
     val constDecl = VConstDecl(ctx)
-    logger.info(s"${constDecl.idList}")
-    constDecl.vExp match {
-      case Some(exp) => logger.info(s"${exp.repr}")
-      case None => logger.info("---")
+    for {
+      id <- constDecl.idList
+    } yield {
+      val expOption = constDecl.vExp
+      val valType = constDecl.subtypeIndication.selectedName
+      if (typeInfo.isListType(valType)) {
+        val initVals = typeInfo.getListInitVals(valType, expOption)
+        val varDef = IVarListDef(id, initVals)
+        defs += (id -> varDef.toString)
+        logger.info(s"${varDef}")
+      } else {
+        val initVal = if (typeInfo.isVectorType(valType)) {
+          typeInfo._guessVectorInitVal(valType, (0, 3))
+        } else {
+          typeInfo.getScalarInitVal(valType, expOption)
+        }
+        val varDef = IVarDef(id, valType, initVal)
+        defs += (id -> varDef.toString)
+        logger.info(s"${varDef}")
+      }
     }
-    //    logger.info(s"$constDecl")
     super.visitConstant_declaration(ctx)
   }
 
@@ -281,7 +297,7 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
     } {
       val name = interfaceConstDecl.subtypeIndication.selectedName
     }
-    //    super.visitInterface_constant_declaration(ctx)
+    super.visitInterface_constant_declaration(ctx)
   }
 
   override def visitInterface_declaration(ctx: Interface_declarationContext): Unit = super.visitInterface_declaration(ctx)
@@ -389,9 +405,24 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
       id <- interfacePortDecl.idList
     } yield {
       val mode = interfacePortDecl.mode
-      val selectedName = interfacePortDecl.subtypeIndication.selectedName
+      val valType = interfacePortDecl.subtypeIndication.selectedName
+      val expOption = interfacePortDecl.vExp
+      if (typeInfo.isListType(valType)) {
+        val initVals = typeInfo.getListInitVals(valType, expOption)
+        val portDecl = IPortListDef(id, initVals, mode)
+        logger.info(s"${portDecl}")
+      } else {
+        val initVal = if (typeInfo.isVectorType(valType)) {
+          typeInfo._guessVectorInitVal(valType, (0, 3))
+        } else {
+          typeInfo.getScalarInitVal(valType, expOption)
+        }
+        val portDef = IPortDef(id, valType, initVal, mode)
+        defs += (id -> portDef.toString)
+        logger.info(s"${portDef}")
+      }
     }
-    //    super.visitPort_list(ctx)
+    super.visitPort_list(ctx)
   }
 
   override def visitPort_map_aspect(ctx: Port_map_aspectContext): Unit = super.visitPort_map_aspect(ctx)
@@ -434,6 +465,7 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
 
   override def visitRecord_nature_definition(ctx: Record_nature_definitionContext): Unit = super.visitRecord_nature_definition(ctx)
 
+  //  DEFINITION
   override def visitRecord_type_definition(ctx: Record_type_definitionContext): Unit = {
     val recordTypeDef = VRecordTypeDef(ctx)
     val items = for {
@@ -441,7 +473,7 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
       flattened <- elementDecl.flatten
     } yield flattened
     val typeDeclId = ctx.getParent.getParent.getParent.asInstanceOf[Type_declarationContext].identifier().getText
-    typeDeclTbl += (typeDeclId -> items.toMap)
+    typeInfo.addNewType(typeDeclId, items)
     super.visitRecord_type_definition(ctx)
   }
 

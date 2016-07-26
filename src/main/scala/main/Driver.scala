@@ -1,8 +1,5 @@
 package main
 
-import java.io.File
-import java.nio.file.{Files, Paths}
-
 import org.antlr.v4.runtime._
 import parsing.{TVisitor, Utils}
 import sg.edu.ntu.hchen.{VHDLLexer, VHDLParser}
