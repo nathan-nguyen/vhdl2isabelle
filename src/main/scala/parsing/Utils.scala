@@ -14,7 +14,9 @@ object Utils {
     parser
   }
 
-  def getDataFile(fileName: String): String = getClass.getClassLoader.getResource(fileName).getFile
+  //  tmp dir
+  def getDataDir = "/home/hongxu/src/vhdl_parser/src/main/resources/files/"
 
+  def getDataFile(fileName: String): String = getDataDir + fileName
 
 }
