@@ -130,14 +130,14 @@ case class VChoiceE(simpleExpr: VSimpleExp) extends VChoice
 
 case object VChoiceOthers extends VChoice
 
-final case class VChoices(choice: VChoice, others: Seq[VChoice])
+final case class VChoices(choiceList: Seq[VChoice])
 
 object VChoices {
   def apply(ctx: ChoicesContext): VChoices = {
     val choiceList = for {
       choice <- ctx.choice()
     } yield VChoice(choice)
-    new VChoices(choiceList.head, choiceList.tail)
+    new VChoices(choiceList)
   }
 }
 
@@ -153,14 +153,38 @@ object VElemAssoc {
   }
 }
 
-case class VAggregate(elemAssoc: VElemAssoc, others: Seq[VElemAssoc])
+case class VAggregate(elemAssocList: Seq[VElemAssoc]) {
+  require(elemAssocList.nonEmpty, "elemAssocList")
+
+  lazy val _getAssoc: Seq[(String, VExp)] = {
+    for {
+      elemAssoc <- elemAssocList
+      choice <- elemAssoc.choices match {
+        case Some(c) => c.choiceList
+        case None => throw VError
+      }
+    } yield {
+      val id = choice match {
+        case VChoiceId(s) => s
+        case _ => "???"
+      }
+      val vExp = elemAssoc.expr
+      id -> vExp
+    }
+  }
+
+  def getFirstMap = _getAssoc.head
+
+  lazy val getAssoc: Map[String, VExp] = _getAssoc.toMap
+
+}
 
 object VAggregate {
   def apply(ctx: AggregateContext): VAggregate = {
     val element_assocList = for {
       elemAssoc <- ctx.element_association()
     } yield VElemAssoc(elemAssoc)
-    new VAggregate(element_assocList.head, element_assocList.tail)
+    new VAggregate(element_assocList)
   }
 }
 
@@ -216,6 +240,17 @@ abstract class VPrimary {
     case VPrimaryLiteral(literal) => literal.asVal
     case _ => s"""(??? ${this.getClass.getName})"""
   }
+
+  def getLiteral: Option[VLiteral] = this match {
+    case VPrimaryLiteral(l) => Some(l)
+    case _ => None
+  }
+
+  def getAggregate: Option[VAggregate] = this match {
+    case VPrimaryAggregate(aggregate) => Some(aggregate)
+    case _ => None
+  }
+
 }
 
 object VPrimary {
@@ -635,10 +670,10 @@ object VRelationOp extends Enumeration {
   }
 }
 
-case class VShiftExp(vSimpleExpr: VSimpleExp, op: Option[VShiftOp.Ty], other: Option[VSimpleExp]) {
+case class VShiftExp(vSimpleExp: VSimpleExp, op: Option[VShiftOp.Ty], other: Option[VSimpleExp]) {
   def repr: String = (op, other) match {
-    case (Some(opV), Some(simpleExpV)) => s"(${vSimpleExpr.asExp} ${op.toString} ${simpleExpV.asExp})"
-    case _ => vSimpleExpr.asExp
+    case (Some(opV), Some(simpleExpV)) => s"(${vSimpleExp.asExp} ${op.toString} ${simpleExpV.asExp})"
+    case _ => vSimpleExp.asExp
   }
 }
 
@@ -678,6 +713,29 @@ case class VExp(relation: VRelation, ops: Seq[VLogicOp.Ty], others: Seq[VRelatio
     val othersReprs = others.map(_.repr)
     opReprs.zip(othersReprs).foldLeft(relationRepr)((acc, cur) => s"(${acc} ${cur._1} ${cur._2})")
   }
+
+  def getPrimary: Option[VPrimary] = {
+    val simplExp = relation.vShiftExpr.vSimpleExp
+    simplExp.term.factor match {
+      case VFFactor(primary, primaryOption) => Some(primary)
+      case _ => None
+    }
+  }
+
+  def getAggregate: Option[VAggregate] = {
+    for {
+      primary <- getPrimary
+      aggregate <- primary.getAggregate
+    } yield aggregate
+  }
+
+  def getLiteral: Option[VLiteral] = {
+    for {
+      primary <- getPrimary
+      literal <- primary.getLiteral
+    } yield literal
+  }
+
 }
 
 object VExp {
