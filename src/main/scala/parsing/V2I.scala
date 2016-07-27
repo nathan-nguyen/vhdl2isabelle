@@ -3,8 +3,12 @@ package parsing
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
+import scala.language.implicitConversions
 
 object V2I {
+
+  type RangeTy = (String, String, String)
+  val defaultRange: RangeTy = ("???", "???", "???")
 
   //  consider adding a type of types to denotes "scalar"/"list" --> vector
 
@@ -63,18 +67,36 @@ object V2I {
       //    TODO not exactly scalar type
       val iVals = for {
         (itemId, itemTyInfo) <- recordInfo
-        valType = itemTyInfo.selectedName
-        iVar = _guessScalarInitVal(valType)
-      } yield IValue(itemId, valType, iVar)
+      } yield {
+        val valType = itemTyInfo.selectedName
+        if (isListType(valType)) {
+          val initVals = _guessListInitVals(valType)
+          //      TODO    IValue shoud have other forms
+          logger.info(s"list-list: $initVals")
+          IValue(itemId, valType, null)
+        } else {
+          val initVal = if (isVectorType(valType)) {
+            val range = itemTyInfo.getRange.getOrElse(defaultRange)
+            _guessVectorInitVal(valType, range)
+          } else {
+            _guessScalarInitVal(valType)
+          }
+          IValue(itemId, valType, initVal)
+        }
+      }
       iVals.toList
     }
 
-    def _guessVectorInitVal(valType: String, r: (Int, Int)): IExp = {
+    def _guessVectorInitVal(valType: String, r: RangeTy): IExp = {
       require(valType.endsWith("_vector"), "vector")
       val genCmd = valType.substring(0, valType.length - "_vector".length) + "_vec_gen"
-      val valListType = if (r._1 <= r._2) "val_list" else "val_rlist"
-      val iVarChar = IVariable("val_c", "(CHR ''0'')")
-      IVariable(valListType, s"${valListType} (${genCmd} ${Math.abs(r._1 - r._2) + 1} ${iVarChar})")
+      val valListType = if (r._2 == "to") "val_list" else if (r._2 == "downto") "val_rlist" else "???"
+      if (List("val_lsit", "val_rlist").contains(valListType)) {
+        val iVarChar = IVariable("val_c", "(CHR ''0'')")
+        IVariable(valListType, s"(${genCmd} ${Math.abs(r._1.toInt - r._3.toInt) + 1} ${iVarChar})")
+      } else {
+        IVariable(valListType, s"???")
+      }
     }
 
     def getListInitVals(valType: String, expOption: Option[VExp]): List[IValue] = {

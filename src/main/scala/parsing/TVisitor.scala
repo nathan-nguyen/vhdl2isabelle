@@ -154,7 +154,10 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
         logger.info(s"${varDef}")
       } else {
         val initVal = if (typeInfo.isVectorType(valType)) {
-          typeInfo._guessVectorInitVal(valType, (0, 3))
+          constDecl.subtypeIndication.getRange match {
+            case Some(r) =>           typeInfo._guessVectorInitVal(valType, r)
+            case None => typeInfo._guessVectorInitVal(valType, defaultRange)
+          }
         } else {
           typeInfo.getScalarInitVal(valType, expOption)
         }
@@ -413,7 +416,10 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
         logger.info(s"${portDecl}")
       } else {
         val initVal = if (typeInfo.isVectorType(valType)) {
-          typeInfo._guessVectorInitVal(valType, (0, 3))
+          interfacePortDecl.subtypeIndication.constraint match {
+            case Some(r) => typeInfo._guessVectorInitVal(valType, r.getRange)
+            case None => typeInfo._guessVectorInitVal(valType, ("0", "???", "1"))
+          }
         } else {
           typeInfo.getScalarInitVal(valType, expOption)
         }

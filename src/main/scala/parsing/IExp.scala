@@ -69,9 +69,9 @@ case class IVarListDef(id: String, iVals: List[IValue]) extends IDef {
     val varDefs = for {
       iVal <- iVals
     } yield {
-      IVarDef(iVal.itemId, iVal.valType, iVal.initVal)
+      IVarDef(s"''${id}_${iVal.itemId}''", iVal.valType, iVal.initVal)
     }
-    val itemsRepr = varDefs.map(_.asItem).mkString("[\n ", ",\n", "\n]")
+    val itemsRepr = varDefs.map(_.asItem).mkString("[\n ", ",\n ", "\n]")
     s"""definition ${id}:: ≡ \"variable list\" where
         |\"${id} ≡ ${itemsRepr}
      """.stripMargin
@@ -96,9 +96,9 @@ case class IPortListDef(id: String, iVals: List[IValue], mode: String, conn: Str
         case iVariable: IVariable => IExp_con(iVal.valType, iVariable)
         case _ => iVal.initVal
       }
-      IPortDef(iVal.itemId, iVal.valType, initValue, mode, conn)
+      IPortDef(s"''${id}_${iVal.itemId}''", iVal.valType, initValue, mode, conn)
     }
-    val itemsRepr = portDefs.map(_.asItem).mkString("[\n ", ",\n", "\n]")
+    val itemsRepr = portDefs.map(_.asItem).mkString("[\n ", ",\n ", "\n]")
     s"""definition ${id}:: ≡ \"port list\" where
         |\"${id} ≡ ${itemsRepr}\"
      """.stripMargin
@@ -123,9 +123,9 @@ case class ISignalListDef(id: String, iVals: List[IValue], signalKind: String) e
         case iVariable: IVariable => IExp_con(iVal.valType, iVariable)
         case _ => iVal.initVal
       }
-      ISignalDef(iVal.itemId, iVal.valType, initValue, signalKind)
+      ISignalDef(s"''${id}_${iVal.itemId}''", iVal.valType, initValue, signalKind)
     }
-    val itemsRepr = signalDefs.map(_.asItem).mkString("[\n ", ",\n", "\n]")
+    val itemsRepr = signalDefs.map(_.asItem).mkString("[\n ", ",\n ", "\n]")
     s"""definition ${id}:: ≡ \"signal list\" where
         |\"${id} ≡ ${itemsRepr}
      """.stripMargin
