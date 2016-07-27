@@ -154,8 +154,9 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
         logger.info(s"${varDef}")
       } else {
         val initVal = if (typeInfo.isVectorType(valType)) {
+          //          TODO perhaps not guess!!!
           constDecl.subtypeIndication.getRange match {
-            case Some(r) =>           typeInfo._guessVectorInitVal(valType, r)
+            case Some(r) => typeInfo._guessVectorInitVal(valType, r)
             case None => typeInfo._guessVectorInitVal(valType, defaultRange)
           }
         } else {
@@ -416,10 +417,8 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
         logger.info(s"${portDecl}")
       } else {
         val initVal = if (typeInfo.isVectorType(valType)) {
-          interfacePortDecl.subtypeIndication.constraint match {
-            case Some(r) => typeInfo._guessVectorInitVal(valType, r.getRange)
-            case None => typeInfo._guessVectorInitVal(valType, ("0", "???", "1"))
-          }
+          val range = interfacePortDecl.subtypeIndication.getRange.getOrElse(defaultRange)
+          typeInfo._guessVectorInitVal(valType, range)
         } else {
           typeInfo.getScalarInitVal(valType, expOption)
         }
@@ -519,7 +518,29 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
 
   override def visitSignal_declaration(ctx: Signal_declarationContext): Unit = {
     val signalDecl = VSignalDecl(ctx)
-    logger.info(s"${signalDecl}")
+    for {
+      id <- signalDecl.idList
+    } yield {
+      val signalKind = signalDecl.signalKind.getOrElse("register").toLowerCase
+      val subtypeIndication = signalDecl.subtypeIndication
+      val valType = subtypeIndication.selectedName
+      if (typeInfo.isListType(valType)) {
+        val initVals = typeInfo._guessListInitVals(valType)
+        val signalListDef = ISignalListDef(id, initVals, signalKind)
+        logger.info(s"${signalListDef}")
+        defs += (id -> signalListDef.toString)
+      } else {
+        val initVal = if (typeInfo.isVectorType(valType)) {
+          val range = subtypeIndication.getRange.getOrElse(defaultRange)
+          typeInfo._guessVectorInitVal(valType, range)
+        } else {
+          typeInfo._guessScalarInitVal(valType)
+        }
+        val signalDef = ISignalDef(id, valType, initVal, signalKind)
+        logger.info(s"${signalDef}")
+        defs += (id -> signalDef.toString)
+      }
+    }
     super.visitSignal_declaration(ctx)
   }
 

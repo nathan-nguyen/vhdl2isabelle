@@ -10,8 +10,6 @@ object V2I {
   type RangeTy = (String, String, String)
   val defaultRange: RangeTy = ("???", "???", "???")
 
-  //  consider adding a type of types to denotes "scalar"/"list" --> vector
-
   val logger = LoggerFactory.getLogger(this.getClass)
 
   def VHDLize(vhdlType: String) = s"vhdl_${vhdlType}"
@@ -62,9 +60,8 @@ object V2I {
       case None => IExp_con(valType, _guessScalarInitVal(valType))
     }
 
-    def _guessListInitVals(rawType: String): List[IValue] = {
+    def _guessListInitVals(rawType: String): List[IScalarOrVecIval] = {
       val recordInfo = typeDeclTbl(rawType)
-      //    TODO not exactly scalar type
       val iVals = for {
         (itemId, itemTyInfo) <- recordInfo
       } yield {
@@ -73,7 +70,7 @@ object V2I {
           val initVals = _guessListInitVals(valType)
           //      TODO    IValue shoud have other forms
           logger.info(s"list-list: $initVals")
-          IValue(itemId, valType, null)
+          IScalarOrVecIval(itemId, valType, null)
         } else {
           val initVal = if (isVectorType(valType)) {
             val range = itemTyInfo.getRange.getOrElse(defaultRange)
@@ -81,7 +78,7 @@ object V2I {
           } else {
             _guessScalarInitVal(valType)
           }
-          IValue(itemId, valType, initVal)
+          IScalarOrVecIval(itemId, valType, initVal)
         }
       }
       iVals.toList
@@ -99,14 +96,14 @@ object V2I {
       }
     }
 
-    def getListInitVals(valType: String, expOption: Option[VExp]): List[IValue] = {
+    def getListInitVals(valType: String, expOption: Option[VExp]): List[IScalarOrVecIval] = {
       require(isListType(valType), s"${valType} should be composite")
       expOption match {
         case Some(vExp) => {
           val expRepr = vExp.repr
           if (expRepr.contains("???")) {
-            logger.warn("unknown composite exp, guessing")
-            List.empty
+            logger.warn(s"unknown composite exp, guessing")
+            _guessListInitVals(valType)
           } else {
             logger.info("comoposite exp, TODO")
             List.empty

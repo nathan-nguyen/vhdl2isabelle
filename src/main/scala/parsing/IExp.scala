@@ -60,20 +60,19 @@ case class IVarDef(id: String, valType: String, iExp: IExp) extends IDef {
     s"""definition ${id}:: \"variable\" where
         | \"${id} ≡ (''${id}'', ${VHDLize(valType)}, ${iExp})\"""".stripMargin
   }
-
   def asItem = s"""(''${id}'', ${VHDLize(valType)}, ${iExp})"""
 }
 
-case class IVarListDef(id: String, iVals: List[IValue]) extends IDef {
+case class IVarListDef(id: String, iVals: List[IScalarOrVecIval]) extends IDef {
   override def toString = {
     val varDefs = for {
       iVal <- iVals
     } yield {
-      IVarDef(s"''${id}_${iVal.itemId}''", iVal.valType, iVal.initVal)
+      IVarDef(s"${id}_${iVal.itemId}", iVal.valType, iVal.initVal)
     }
     val itemsRepr = varDefs.map(_.asItem).mkString("[\n ", ",\n ", "\n]")
-    s"""definition ${id}:: ≡ \"variable list\" where
-        |\"${id} ≡ ${itemsRepr}
+    s"""definition ${id}:: \"variable list\" where
+        |\"${id} ≡ ${itemsRepr}\"
      """.stripMargin
   }
 }
@@ -84,10 +83,10 @@ case class IPortDef(id: String, valType: String, iExp: IExp, mode: String, conn:
         | \"${id} ≡ (''${id}'', ${VHDLize(valType)}, mode_${mode}, ${conn}, ${iExp})\"""".stripMargin
   }
 
-  def asItem = s"""(${id}, ${VHDLize(valType)}, mode_${mode}, ${conn}, ${iExp})"""
+  def asItem = s"""(''${id}'', ${VHDLize(valType)}, mode_${mode}, ${conn}, ${iExp})"""
 }
 
-case class IPortListDef(id: String, iVals: List[IValue], mode: String, conn: String = "connected") extends IDef {
+case class IPortListDef(id: String, iVals: List[IScalarOrVecIval], mode: String, conn: String = "connected") extends IDef {
   override def toString = {
     val portDefs = for {
       iVal <- iVals
@@ -96,45 +95,50 @@ case class IPortListDef(id: String, iVals: List[IValue], mode: String, conn: Str
         case iVariable: IVariable => IExp_con(iVal.valType, iVariable)
         case _ => iVal.initVal
       }
-      IPortDef(s"''${id}_${iVal.itemId}''", iVal.valType, initValue, mode, conn)
+      IPortDef(s"${id}_${iVal.itemId}", iVal.valType, initValue, mode, conn)
     }
     val itemsRepr = portDefs.map(_.asItem).mkString("[\n ", ",\n ", "\n]")
-    s"""definition ${id}:: ≡ \"port list\" where
+    s"""definition ${id}:: \"port list\" where
         |\"${id} ≡ ${itemsRepr}\"
      """.stripMargin
   }
 }
 
-case class ISignalDef(id: String, valType: String, iExp: IExp, signalKind: String) extends IDef {
+case class ISignalDef(id: String, valType: String, iExp: IExp, signalKind: String = "register") extends IDef {
   override def toString = {
     s"""definition ${id}:: \"variable\" where
         | \"${id} ≡ (''${id}'', ${VHDLize(valType)}, ${signalKind}, ${iExp})\"""".stripMargin
   }
 
-  def asItem = s"""(${id}, ${VHDLize(valType)}, ${signalKind}, ${iExp})"""
+  def asItem = s"""(''${id}'', ${VHDLize(valType)}, ${signalKind}, ${iExp})"""
 }
 
-case class ISignalListDef(id: String, iVals: List[IValue], signalKind: String) extends IDef {
+case class ISignalListDef(id: String, iVals: List[IScalarOrVecIval], signalKind: String = "register") extends IDef {
   override def toString = {
     val signalDefs = for {
       iVal <- iVals
     } yield {
       val initValue = iVal.initVal match {
-        case iVariable: IVariable => IExp_con(iVal.valType, iVariable)
+        case iVariable: IVariable => iVariable // IExp_con(iVal.valType, iVariable)
         case _ => iVal.initVal
       }
-      ISignalDef(s"''${id}_${iVal.itemId}''", iVal.valType, initValue, signalKind)
+      ISignalDef(s"${id}_${iVal.itemId}", iVal.valType, initValue, signalKind)
     }
     val itemsRepr = signalDefs.map(_.asItem).mkString("[\n ", ",\n ", "\n]")
-    s"""definition ${id}:: ≡ \"signal list\" where
-        |\"${id} ≡ ${itemsRepr}
+    s"""definition ${id}:: \"signal list\" where
+        |\"${id} ≡ ${itemsRepr}\"
      """.stripMargin
   }
 }
 
 ////////////////////////////////////////////////////////////////////////////
 
-final case class IValue(itemId: String, valType: String, initVal: IExp)
+sealed trait IValue
+
+final case class IScalarOrVecIval(itemId: String, valType: String, initVal: IExp) extends IValue
+
+// FIXME may change isar definition
+final case class IListVal(itemId: String, valType: String) extends IValue
 
 
 ////////////////////////////////////////////////////////////////////////////

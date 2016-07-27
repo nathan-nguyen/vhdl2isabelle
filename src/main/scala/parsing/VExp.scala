@@ -14,7 +14,7 @@ object Antlr2VTy {
   def getIdList(ctx: Identifier_listContext) = {
     for {
       id <- ctx.identifier()
-    } yield id.getText
+    } yield id.getText.toLowerCase
   }
 
   def selectedNameFromSubtypeInd(ctx: Subtype_indicationContext) = {
@@ -268,7 +268,7 @@ case class VSubtypeIndication(selectedName: String,
 
 object VSubtypeIndication {
   def apply(ctx: Subtype_indicationContext): VSubtypeIndication = {
-    val selectedName = Antlr2VTy.selectedNameFromSubtypeInd(ctx)
+    val selectedName = Antlr2VTy.selectedNameFromSubtypeInd(ctx).toLowerCase
     val constraint = Option(ctx.constraint()).map(VConstraint(_))
     val tolerance = Option(ctx.tolerance_aspect()).map(VToleranceAspect(_))
     new VSubtypeIndication(selectedName, constraint, tolerance)
