@@ -5,9 +5,9 @@ import parsing.{Utils, VITran}
 object Driver {
 
   def main(args: Array[String]) {
-    val inFile = Utils.getDataFile("simple.vhd")
+    val inFile = Utils.getInFile("simple.vhd")
     val transfer = new VITran(inFile)
-    transfer.transfer
+    transfer.transfer()
   }
 
 }

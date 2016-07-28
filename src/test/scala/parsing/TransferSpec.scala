@@ -2,7 +2,7 @@ package parsing
 
 class TransferSpec extends BaseSpec {
 
-  val absFileName = Utils.getDataFile("simple.vhd")
+  val absFileName = Utils.getInFile("simple.vhd")
   val transfer = new VITran(absFileName)
 
   val logVisitor = new TVisitor

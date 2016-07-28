@@ -14,9 +14,8 @@ object Utils {
     parser
   }
 
-  //  tmp dir
-  def getDataDir = "/home/hongxu/src/vhdl_parser/src/main/resources/files/"
+  def getInFile(fileName: String) = "/home/hongxu/src/vhdl_parser/src/main/resources/files/" + fileName
 
-  def getDataFile(fileName: String): String = getDataDir + fileName
+  def getOutFile(fileName: String) = "/home/hongxu/Dropbox/000/isabelle/VHDLModel/" + fileName
 
 }

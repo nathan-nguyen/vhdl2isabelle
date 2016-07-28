@@ -60,7 +60,7 @@ case class IVarDef(id: String, valType: String, iExp: IExp) extends IDef {
     s"""definition ${id}:: \"variable\" where
         | \"${id} ≡ (''${id}'', ${VHDLize(valType)}, ${iExp})\"""".stripMargin
   }
-  def asItem = s"""(''${id}'', ${VHDLize(valType)}, ${iExp})"""
+  def asItem = s"""vl_v (''${id}'', ${VHDLize(valType)}, ${iExp})"""
 }
 
 case class IVarListDef(id: String, iVals: List[IScalarOrVecIval]) extends IDef {
@@ -71,8 +71,8 @@ case class IVarListDef(id: String, iVals: List[IScalarOrVecIval]) extends IDef {
       IVarDef(s"${id}_${iVal.itemId}", iVal.valType, iVal.initVal)
     }
     val itemsRepr = varDefs.map(_.asItem).mkString("[\n ", ",\n ", "\n]")
-    s"""definition ${id}:: \"variable list\" where
-        |\"${id} ≡ ${itemsRepr}\"
+    s"""definition ${id}:: \"vl\" where
+        |\"${id} ≡ vnl ('''', ${itemsRepr})\"
      """.stripMargin
   }
 }
@@ -83,7 +83,7 @@ case class IPortDef(id: String, valType: String, iExp: IExp, mode: String, conn:
         | \"${id} ≡ (''${id}'', ${VHDLize(valType)}, mode_${mode}, ${conn}, ${iExp})\"""".stripMargin
   }
 
-  def asItem = s"""(''${id}'', ${VHDLize(valType)}, mode_${mode}, ${conn}, ${iExp})"""
+  def asItem = s"""spl_p (''${id}'', ${VHDLize(valType)}, mode_${mode}, ${conn}, ${iExp})"""
 }
 
 case class IPortListDef(id: String, iVals: List[IScalarOrVecIval], mode: String, conn: String = "connected") extends IDef {
@@ -98,19 +98,19 @@ case class IPortListDef(id: String, iVals: List[IScalarOrVecIval], mode: String,
       IPortDef(s"${id}_${iVal.itemId}", iVal.valType, initValue, mode, conn)
     }
     val itemsRepr = portDefs.map(_.asItem).mkString("[\n ", ",\n ", "\n]")
-    s"""definition ${id}:: \"port list\" where
-        |\"${id} ≡ ${itemsRepr}\"
+    s"""definition ${id}:: \"spl\" where
+        |\"${id} ≡ spnl ('''', ${itemsRepr})\"
      """.stripMargin
   }
 }
 
 case class ISignalDef(id: String, valType: String, iExp: IExp, signalKind: String = "register") extends IDef {
   override def toString = {
-    s"""definition ${id}:: \"variable\" where
+    s"""definition ${id}:: \"signal\" where
         | \"${id} ≡ (''${id}'', ${VHDLize(valType)}, ${signalKind}, ${iExp})\"""".stripMargin
   }
 
-  def asItem = s"""(''${id}'', ${VHDLize(valType)}, ${signalKind}, ${iExp})"""
+  def asItem = s"""spl_s (''${id}'', ${VHDLize(valType)}, ${signalKind}, ${iExp})"""
 }
 
 case class ISignalListDef(id: String, iVals: List[IScalarOrVecIval], signalKind: String = "register") extends IDef {
@@ -125,8 +125,8 @@ case class ISignalListDef(id: String, iVals: List[IScalarOrVecIval], signalKind:
       ISignalDef(s"${id}_${iVal.itemId}", iVal.valType, initValue, signalKind)
     }
     val itemsRepr = signalDefs.map(_.asItem).mkString("[\n ", ",\n ", "\n]")
-    s"""definition ${id}:: \"signal list\" where
-        |\"${id} ≡ ${itemsRepr}\"
+    s"""definition ${id}:: \"spl\" where
+        |\"${id} ≡ spnl ('''', ${itemsRepr})\"
      """.stripMargin
   }
 }

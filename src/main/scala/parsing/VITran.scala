@@ -11,12 +11,15 @@ class VITran(file: String) {
   val filePath = Paths.get(file)
   require(Files.exists(filePath), s"${filePath} not exists")
 
-  val vhdlName = {
-    val fileName = filePath.getFileName.toString
-    val pos = fileName.lastIndexOf(".")
-    if (pos > 0) fileName.substring(0, pos) else fileName
+  val moduleName = {
+    val vhdlName = {
+      val fileName = filePath.getFileName.toString
+      val pos = fileName.lastIndexOf(".")
+      if (pos > 0) fileName.substring(0, pos) else fileName
+    }
+    s"VVV_${vhdlName}"
   }
-  val moduleName = s"vhdl_${vhdlName}"
+
 
   val parser = {
     val lexer = new VHDLLexer(new ANTLRFileStream(filePath.toString))
@@ -36,20 +39,22 @@ class VITran(file: String) {
     }
   }
 
-  def transfer = {
+  def transfer() = {
     val visitor = new TVisitor
     val tree = parser.design_file()
     visitor.visit(tree)
-    val outFile = Utils.getDataFile(s"${moduleName}.thy")
+    val outFile = Utils.getOutFile(s"${moduleName}.thy")
     val file = new File(outFile)
     printToFile(file) { p =>
       p.println(header)
+      p.println("begin\n")
       for {
         (id, d) <- visitor.defs
       } {
         p.println(d + "\n")
       }
       p.println(foot("OCaml"))
+      p.println("\nend")
     }
   }
 
@@ -62,7 +67,7 @@ class VITran(file: String) {
   }
 
   def header: String = {
-    s"theory vhdl_${vhdlName}\nimports Main vhdl_component vhdl_syntax_complex\n"
+    s"theory ${moduleName}\nimports Main vhdl_component vhdl_syntax_complex"
   }
 
   def foot(target: String = "OCaml"): String = {
@@ -71,8 +76,8 @@ class VITran(file: String) {
       case Some(x) => x
       case None => throw new IllegalArgumentException(s"${target} not supported")
     }
-    val outFileName = s"${vhdlName}${ext}"
-    s"""export_code ${vhdlName} simulation init_state arch_state_power sim_arch trans_vhdl_desc_complex in ${target}
-        |module_name ${moduleName} file ${outFileName}\n""".stripMargin
+    val outFileName = s"${moduleName}${ext}"
+    s"""export_code ${moduleName} simulation init_state arch_state_power sim_arch trans_vhdl_desc_complex in ${target}
+        |module_name ${moduleName} file \"${outFileName}\"""".stripMargin
   }
 }
