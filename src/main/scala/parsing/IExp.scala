@@ -2,55 +2,6 @@ package parsing
 
 import parsing.V2I._
 
-object IUop extends Enumeration {
-  type Ty = Value
-  val abs = Value("[abs]")
-  val not = Value("[not]")
-  val neg = Value("[-:]")
-  val pos = Value("[+:]")
-}
-
-object ILop extends Enumeration {
-  type Ty = Value
-  val and = Value("[and]")
-  val or = Value("[or]")
-  val nand = Value("[nand]")
-  val nor = Value("[nor]")
-  val xor = Value("[xor]")
-  val xnor = Value("[xnor]")
-}
-
-object IRop extends Enumeration {
-  type Ty = Value
-  val eq = Value("[=]")
-  val neq = Value("['/=]")
-  val lt = Value("[<]")
-  val le = Value("[<=]")
-  val gt = Value("[>]")
-  val ge = Value("[>=]")
-}
-
-object ISop extends Enumeration {
-  type Ty = Value
-  val sll = Value("[sll]")
-  val srl = Value("[srl]")
-  val sla = Value("[sla]")
-  val sra = Value("[sra]")
-  val rol = Value("[rol]")
-  val ror = Value("[ror]")
-}
-
-object IAop extends Enumeration {
-  type Ty = Value
-  val add = Value("[+]")
-  val sub = Value("[-]")
-  val concat = Value("[&]")
-  val mul = Value("[*]")
-  val div = Value("[/=]")
-  val rem = Value("[mod]")
-  val exp = Value("[**]")
-}
-
 //////////////////////////////////////////////////////////////////////////////
 
 sealed trait IDef
@@ -60,6 +11,7 @@ case class IVarDef(id: String, valType: String, iExp: IExp) extends IDef {
     s"""definition ${id}:: \"variable\" where
         | \"${id} ≡ (''${id}'', ${VHDLize(valType)}, ${iExp})\"""".stripMargin
   }
+
   def asItem = s"""vl_v (''${id}'', ${VHDLize(valType)}, ${iExp})"""
 }
 
@@ -160,7 +112,8 @@ sealed trait IExp {
     case IBexpl(e1, lop, e2) => s"""(bexpl ${e1} ${lop} ${e2})"""
     case IBexpr(e1, rop, e2) => s"""(bexpr ${e1} ${rop} ${e2})"""
     case IBexps(e1, sop, e2) => s"""(bexps ${e1} ${sop} ${e2})"""
-    case IBexpa(e1, aop, e2) => s"""(bexpa ${e1} ${aop} ${e2})"""
+    case IBexpta(e1, aop, e2) => s"""(bexpa ${e1} ${aop} ${e2})"""
+    case IBexpfa(e1, aop, e2) => s"""(bexpa ${e1} ${aop} ${e2})"""
     case IExp_nth(e1, e2) => s"""(exp_nth ${e1} ${e2})"""
     case IExp_sl(e1, e2, e3) => s"""(exp_sl ${e1} ${e2} ${e3})"""
     case IExp_tl(e1, e2) => s"""(exp_tl ${e1} ${e2})"""
@@ -176,15 +129,24 @@ case class IExp_sig(valType: String, signal: ISignal) extends IExp
 
 case class IExp_prt(valType: String, port: IPort) extends IExp
 
-case class IUexp(op: IUop.Ty, e: IExp) extends IExp
+case class IUexp(op: VUop.Ty, e: IExp) extends IExp
 
-case class IBexpl(e1: IExp, op: ILop.Ty, e2: IExp) extends IExp
+// logic
+case class IBexpl(e1: IExp, op: VLogicOp.Ty, e2: IExp) extends IExp
 
-case class IBexpr(e1: IExp, op: IRop.Ty, e2: IExp) extends IExp
+// relation
+case class IBexpr(e1: IExp, op: VRelationOp.Ty, e2: IExp) extends IExp
 
-case class IBexps(e1: IExp, op: ISop.Ty, e2: IExp) extends IExp
+// shift
+case class IBexps(e1: IExp, op: VShiftOp.Ty, e2: IExp) extends IExp
 
-case class IBexpa(e1: IExp, op: IAop.Ty, e2: IExp) extends IExp
+sealed abstract class IBexpa extends IExp
+
+// factor arighmetic
+final case class IBexpfa(e1: IExp, op: VFactorOp.Ty, e2: IExp) extends IBexpa
+
+// term arighmetic
+final case class IBexpta(e1: IExp, op: VTermOp.Ty, e2: IExp) extends IBexpa
 
 case class IExp_nth(e1: IExp, e2: IExp) extends IExp
 

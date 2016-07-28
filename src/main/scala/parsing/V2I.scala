@@ -8,8 +8,16 @@ import scala.language.implicitConversions
 object V2I {
 
   type RangeTy = (String, String, String)
-  val defaultRange: RangeTy = ("???", "???", "???")
-  val defaultScalarValue = IVariable("???", "???")
+
+  def defaultRange(msg: String): RangeTy = {
+    logger.warn(s"defaultRange: ${msg}")
+    ("???", "???", "???")
+  }
+
+  @inline def defaultScalarValue(msg: String) = {
+    logger.warn(s"defaultScalarValue: ${msg}")
+    IVariable("???", "???")
+  }
 
   val logger = LoggerFactory.getLogger(this.getClass)
 
@@ -49,16 +57,16 @@ object V2I {
 
     def getScalarInitVal(valType: String, expOption: Option[VExp]): IExp = expOption match {
       case Some(exp) => {
-        val expRepr = exp.repr
+        val expRepr = exp.toIExp.toString
         if (expRepr.contains("???")) {
-          logger.warn(s"unknown exp, guessing")
-          IExp_con(valType, _guessScalarInitVal(valType))
+          logger.warn(s"unknown exp === ${expRepr}")
+          _guessScalarInitVal(valType)
         } else {
           //        repr -> IExpr
           IVariable("TODO", "Scalar repr")
         }
       }
-      case None => IExp_con(valType, _guessScalarInitVal(valType))
+      case None => _guessScalarInitVal(valType)
     }
 
     def _guessListInitVals(rawType: String): List[IScalarOrVecIval] = {
@@ -70,11 +78,10 @@ object V2I {
         if (isListType(valType)) {
           val initVals = _guessListInitVals(valType)
           //      TODO    IValue shoud have other forms
-          logger.info(s"list-list: $initVals")
-          IScalarOrVecIval(itemId, valType, defaultScalarValue)
+          IScalarOrVecIval(itemId, valType, defaultScalarValue(s"list-list: ${initVals}"))
         } else {
           val initVal = if (isVectorType(valType)) {
-            val range = subtypeIndication.getRange.getOrElse(defaultRange)
+            val range = subtypeIndication.getRange.getOrElse(defaultRange(s"guessListInit vector ${subtypeIndication}"))
             _guessVectorInitVal(valType, range)
           } else {
             _guessScalarInitVal(valType)
@@ -90,7 +97,7 @@ object V2I {
       val genCmd = valType.substring(0, valType.length - "_vector".length) + "_vec_gen"
       val valListType = if (r._2 == "to") "val_list" else if (r._2 == "downto") "val_rlist" else "???"
       if (List("val_lsit", "val_rlist").contains(valListType)) {
-        val iVarChar = IVariable("val_c", s"(CHR ''${numericVal}'')")
+        val iVarChar = IVariable("val_c", s"(CHR '${numericVal}')")
         IVariable(valListType, s"(${genCmd} ${Math.abs(r._1.toInt - r._3.toInt) + 1} ${iVarChar})")
       } else {
         IVariable(valListType, s"???")
@@ -112,20 +119,26 @@ object V2I {
                 val itemExp = aggregateIdExpMap(itemId)
                 val itemValType = subtypeIndication.selectedName
                 val initValue: IExp = if (isListType(itemValType)) {
-                  defaultScalarValue
+                  defaultScalarValue(s"list-list: ${itemValType}")
                 } else if (isVectorType(itemValType)) {
                   itemExp.getAggregate match {
                     case Some(itemAggregate) => {
                       val (fieldName, innerExp) = itemAggregate.getFirstMap
                       if (fieldName == "others") {
-                        val range = subtypeIndication.getRange.getOrElse(defaultRange)
-                        val numericVal = innerExp.repr
-                        _guessVectorInitVal(itemValType, range, numericVal)
+                        val range = subtypeIndication.getRange.getOrElse(defaultRange(s"getListInit vector ${subtypeIndication}"))
+                        val numericVal = innerExp.getPrimary
+                        numericVal match {
+                          case Some(p) => {
+                            _guessVectorInitVal(itemValType, range, p.asVal)
+                          }
+                          case None => defaultScalarValue(s"${numericVal}")
+                        }
                       } else {
-                        defaultScalarValue
+                        logger.info(s"${itemAggregate.getFirstMap}")
+                        defaultScalarValue(s"${itemValType}")
                       }
                     }
-                    case None => defaultScalarValue
+                    case None => defaultScalarValue(s"${itemExp}")
                   }
                 } else {
                   getScalarInitVal(itemValType, Option(itemExp))

@@ -4,9 +4,12 @@ import java.io.File
 import java.nio.file.{Files, Paths}
 
 import org.antlr.v4.runtime.{ANTLRFileStream, CommonTokenStream, Lexer, Token}
+import org.slf4j.LoggerFactory
 import sg.edu.ntu.hchen.{VHDLLexer, VHDLParser}
 
 class VITran(file: String) {
+
+  val logger = LoggerFactory.getLogger(getClass)
 
   val filePath = Paths.get(file)
   require(Files.exists(filePath), s"${filePath} not exists")
@@ -45,16 +48,23 @@ class VITran(file: String) {
     visitor.visit(tree)
     val outFile = Utils.getOutFile(s"${moduleName}.thy")
     val file = new File(outFile)
-    printToFile(file) { p =>
-      p.println(header)
-      p.println("begin\n")
-      for {
-        (id, d) <- visitor.defs
-      } {
-        p.println(d + "\n")
+    if (visitor.definedEntities.nonEmpty) {
+      for (entity <- visitor.definedEntities) {
+        val exportRawName = s"${moduleName}_${entity}"
+        printToFile(file) { p =>
+          p.println(header)
+          p.println("begin\n")
+          for {
+            (id, d) <- visitor.defs
+          } {
+            p.println(d + "\n")
+          }
+          p.println(foot(entity, exportRawName, "OCaml"))
+          p.println("\nend")
+        }
       }
-      p.println(foot("OCaml"))
-      p.println("\nend")
+    } else {
+      logger.warn("no entity declared in this module")
     }
   }
 
@@ -70,14 +80,13 @@ class VITran(file: String) {
     s"theory ${moduleName}\nimports Main vhdl_component vhdl_syntax_complex"
   }
 
-  def foot(target: String = "OCaml"): String = {
+  def foot(entityName: String, outFileName: String, target: String): String = {
     val extMap = Map("OCaml" -> ".ml", "Haskell" -> ".hs", "Scala" -> ".scala", "SML" -> ".ml")
     val ext = extMap.get(target) match {
       case Some(x) => x
       case None => throw new IllegalArgumentException(s"${target} not supported")
     }
-    val outFileName = s"${moduleName}${ext}"
-    s"""export_code ${moduleName} simulation init_state arch_state_power sim_arch trans_vhdl_desc_complex in ${target}
+    s"""export_code ${entityName} simulation init_state arch_state_power sim_arch trans_vhdl_desc_complex in ${target}
         |module_name ${moduleName} file \"${outFileName}\"""".stripMargin
   }
 }
