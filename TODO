@@ -1,2 +1,4 @@
-- make VExp repr in IExp
 - list-list
+- vector string init
+- architecture definition
+- IExp_con

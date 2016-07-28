@@ -122,7 +122,19 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
 
   override def visitConcurrent_procedure_call_statement(ctx: Concurrent_procedure_call_statementContext): Unit = super.visitConcurrent_procedure_call_statement(ctx)
 
-  override def visitConcurrent_signal_assignment_statement(ctx: Concurrent_signal_assignment_statementContext): Unit = super.visitConcurrent_signal_assignment_statement(ctx)
+  override def visitConcurrent_signal_assignment_statement(ctx: Concurrent_signal_assignment_statementContext): Unit = {
+    val concurrentSignalAssign = VConcurrentSignalAssignStat(ctx)
+    concurrentSignalAssign match {
+      case VConcurrentSignalAssignStatC(_, _, condSignAssign) => {
+        val targetName = condSignAssign.target.getName.getOrElse(defaultTargetName(s"${concurrentSignalAssign}"))
+        logger.info(s"${targetName}")
+      }
+      case VConcurrentSignalAssignStatS(_, _, selectSignalAssign) => {
+        val targetName = selectSignalAssign.target.getName.getOrElse(defaultTargetName(s"${concurrentSignalAssign}"))
+      }
+    }
+    super.visitConcurrent_signal_assignment_statement(ctx)
+  }
 
   override def visitCondition(ctx: ConditionContext): Unit = super.visitCondition(ctx)
 
@@ -262,9 +274,7 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
 
   override def visitGeneration_scheme(ctx: Generation_schemeContext): Unit = super.visitGeneration_scheme(ctx)
 
-  override def visitGeneric_clause(ctx: Generic_clauseContext): Unit = {
-    super.visitGeneric_clause(ctx)
-  }
+  override def visitGeneric_clause(ctx: Generic_clauseContext): Unit = super.visitGeneric_clause(ctx)
 
   override def visitGeneric_list(ctx: Generic_listContext): Unit = super.visitGeneric_list(ctx)
 
@@ -296,15 +306,7 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
 
   override def visitInstantiation_list(ctx: Instantiation_listContext): Unit = super.visitInstantiation_list(ctx)
 
-  override def visitInterface_constant_declaration(ctx: Interface_constant_declarationContext): Unit = {
-    val interfaceConstDecl = VInterfaceConstDecl(ctx)
-    for {
-      id <- interfaceConstDecl.idList
-    } {
-      val name = interfaceConstDecl.subtypeIndication.selectedName
-    }
-    super.visitInterface_constant_declaration(ctx)
-  }
+  override def visitInterface_constant_declaration(ctx: Interface_constant_declarationContext): Unit = super.visitInterface_constant_declaration(ctx)
 
   override def visitInterface_declaration(ctx: Interface_declarationContext): Unit = super.visitInterface_declaration(ctx)
 
@@ -314,9 +316,7 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
 
   override def visitInterface_signal_list(ctx: Interface_signal_listContext): Unit = super.visitInterface_signal_list(ctx)
 
-  override def visitInterface_port_list(ctx: Interface_port_listContext): Unit = {
-    super.visitInterface_port_list(ctx)
-  }
+  override def visitInterface_port_list(ctx: Interface_port_listContext): Unit = super.visitInterface_port_list(ctx)
 
   override def visitInterface_list(ctx: Interface_listContext): Unit = super.visitInterface_list(ctx)
 
@@ -324,9 +324,8 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
 
   override def visitInterface_port_declaration(ctx: Interface_port_declarationContext): Unit = super.visitInterface_port_declaration(ctx)
 
-  override def visitInterface_signal_declaration(ctx: Interface_signal_declarationContext): Unit = {
-    super.visitInterface_signal_declaration(ctx)
-  }
+  override def visitInterface_signal_declaration(ctx: Interface_signal_declarationContext): Unit = super.visitInterface_signal_declaration(ctx)
+
 
   override def visitInterface_terminal_declaration(ctx: Interface_terminal_declarationContext): Unit = super.visitInterface_terminal_declaration(ctx)
 
@@ -336,9 +335,7 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
 
   override def visitLabel_colon(ctx: Label_colonContext): Unit = super.visitLabel_colon(ctx)
 
-  override def visitLibrary_clause(ctx: Library_clauseContext): Unit = {
-    super.visitLibrary_clause(ctx)
-  }
+  override def visitLibrary_clause(ctx: Library_clauseContext): Unit = super.visitLibrary_clause(ctx)
 
   override def visitLibrary_unit(ctx: Library_unitContext): Unit = super.visitLibrary_unit(ctx)
 
@@ -386,9 +383,8 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
 
   override def visitPackage_body_declarative_item(ctx: Package_body_declarative_itemContext): Unit = super.visitPackage_body_declarative_item(ctx)
 
-  override def visitPackage_body_declarative_part(ctx: Package_body_declarative_partContext): Unit = {
-    super.visitPackage_body_declarative_part(ctx)
-  }
+  override def visitPackage_body_declarative_part(ctx: Package_body_declarative_partContext): Unit = super.visitPackage_body_declarative_part(ctx)
+
 
   override def visitPackage_declaration(ctx: Package_declarationContext): Unit = super.visitPackage_declaration(ctx)
 
@@ -611,9 +607,7 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
 
   override def visitTolerance_aspect(ctx: Tolerance_aspectContext): Unit = super.visitTolerance_aspect(ctx)
 
-  override def visitType_declaration(ctx: Type_declarationContext): Unit = {
-    super.visitType_declaration(ctx)
-  }
+  override def visitType_declaration(ctx: Type_declarationContext): Unit = super.visitType_declaration(ctx)
 
   override def visitType_definition(ctx: Type_definitionContext): Unit = super.visitType_definition(ctx)
 

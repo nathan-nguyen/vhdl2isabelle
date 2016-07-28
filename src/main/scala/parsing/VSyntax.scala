@@ -958,3 +958,174 @@ object VInterfacePortDecl {
 }
 
 case class VPortList(interfacePortDecls: Seq[VInterfacePortDecl])
+
+
+///////////////////////////////////////////////////////////////
+
+// perhaps needing separation
+case class VName(s: String)
+
+object VName {
+  def apply(ctx: NameContext): VName = {
+    new VName(ctx.getText)
+  }
+}
+
+sealed abstract class VTarget {
+  def getName: Option[String] = this match {
+    case VTargetN(name) => Some(name.s)
+    case VTargetAggregate(aggregate) => None
+  }
+}
+
+object VTarget {
+  def apply(ctx: TargetContext): VTarget = {
+    val name = ctx.name()
+    val aggregate = ctx.aggregate()
+    if (name != null) {
+      VTargetN(VName(name))
+    } else if (aggregate != null) {
+      VTargetAggregate(VAggregate(aggregate))
+    } else throw VError
+  }
+}
+
+case class VTargetN(name: VName) extends VTarget
+
+case class VTargetAggregate(aggregate: VAggregate) extends VTarget
+
+//////////////////////////////////////////////////////////////////////////////
+
+sealed abstract class VDelay
+
+object VDelay {
+  def apply(ctx: Delay_mechanismContext): VDelay = {
+    val transport = ctx.TRANSPORT()
+    val inertial = ctx.INERTIAL()
+    if (transport != null) {
+      VDelayT
+    } else if (inertial != null) {
+      val exp = Option(ctx.expression()).map(VExp(_))
+      VDelayE(exp)
+    } else throw VError
+  }
+}
+
+object VDelayT extends VDelay
+
+case class VDelayE(vExp: Option[VExp]) extends VDelay
+
+case class VOpts(guarded: Boolean, delay: Option[VDelay])
+
+object VOpts {
+  def apply(ctx: OptsContext): VOpts = {
+    val guarded = ctx.GUARDED() != null
+    val delay = Option(ctx.delay_mechanism()).map(VDelay(_))
+    new VOpts(guarded, delay)
+  }
+}
+
+//////////////////////////////////////////////////////////////////////////////
+case class VWaveFormElem(exp: VExp, expOption: Option[VExp])
+
+object VWaveFormElem {
+  def apply(ctx: Waveform_elementContext): VWaveFormElem = {
+    val exprs = ctx.expression().map(VExp(_))
+    val exp = exprs.head
+    val expOption = exprs.lift(1)
+    new VWaveFormElem(exp, expOption)
+  }
+}
+
+sealed abstract class VWaveForm
+
+object VWaveForm {
+  def apply(ctx: WaveformContext): VWaveForm = {
+    val unaffected = ctx.UNAFFECTED()
+    val waveFormElemList = ctx.waveform_element()
+    if (unaffected != null) {
+      VWaveFormU
+    } else if (waveFormElemList != null) {
+      VWaveFormE(waveFormElemList.map(VWaveFormElem(_)))
+    } else throw VError
+  }
+}
+
+case class VWaveFormE(elems: Seq[VWaveFormElem]) extends VWaveForm {
+  require(elems.nonEmpty, "VWaveFormE")
+}
+
+object VWaveFormU extends VWaveForm
+
+
+case class VCondWaveForms(vWaveForm: VWaveForm, cond: Option[VExp], elseCond: Option[VCondWaveForms])
+
+
+// TODO check whether there is an infinite recursive call
+object VCondWaveForms {
+  def apply(ctx: Conditional_waveformsContext): VCondWaveForms = {
+    val waveForm = VWaveForm(ctx.waveform())
+    val cond = Option(ctx.condition()).map(c => VExp(c.expression()))
+    val condWaves = Option(ctx.conditional_waveforms()).map(VCondWaveForms(_))
+    new VCondWaveForms(waveForm, cond, condWaves)
+  }
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+case class VSelectedWaveForm(waveForm: VWaveForm, choices: VChoices, waveFormOpt: Option[VWaveForm], choicesOpt: Option[VChoices])
+
+object VSelectedWaveForm {
+  def apply(ctx: Selected_waveformsContext): VSelectedWaveForm = {
+    val waveFormList = ctx.waveform().map(VWaveForm(_))
+    val choicesList = ctx.choices().map(VChoices(_))
+    new VSelectedWaveForm(waveFormList.head, choicesList.head, waveFormList.lift(1), choicesList.lift(1))
+  }
+}
+
+case class VSelectedSignalAssign(exp: VExp, target: VTarget, opts: VOpts, selectedWaveForm: VSelectedWaveForm)
+
+object VSelectedSignalAssign {
+  def apply(ctx: Selected_signal_assignmentContext): VSelectedSignalAssign = {
+    val exp = VExp(ctx.expression())
+    val target = VTarget(ctx.target())
+    val opts = VOpts(ctx.opts())
+    val selectedWaveForm = VSelectedWaveForm(ctx.selected_waveforms())
+    new VSelectedSignalAssign(exp, target, opts, selectedWaveForm)
+  }
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+case class VCondSignAssign(target: VTarget, opts: VOpts, conditionalWaveforms: VCondWaveForms)
+
+object VCondSignAssign {
+  def apply(ctx: Conditional_signal_assignmentContext): VCondSignAssign = {
+    val target = VTarget(ctx.target())
+    val opts = VOpts(ctx.opts())
+    val condWaveForms = VCondWaveForms(ctx.conditional_waveforms())
+    new VCondSignAssign(target, opts, condWaveForms)
+  }
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+sealed abstract class VConcurrentSignalAssignStat
+
+object VConcurrentSignalAssignStat {
+  def apply(ctx: Concurrent_signal_assignment_statementContext): VConcurrentSignalAssignStat = {
+    val condSignalAssign = ctx.conditional_signal_assignment()
+    val selectedSignalAssign = ctx.selected_signal_assignment()
+    val labelColon = Option(ctx.label_colon()).map(_.getText)
+    val postPonded = ctx.POSTPONED() != null
+    if (condSignalAssign != null) {
+      VConcurrentSignalAssignStatC(labelColon, postPonded, VCondSignAssign(condSignalAssign))
+    } else if (selectedSignalAssign != null) {
+      VConcurrentSignalAssignStatS(labelColon, postPonded, VSelectedSignalAssign(selectedSignalAssign))
+    } else throw VError
+  }
+}
+
+case class VConcurrentSignalAssignStatC(labelColon: Option[String], postPonded: Boolean, condSignAssign: VCondSignAssign) extends VConcurrentSignalAssignStat
+
+case class VConcurrentSignalAssignStatS(labelColon: Option[String], postPonded: Boolean, selectSignalAssign: VSelectedSignalAssign) extends VConcurrentSignalAssignStat

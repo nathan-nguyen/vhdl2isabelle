@@ -85,13 +85,17 @@ case class ISignalListDef(id: String, iVals: List[IScalarOrVecIval], signalKind:
 
 ////////////////////////////////////////////////////////////////////////////
 
+/**
+  * an IValue has name and
+  * 1. an initial value (IExp) and type
+  * 2. a list of initial value (IExp) and type
+  */
 sealed trait IValue
 
 final case class IScalarOrVecIval(itemId: String, valType: String, initVal: IExp) extends IValue
 
 // FIXME may change isar definition
 final case class IListVal(itemId: String, valType: String) extends IValue
-
 
 ////////////////////////////////////////////////////////////////////////////
 

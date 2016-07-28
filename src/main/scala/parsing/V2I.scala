@@ -9,6 +9,11 @@ object V2I {
 
   type RangeTy = (String, String, String)
 
+  def defaultTargetName(msg: String): String = {
+    logger.warn(s"defaultTargetName: ${msg}")
+    "===???==="
+  }
+
   def defaultRange(msg: String): RangeTy = {
     logger.warn(s"defaultRange: ${msg}")
     ("???", "???", "???")

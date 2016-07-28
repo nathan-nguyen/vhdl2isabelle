@@ -1,8 +1,18 @@
 package parsing
 
+import org.antlr.v4.runtime.{ANTLRInputStream, CommonTokenStream}
+import sg.edu.ntu.hchen.{VHDLLexer, VHDLParser}
+
 class ParserSpec extends BaseSpec {
 
-  import Utils._
+  def pFromStr(s: String): VHDLParser = {
+    val lexer = new VHDLLexer(new ANTLRInputStream(s))
+    val tokens = new CommonTokenStream(lexer)
+    val parser = new VHDLParser(tokens)
+    parser.removeErrorListeners()
+    parser.addErrorListener(new PErrorListener)
+    parser
+  }
 
   "type-declaration" should "parse" in {
     val s1 =
@@ -82,7 +92,7 @@ class ParserSpec extends BaseSpec {
         |END PROCESS;
         |END ARCHITECTURE Behave;
       """.stripMargin
-    //    pFromStr(s1).design_file()
+    pFromStr(s1).entity_declaration()
   }
 
   "attribute-declaration attribute-specification" should "parse" in {
@@ -90,7 +100,7 @@ class ParserSpec extends BaseSpec {
       """
         |ATTRIBUTE syn_encoding : STRING;
       """.stripMargin
-    //    pFromStr(s1).attribute_declaration()
+    pFromStr(s1).attribute_declaration()
   }
 
   "constant-declaration" should "parse" in {
@@ -127,7 +137,7 @@ class ParserSpec extends BaseSpec {
       """
         |SIGNAL data : STD_LOGIC_VECTOR(3 DOWNTO 0);
       """.stripMargin
-    //    pFromStr(s1).signal_declaration()
+    pFromStr(s1).signal_declaration()
   }
 
   "attribute-declaration" should "parse" in {
