@@ -1,11 +1,11 @@
-package parsing
+package utils
 
 import java.util
 import java.util.Collections
 
+import org.antlr.v4.runtime._
 import org.antlr.v4.runtime.atn.ATNConfigSet
 import org.antlr.v4.runtime.dfa.DFA
-import org.antlr.v4.runtime._
 import org.slf4j.LoggerFactory
 
 final class PErrorListener extends BaseErrorListener {

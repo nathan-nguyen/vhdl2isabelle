@@ -1,6 +1,6 @@
 package parsing
 
-import parsing.V2I._
+import parsing.V2IUtils._
 import sg.edu.ntu.hchen.VHDLParser._
 
 import scala.collection.JavaConversions._

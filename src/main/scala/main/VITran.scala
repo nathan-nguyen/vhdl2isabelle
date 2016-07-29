@@ -1,17 +1,19 @@
-package parsing
+package main
 
 import java.io.File
 import java.nio.file.{Files, Paths}
 
 import org.antlr.v4.runtime.{ANTLRFileStream, CommonTokenStream, Lexer, Token}
 import org.slf4j.LoggerFactory
+import parsing.{IEnv, TVisitor}
 import sg.edu.ntu.hchen.{VHDLLexer, VHDLParser}
+import utils.PErrorListener
 
-class VITran(file: String) {
+class VITran(inFile: String, outDir: String) {
 
   val logger = LoggerFactory.getLogger(getClass)
 
-  val filePath = Paths.get(file)
+  val filePath = Paths.get(inFile)
   require(Files.exists(filePath), s"${filePath} not exists")
 
   val moduleName = {
@@ -22,7 +24,6 @@ class VITran(file: String) {
     }
     s"VVV_${vhdlName}"
   }
-
 
   val parser = {
     val lexer = new VHDLLexer(new ANTLRFileStream(filePath.toString))
@@ -42,11 +43,18 @@ class VITran(file: String) {
     }
   }
 
-  def transfer() = {
+  def transferImpl(): TVisitor = {
     val visitor = new TVisitor
     val tree = parser.design_file()
     visitor.visit(tree)
-    val outFile = Utils.getOutFile(s"${moduleName}.thy")
+    val env = IEnv(visitor.defInfo)
+    println(s"${env.repr}")
+    visitor
+  }
+
+  def transfer() = {
+    val visitor = transferImpl()
+    val outFile = outDir + s"${moduleName}.thy"
     val file = new File(outFile)
     if (visitor.definedEntities.nonEmpty) {
       for (entity <- visitor.definedEntities) {
@@ -54,11 +62,7 @@ class VITran(file: String) {
         printToFile(file) { p =>
           p.println(header)
           p.println("begin\n")
-          for {
-            (id, d) <- visitor.defs
-          } {
-            p.println(d + "\n")
-          }
+          p.println(visitor.defInfo)
           p.println(foot(entity, exportRawName, "OCaml"))
           p.println("\nend")
         }

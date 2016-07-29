@@ -2,6 +2,7 @@ package parsing
 
 import org.antlr.v4.runtime.{ANTLRInputStream, CommonTokenStream}
 import sg.edu.ntu.hchen.{VHDLLexer, VHDLParser}
+import utils.PErrorListener
 
 class ParserSpec extends BaseSpec {
 
