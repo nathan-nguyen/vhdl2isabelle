@@ -2,23 +2,27 @@ package parsing
 
 import scala.collection.mutable
 
-class TypeInfo {
+///////////////////////////////////////////////////////////////
+//  for type rather than value
+case class TVRecordItem(id: String, valType: String, range: Seq[VExplicitRange])
+
+case class TVRecord(id: String, items: Seq[TVRecordItem])
+
+///////////////////////////////////////////////////////////////
+
+class TypeInfo(typeInfo: Option[TypeInfo]) {
+
   import V2IUtils._
 
-  ///////////////////////////////////////////////////////////////
-  //  for type rather than value
-  case class TVRecordItem(id: String, valType: String, range: Seq[VExplicitRange])
-
-  case class TVRecord(id: String, items: Seq[TVRecordItem])
-
-  ///////////////////////////////////////////////////////////////
-
   type RecordInfoTy = Seq[(String, VSubtypeIndication)]
-  val typeDeclTbl = mutable.Map.empty[String, RecordInfoTy]
 
-  def addNewType(id: String, items: RecordInfoTy): Unit = {
-    typeDeclTbl += (id -> items)
+  val typeDeclTbl: mutable.Map[String, RecordInfoTy] = typeInfo match {
+    case Some(ti) => ti.typeDeclTbl
+    case None => mutable.Map.empty
   }
+
+  def +=(id: String, items: RecordInfoTy): Unit = typeDeclTbl += (id -> items)
+
 
   val knownListType = Set("div32_in_type", "div32_out_type")
 

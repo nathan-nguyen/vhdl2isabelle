@@ -8,11 +8,11 @@ import sg.edu.ntu.hchen.VHDLParser._
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 
-final class TVisitor extends VHDLBaseVisitor[Unit] {
+final class TVisitor(vInfo: Option[VInfo]) extends VHDLBaseVisitor[Unit] {
 
-  val defInfo = new DefInfo
+  val defInfo = new DefInfo(vInfo.map(_.defInfo))
 
-  val typeInfo = new TypeInfo
+  val typeInfo = new TypeInfo(vInfo.map(_.typeInfo))
 
   val definedEntities = mutable.ArrayBuffer.empty[String]
 
@@ -475,7 +475,7 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
       flattened <- elementDecl.flatten
     } yield flattened
     val typeDeclId = ctx.getParent.getParent.getParent.asInstanceOf[Type_declarationContext].identifier().getText
-    typeInfo.addNewType(typeDeclId, items)
+    typeInfo +=(typeDeclId, items)
     super.visitRecord_type_definition(ctx)
   }
 

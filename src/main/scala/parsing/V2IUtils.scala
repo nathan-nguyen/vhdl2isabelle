@@ -4,6 +4,8 @@ import org.slf4j.LoggerFactory
 
 import scala.language.implicitConversions
 
+case class VInfo(typeInfo: TypeInfo, defInfo: DefInfo)
+
 object V2IUtils {
 
   val logger = LoggerFactory.getLogger(this.getClass)

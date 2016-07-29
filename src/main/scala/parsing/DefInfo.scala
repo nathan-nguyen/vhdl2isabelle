@@ -4,7 +4,7 @@ import parsing.V2IUtils.VHDLize
 
 import scala.collection.mutable
 
-class DefInfo {
+final class DefInfo(defInfo: Option[DefInfo]) {
 
   //  TODO perhaps need preserving order for each map
 
@@ -14,6 +14,28 @@ class DefInfo {
   val sl = mutable.Map.empty[String, ISignalListDef]
   val ps = mutable.Map.empty[String, IPortScalarDef]
   val pl = mutable.Map.empty[String, IPortListDef]
+
+  defInfo match {
+    case Some(di) => {
+      vs ++= di.vs
+      vl ++= di.vl
+      ss ++= di.ss
+      sl ++= di.sl
+      ps ++= di.ps
+      pl ++= di.pl
+    }
+    case None => {
+      ps += {
+        //    TODO currently rewrite "clk" to "p_clk" in vhd file
+        //    TODO ideally definition should be parsed from vhd file
+        //    TODO definition should not exist in isar file
+        val id = "p_clk"
+        val iVariable = IVariable("val_c", "CHR ''0''")
+        val exp_con = IExp_con("std_ulogic", iVariable)
+        id -> IPortScalarDef(id, "std_ulogic", exp_con, "in", "connected")
+      }
+    }
+  }
 
   def +=(id: String, d: IVarScalarDef) = vs += (id -> d)
 

@@ -5,11 +5,11 @@ import java.nio.file.{Files, Paths}
 
 import org.antlr.v4.runtime.{ANTLRFileStream, CommonTokenStream, Lexer, Token}
 import org.slf4j.LoggerFactory
-import parsing.{IEnv, TVisitor}
+import parsing.{IEnv, TVisitor, VInfo}
 import sg.edu.ntu.hchen.{VHDLLexer, VHDLParser}
 import utils.PErrorListener
 
-class VITran(inFile: String, outDir: String) {
+class VITran(inFile: String, vInfo: Option[VInfo]) {
 
   val logger = LoggerFactory.getLogger(getClass)
 
@@ -43,17 +43,21 @@ class VITran(inFile: String, outDir: String) {
     }
   }
 
-  def transferImpl(): TVisitor = {
-    val visitor = new TVisitor
+  def _process(): TVisitor = {
+    val visitor = new TVisitor(vInfo)
     val tree = parser.design_file()
     visitor.visit(tree)
-    val env = IEnv(visitor.defInfo)
-    println(s"${env.repr}")
     visitor
   }
 
-  def transfer() = {
-    val visitor = transferImpl()
+  def preInfo: VInfo = {
+    val visitor = _process()
+    VInfo(visitor.typeInfo, visitor.defInfo)
+  }
+
+  def dump(outDir: String) = {
+    val visitor = _process()
+    val env = IEnv(visitor.defInfo)
     val outFile = outDir + s"${moduleName}.thy"
     val file = new File(outFile)
     if (visitor.definedEntities.nonEmpty) {
