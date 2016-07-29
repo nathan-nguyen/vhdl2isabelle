@@ -36,13 +36,20 @@ signal r, rin : div_regtype;
 signal addin1, addin2, addout: std_logic_vector(32 downto 0);
 signal addsub : std_logic;
 
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
 begin
 
+  --- concurrent_signal_assignment_statement
   arst <= testrst when (ASYNC_RESET and scantest/=0 and testen/='0') else
           rst when ASYNC_RESET else
           '1';
+  -----------------------------------------------------------------------
 
+  --- process_statement
   divcomb : process (r, rst, divi, addout)
+
   variable v : div_regtype;
   variable vready, vnready : std_logic;
   variable vaddin1, vaddin2 : std_logic_vector(32 downto 0);
@@ -127,14 +134,18 @@ begin
     addin1 <= vaddin1; addin2 <= vaddin2; addsub <= vaddsub;
 
   end process;
+  -----------------------------------------------------------------------
 
+  --- process_statement
   divadd : process(addin1, addin2, addsub)
   variable b : std_logic_vector(32 downto 0);
   begin
     if addsub = '1' then b := not addin2; else b := addin2; end if;
     addout <= addin1 + b + addsub;
   end process;
+  -----------------------------------------------------------------------
 
+  --- generate_statement
   syncrregs : if not ASYNC_RESET generate
     reg : process(clk)
     begin
@@ -150,6 +161,9 @@ begin
       end if;
     end process;
   end generate syncrregs;
+  -----------------------------------------------------------------------
+
+  --- generate_statement
   asyncrregs : if ASYNC_RESET generate
     reg : process(clk, arst)
     begin
@@ -160,9 +174,11 @@ begin
       end if;
     end process;
   end generate asyncrregs;
+  -----------------------------------------------------------------------
 
 end;
-
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
 
 entity div32 is
 generic (scantest  : integer := 0);

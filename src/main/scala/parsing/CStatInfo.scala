@@ -1,0 +1,5 @@
+package parsing
+
+class CStatInfo {
+
+}

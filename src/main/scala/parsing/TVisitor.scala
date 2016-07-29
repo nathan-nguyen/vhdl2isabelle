@@ -14,9 +14,68 @@ final class TVisitor(vInfo: Option[VInfo]) extends VHDLBaseVisitor[Unit] {
 
   val typeInfo = new TypeInfo(vInfo.map(_.typeInfo))
 
+  val cStateInfo = new CStatInfo
+
   val definedEntities = mutable.ArrayBuffer.empty[String]
 
   val logger = LoggerFactory.getLogger(classOf[TVisitor])
+
+  private def genIVariable(id: String, expOption: Option[VExp], sti: VSubtypeInd): Unit = {
+    val valType = sti.selectedName
+    if (typeInfo.isListType(valType)) {
+      val initVals = typeInfo.getListInitVals(valType, expOption)
+      val vl = IVarListDef(id, initVals)
+      defInfo +=(id, vl)
+    } else {
+      val initVal = if (typeInfo.isVectorType(valType)) {
+        // TODO perhaps not guess!!!
+        sti.getRange match {
+          case Some(r) => typeInfo._guessVectorInitVal(valType, r)
+          case None => typeInfo._guessVectorInitVal(valType, defaultRange(s"ConstDecl vector ${sti}"))
+        }
+      } else {
+        typeInfo.getScalarInitVal(valType, expOption)
+      }
+      val vs = IVarScalarDef(id, valType, initVal)
+      defInfo +=(id, vs)
+    }
+  }
+
+  private def genIPort(id: String, expOption: Option[VExp], sti: VSubtypeInd, mode: String, conn: String): Unit = {
+    val valType = sti.selectedName
+    if (typeInfo.isListType(valType)) {
+      val initVals = typeInfo.getListInitVals(valType, expOption)
+      val pl = IPortListDef(id, initVals, mode)
+      defInfo +=(id, pl)
+    } else {
+      val initVal = if (typeInfo.isVectorType(valType)) {
+        val range = sti.getRange.getOrElse(defaultRange(s"Port_list vector ${typeInfo}"))
+        typeInfo._guessVectorInitVal(valType, range)
+      } else {
+        typeInfo.getScalarInitVal(valType, expOption)
+      }
+      val ps = IPortScalarDef(id, valType, initVal, mode)
+      defInfo +=(id, ps)
+    }
+  }
+
+  private def genISignal(id: String, sti: VSubtypeInd, signalKind: String): Unit = {
+    val valType = sti.selectedName
+    if (typeInfo.isListType(valType)) {
+      val initVals = typeInfo._guessListInitVals(valType)
+      val sl = ISignalListDef(id, initVals, signalKind)
+      defInfo +=(id, sl)
+    } else {
+      val initVal = if (typeInfo.isVectorType(valType)) {
+        val range = sti.getRange.getOrElse(defaultRange(s"signalDecl vector ${sti}"))
+        typeInfo._guessVectorInitVal(valType, range)
+      } else {
+        typeInfo._guessScalarInitVal(valType)
+      }
+      val ss = ISignalScalarDef(id, valType, initVal, signalKind)
+      defInfo +=(id, ss)
+    }
+  }
 
   override def visitAbstract_literal(ctx: Abstract_literalContext): Unit = super.visitAbstract_literal(ctx)
 
@@ -158,27 +217,8 @@ final class TVisitor(vInfo: Option[VInfo]) extends VHDLBaseVisitor[Unit] {
     val constDecl = VConstDecl(ctx)
     for {
       id <- constDecl.idList
-    } yield {
-      val expOption = constDecl.vExp
-      val subtypeIndication = constDecl.subtypeIndication
-      val valType = subtypeIndication.selectedName
-      if (typeInfo.isListType(valType)) {
-        val initVals = typeInfo.getListInitVals(valType, expOption)
-        val vl = IVarListDef(id, initVals)
-        defInfo +=(id, vl)
-      } else {
-        val initVal = if (typeInfo.isVectorType(valType)) {
-          //          TODO perhaps not guess!!!
-          subtypeIndication.getRange match {
-            case Some(r) => typeInfo._guessVectorInitVal(valType, r)
-            case None => typeInfo._guessVectorInitVal(valType, defaultRange(s"ConstDecl vector ${subtypeIndication}"))
-          }
-        } else {
-          typeInfo.getScalarInitVal(valType, expOption)
-        }
-        val vs = IVarScalarDef(id, valType, initVal)
-        defInfo +=(id, vs)
-      }
+    } {
+      genIVariable(id, constDecl.vExp, constDecl.subtypeInd)
     }
     super.visitConstant_declaration(ctx)
   }
@@ -407,22 +447,9 @@ final class TVisitor(vInfo: Option[VInfo]) extends VHDLBaseVisitor[Unit] {
       id <- interfacePortDecl.idList
     } {
       val mode = interfacePortDecl.mode
-      val valType = interfacePortDecl.subtypeIndication.selectedName
+      val sti = interfacePortDecl.subtypeInd
       val expOption = interfacePortDecl.vExp
-      if (typeInfo.isListType(valType)) {
-        val initVals = typeInfo.getListInitVals(valType, expOption)
-        val pl = IPortListDef(id, initVals, mode)
-        defInfo +=(id, pl)
-      } else {
-        val initVal = if (typeInfo.isVectorType(valType)) {
-          val range = interfacePortDecl.subtypeIndication.getRange.getOrElse(defaultRange(s"Port_list vector ${typeInfo}"))
-          typeInfo._guessVectorInitVal(valType, range)
-        } else {
-          typeInfo.getScalarInitVal(valType, expOption)
-        }
-        val ps = IPortScalarDef(id, valType, initVal, mode)
-        defInfo +=(id, ps)
-      }
+      genIPort(id, expOption, sti, mode, "connected")
     }
     super.visitPort_list(ctx)
   }
@@ -447,7 +474,10 @@ final class TVisitor(vInfo: Option[VInfo]) extends VHDLBaseVisitor[Unit] {
 
   override def visitProcess_declarative_part(ctx: Process_declarative_partContext): Unit = super.visitProcess_declarative_part(ctx)
 
-  override def visitProcess_statement(ctx: Process_statementContext): Unit = super.visitProcess_statement(ctx)
+  override def visitProcess_statement(ctx: Process_statementContext): Unit = {
+
+    super.visitProcess_statement(ctx)
+  }
 
   override def visitProcess_statement_part(ctx: Process_statement_partContext): Unit = super.visitProcess_statement_part(ctx)
 
@@ -519,22 +549,8 @@ final class TVisitor(vInfo: Option[VInfo]) extends VHDLBaseVisitor[Unit] {
       id <- signalDecl.idList
     } {
       val signalKind = signalDecl.signalKind.getOrElse("register").toLowerCase
-      val subtypeIndication = signalDecl.subtypeIndication
-      val valType = subtypeIndication.selectedName
-      if (typeInfo.isListType(valType)) {
-        val initVals = typeInfo._guessListInitVals(valType)
-        val sl = ISignalListDef(id, initVals, signalKind)
-        defInfo +=(id, sl)
-      } else {
-        val initVal = if (typeInfo.isVectorType(valType)) {
-          val range = subtypeIndication.getRange.getOrElse(defaultRange(s"signalDecl vector ${subtypeIndication}"))
-          typeInfo._guessVectorInitVal(valType, range)
-        } else {
-          typeInfo._guessScalarInitVal(valType)
-        }
-        val ss = ISignalScalarDef(id, valType, initVal, signalKind)
-        defInfo +=(id, ss)
-      }
+      val sti = signalDecl.subtypeInd
+      genISignal(id, sti, signalKind)
     }
     super.visitSignal_declaration(ctx)
   }
@@ -621,7 +637,15 @@ final class TVisitor(vInfo: Option[VInfo]) extends VHDLBaseVisitor[Unit] {
 
   override def visitVariable_assignment_statement(ctx: Variable_assignment_statementContext): Unit = super.visitVariable_assignment_statement(ctx)
 
-  override def visitVariable_declaration(ctx: Variable_declarationContext): Unit = super.visitVariable_declaration(ctx)
+  override def visitVariable_declaration(ctx: Variable_declarationContext): Unit = {
+    val variabledecl = VVarDecl(ctx)
+    for {
+      id <- variabledecl.idList
+    } yield {
+      genIVariable(id, variabledecl.vExp, variabledecl.subtypeInd)
+    }
+    super.visitVariable_declaration(ctx)
+  }
 
   override def visitWait_statement(ctx: Wait_statementContext): Unit = super.visitWait_statement(ctx)
 

@@ -10,11 +10,11 @@ case class TVRecord(id: String, items: Seq[TVRecordItem])
 
 ///////////////////////////////////////////////////////////////
 
-class TypeInfo(typeInfo: Option[TypeInfo]) {
+class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
 
   import V2IUtils._
 
-  type RecordInfoTy = Seq[(String, VSubtypeIndication)]
+  type RecordInfoTy = Seq[(String, VSubtypeInd)]
 
   val typeDeclTbl: mutable.Map[String, RecordInfoTy] = typeInfo match {
     case Some(ti) => ti.typeDeclTbl
@@ -22,7 +22,6 @@ class TypeInfo(typeInfo: Option[TypeInfo]) {
   }
 
   def +=(id: String, items: RecordInfoTy): Unit = typeDeclTbl += (id -> items)
-
 
   val knownListType = Set("div32_in_type", "div32_out_type")
 

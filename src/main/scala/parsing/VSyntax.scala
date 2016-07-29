@@ -5,7 +5,6 @@ import sg.edu.ntu.hchen.VHDLParser._
 
 import scala.collection.JavaConversions._
 
-
 object VError extends Throwable
 
 
@@ -144,9 +143,9 @@ case class VSecondaryUnitDecl(id: String, literal: VLiteral)
 //////////////////////////////////////////////////////////////
 sealed trait VTypeDef
 
-case class VAccessTypeDef(subtypeIndication: VSubtypeIndication) extends VTypeDef
+case class VAccessTypeDef(subtypeInd: VSubtypeInd) extends VTypeDef
 
-case class VFileTypeDef(subtypeIndication: VSubtypeIndication) extends VTypeDef
+case class VFileTypeDef(subtypeInd: VSubtypeInd) extends VTypeDef
 
 abstract class VScalarTypeDef extends VTypeDef
 
@@ -163,20 +162,20 @@ abstract class VArrayTypeDecl extends VCompositeTypeDecl
 
 case class VIndexSubtypeDef(name: String)
 
-case class VUArrayDef(indexSubtypeDef: Seq[VIndexSubtypeDef], subtypeIndication: VSubtypeIndication) extends VArrayTypeDecl
+case class VUArrayDef(indexSubtypeDef: Seq[VIndexSubtypeDef], subtypeInd: VSubtypeInd) extends VArrayTypeDecl
 
-case class VCArrayDef(indexConstraint: VIndexConstraint, subtypeIndication: VSubtypeIndication) extends VArrayTypeDecl
+case class VCArrayDef(indexConstraint: VIndexConstraint, subtypeInd: VSubtypeInd) extends VArrayTypeDecl
 
 // no element_subtype_definition
-case class VElementDecl(ids: Seq[String], subtypeIndication: VSubtypeIndication) {
-  def flatten = for (id <- ids) yield (id -> subtypeIndication)
+case class VElementDecl(ids: Seq[String], subtypeInd: VSubtypeInd) {
+  def flatten = for (id <- ids) yield (id -> subtypeInd)
 }
 
 object VElementDecl {
   def apply(ctx: Element_declarationContext): VElementDecl = {
     val idList = getIdList(ctx.identifier_list())
-    val subtypeIndication = VSubtypeIndication(ctx.element_subtype_definition().subtype_indication())
-    new VElementDecl(idList, subtypeIndication)
+    val subtypeInd = VSubtypeInd(ctx.element_subtype_definition().subtype_indication())
+    new VElementDecl(idList, subtypeInd)
   }
 }
 
@@ -196,7 +195,7 @@ object VRecordTypeDef {
 
 sealed trait VBlockDeclItem
 
-case class VSubtypeDecl(id: String, subtypeIndication: VSubtypeIndication) extends VBlockDeclItem
+case class VSubtypeDecl(id: String, subtypeInd: VSubtypeInd) extends VBlockDeclItem
 
 // TODO more here
 
@@ -291,13 +290,13 @@ object VAggregate {
 
 sealed trait VQExp
 
-case class VQExpA(subtypeIndication: VSubtypeIndication, aggregate: VAggregate) extends VQExp
+case class VQExpA(subtypeInd: VSubtypeInd, aggregate: VAggregate) extends VQExp
 
-case class VQExpE(subtypeIndication: VSubtypeIndication, exp: VExp) extends VQExp
+case class VQExpE(subtypeInd: VSubtypeInd, exp: VExp) extends VQExp
 
 object VQExp {
   def apply(ctx: Qualified_expressionContext): VQExp = {
-    val subtypeInd = VSubtypeIndication(ctx.subtype_indication())
+    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
     val (aggregate, expression) = (ctx.aggregate(), ctx.expression())
     if (aggregate != null) {
       val vAggregate = VAggregate(aggregate)
@@ -313,7 +312,7 @@ sealed trait VAllocator
 
 case class VallocatorE(qexp: VQExp) extends VAllocator
 
-case class VAllocatorS(subtypeIndication: VSubtypeIndication) extends VAllocator
+case class VAllocatorS(subtypeInd: VSubtypeInd) extends VAllocator
 
 object VAllocator {
   def apply(ctx: AllocatorContext): VAllocator = {
@@ -322,7 +321,7 @@ object VAllocator {
     if (qualified_expression != null) {
       VallocatorE(VQExp(qualified_expression))
     } else if (subtype_indication != null) {
-      VAllocatorS(VSubtypeIndication(subtype_indication))
+      VAllocatorS(VSubtypeInd(subtype_indication))
     } else throw VError
   }
 }
@@ -394,20 +393,19 @@ case class VPrimaryName(name: String) extends VPrimary
 
 sealed trait VAliasIndication
 
-case class VSubtypeIndication(selectedName: String,
-                              constraint: Option[VConstraint],
-                              tolerance: Option[VToleranceAspect]
-                             ) extends VAliasIndication {
+case class VSubtypeInd(selectedName: String,
+                       constraint: Option[VConstraint],
+                       tolerance: Option[VToleranceAspect]) extends VAliasIndication {
   //  TODO currently suppose it is a (Int, Int)
   def getRange: Option[RangeTy] = constraint.map(_.getRange)
 }
 
-object VSubtypeIndication {
-  def apply(ctx: Subtype_indicationContext): VSubtypeIndication = {
+object VSubtypeInd {
+  def apply(ctx: Subtype_indicationContext): VSubtypeInd = {
     val selectedName = Antlr2VTy.selectedNameFromSubtypeInd(ctx).toLowerCase
     val constraint = Option(ctx.constraint()).map(VConstraint(_))
     val tolerance = Option(ctx.tolerance_aspect()).map(VToleranceAspect(_))
-    new VSubtypeIndication(selectedName, constraint, tolerance)
+    new VSubtypeInd(selectedName, constraint, tolerance)
   }
 }
 
@@ -453,9 +451,9 @@ case class VRangeN(name: String) extends VRange
 sealed trait VDiscreteRange {
   def getRange: RangeTy = this match {
     case VDiscreteRangeR(range) => range.getRange
-    case VDiscreteRangeSub(subtypeIndication) => subtypeIndication.getRange match {
+    case VDiscreteRangeSub(subtypeInd) => subtypeInd.getRange match {
       case Some(range) => range
-      case None => defaultRange(s"VDiscreteRangeSub ${subtypeIndication}")
+      case None => defaultRange(s"VDiscreteRangeSub ${subtypeInd}")
     }
   }
 }
@@ -467,14 +465,14 @@ object VDiscreteRange {
     if (range != null) {
       VDiscreteRangeR(VRange(range))
     } else if (subtype_indication != null) {
-      VDiscreteRangeSub(VSubtypeIndication(subtype_indication))
+      VDiscreteRangeSub(VSubtypeInd(subtype_indication))
     } else throw VError
   }
 }
 
 case class VDiscreteRangeR(range: VRange) extends VDiscreteRange
 
-case class VDiscreteRangeSub(subtypeIndication: VSubtypeIndication) extends VDiscreteRange
+case class VDiscreteRangeSub(subtypeInd: VSubtypeInd) extends VDiscreteRange
 
 ////////////////////////////////////////////////////////////
 
@@ -891,67 +889,67 @@ object VExp {
 
 ///////////////////////////////////////////////////////////////////////
 
-case class VConstDecl(idList: Seq[String], subtypeIndication: VSubtypeIndication, vExp: Option[VExp])
+case class VConstDecl(idList: Seq[String], subtypeInd: VSubtypeInd, vExp: Option[VExp])
 
 object VConstDecl {
   def apply(ctx: Constant_declarationContext): VConstDecl = {
     val idList = getIdList(ctx.identifier_list())
-    val subtypeIndication = VSubtypeIndication(ctx.subtype_indication())
+    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
     val vExp = Option(ctx.expression()).map(VExp(_))
-    new VConstDecl(idList, subtypeIndication, vExp)
+    new VConstDecl(idList, subtypeInd, vExp)
   }
 }
 
 
 ///////////////////////////////////////////////////////////////////////
 
-case class VSignalDecl(idList: Seq[String], subtypeIndication: VSubtypeIndication,
+case class VSignalDecl(idList: Seq[String], subtypeInd: VSubtypeInd,
                        signalKind: Option[String], exp: Option[VExp])
 
 object VSignalDecl {
   def apply(ctx: Signal_declarationContext): VSignalDecl = {
     val idList = getIdList(ctx.identifier_list())
-    val subtypeIndication = VSubtypeIndication(ctx.subtype_indication())
+    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
     val signalKind = Option(ctx.signal_kind()).map(_.getText.toLowerCase)
     val exp = Option(ctx.expression()).map(VExp(_))
-    new VSignalDecl(idList, subtypeIndication, signalKind, exp)
+    new VSignalDecl(idList, subtypeInd, signalKind, exp)
   }
 }
 
 ///////////////////////////////////////////////////////////////////////
 
-case class VInterfaceSignalDecl(idList: Seq[String], subtypeIndication: VSubtypeIndication, vExp: Option[VExp])
+case class VInterfaceSignalDecl(idList: Seq[String], subtypeInd: VSubtypeInd, vExp: Option[VExp])
 
 object VInterfaceSignalDecl {
   def apply(ctx: Interface_signal_declarationContext): VInterfaceSignalDecl = {
     val idList = getIdList(ctx.identifier_list())
-    val subtypeIndication = VSubtypeIndication(ctx.subtype_indication())
+    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
     val vExp = Option(ctx.expression()).map(VExp(_))
-    new VInterfaceSignalDecl(idList, subtypeIndication, vExp)
+    new VInterfaceSignalDecl(idList, subtypeInd, vExp)
   }
 }
 
-case class VInterfaceConstDecl(idList: Seq[String], subtypeIndication: VSubtypeIndication, vExp: Option[VExp])
+case class VInterfaceConstDecl(idList: Seq[String], subtypeInd: VSubtypeInd, vExp: Option[VExp])
 
 object VInterfaceConstDecl {
   def apply(ctx: Interface_constant_declarationContext): VInterfaceConstDecl = {
     val idList = getIdList(ctx.identifier_list())
-    val subtypeIndication = VSubtypeIndication(ctx.subtype_indication())
+    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
     val vExp = Option(ctx.expression()).map(VExp(_))
-    new VInterfaceConstDecl(idList, subtypeIndication, vExp)
+    new VInterfaceConstDecl(idList, subtypeInd, vExp)
   }
 }
 
 case class VInterfacePortDecl(idList: Seq[String], mode: String,
-                              subtypeIndication: VSubtypeIndication, vExp: Option[VExp])
+                              subtypeInd: VSubtypeInd, vExp: Option[VExp])
 
 object VInterfacePortDecl {
   def apply(ctx: Interface_port_declarationContext): VInterfacePortDecl = {
     val idList = getIdList(ctx.identifier_list())
     val mode = ctx.signal_mode().getText
-    val subtypeIndication = VSubtypeIndication(ctx.subtype_indication())
+    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
     val vExp = Option(ctx.expression()).map(VExp(_))
-    new VInterfacePortDecl(idList, mode, subtypeIndication, vExp)
+    new VInterfacePortDecl(idList, mode, subtypeInd, vExp)
   }
 }
 
@@ -1129,3 +1127,101 @@ case class VConcurrentSignalAssignStatC(labelColon: Option[String],
 case class VConcurrentSignalAssignStatS(labelColon: Option[String],
                                         postPonded: Boolean,
                                         selectSignalAssign: VSelectedSignalAssign) extends VConcurrentSignalAssignStat
+
+
+///////////////////////////////////////////////////////////////////////////////////
+case class VVarDecl(shared: Boolean, idList: Seq[String],
+                    subtypeInd: VSubtypeInd, vExp: Option[VExp])
+
+object VVarDecl {
+  def apply(ctx: Variable_declarationContext): VVarDecl = {
+    val shared = ctx.SHARED() != null
+    val idList = getIdList(ctx.identifier_list())
+    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
+    val vExp = Option(ctx.expression()).map(VExp(_))
+    new VVarDecl(shared, idList, subtypeInd, vExp)
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+case class VSubProgSpec()
+
+////////////////////////////////////////////////////////////////////////////////
+
+case class VSubProgBody()
+
+////////////////////////////////////////////////////////////////////////////////
+
+case class VTypeDecl()
+
+////////////////////////////////////////////////////////////////////////////////
+
+case class VFileDecl()
+
+////////////////////////////////////////////////////////////////////////////////
+
+case class VAliasDecl()
+
+////////////////////////////////////////////////////////////////////////////////
+case class VAttrDecl()
+
+////////////////////////////////////////////////////////////////////////////////
+case class VAttrSpec()
+
+////////////////////////////////////////////////////////////////////////////////
+case class VUseClause()
+
+////////////////////////////////////////////////////////////////////////////////
+case class VGrpTempDecl()
+
+////////////////////////////////////////////////////////////////////////////////
+
+case class VGrpDecl()
+
+////////////////////////////////////////////////////////////////////////////////
+sealed abstract class VProcDeclItem
+
+// subprogram_declaration not defined
+case class VProcDeclItemSPD(subProgDecl: VSubProgSpec) extends VProcDeclItem
+
+case class VProcDeclItemSPB(subProgBody: VSubProgBody) extends VProcDeclItem
+
+case class VProcDeclItemTD(typeDecl: VTypeDecl) extends VProcDeclItem
+
+case class VProcDeclItemSTD(subtypeDecl: VSubtypeDecl) extends VProcDeclItem
+
+case class VProcDeclItemCD(constDecl: VConstDecl) extends VProcDeclItem
+
+case class VProcDeclItemVD(varDecl: VVarDecl) extends VProcDeclItem
+
+case class VProcDeclItemFD(fileDecl: VFileDecl) extends VProcDeclItem
+
+case class VProcDeclItemAliasD(aliasDecl: VAliasDecl) extends VProcDeclItem
+
+case class VProcDeclItemAttrD(attrDecl: VAttrDecl) extends VProcDeclItem
+
+case class VProcDeclItemAttrS(attrSpec: VAttrSpec) extends VProcDeclItem
+
+case class VProcDeclItemUC(useClause: VUseClause) extends VProcDeclItem
+
+case class VProcDeclGTD(grpTemplDecl: VGrpTempDecl) extends VProcDeclItem
+
+case class VProcDeclGD(grpDecl: VGrpDecl) extends VProcDeclItem
+
+/////////////////////////////////////////////////////////////////////////////////
+
+sealed abstract class VSeqStat
+
+
+
+/////////////////////////////////////////////////////////////////////////////////
+case class VProcStatPart(seqStatList: List[VSeqStat])
+
+/////////////////////////////////////////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////////////////////////////////////
