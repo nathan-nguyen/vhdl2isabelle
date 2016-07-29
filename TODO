@@ -1,4 +1,5 @@
 - list-list
 - vector string init
 - architecture definition
-- IExp_con
+- abbrevation seems impossible in translation
+- parse >1 and pre-parse files

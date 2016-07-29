@@ -176,7 +176,7 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
         } else {
           typeInfo.getScalarInitVal(valType, expOption)
         }
-        val varDef = IVarDef(id, valType, initVal)
+        val varDef = IVarScalarDef(id, valType, initVal)
         defs += (id -> varDef)
       }
     }
@@ -419,7 +419,7 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
         } else {
           typeInfo.getScalarInitVal(valType, expOption)
         }
-        IPortDef(id, valType, initVal, mode)
+        IPortScalarDef(id, valType, initVal, mode)
       }
       defs += (id -> curDef)
     }
@@ -530,7 +530,7 @@ final class TVisitor extends VHDLBaseVisitor[Unit] {
         } else {
           typeInfo._guessScalarInitVal(valType)
         }
-        ISignalDef(id, valType, initVal, signalKind)
+        ISignalScalarDef(id, valType, initVal, signalKind)
       }
       defs += (id -> curDef)
     }

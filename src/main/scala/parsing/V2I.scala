@@ -19,7 +19,7 @@ object V2I {
     ("???", "???", "???")
   }
 
-  @inline def defaultScalarValue(msg: String) = {
+  def defaultScalarValue(msg: String): IVariable = {
     logger.warn(s"defaultScalarValue: ${msg}")
     IVariable("???", "???")
   }
@@ -50,14 +50,17 @@ object V2I {
       if (isListType(valType)) s"${rawIdType} list" else rawIdType
     }
 
-    def _guessScalarInitVal(valType: String): IVariable = valType match {
-      case "integer" => IVariable("val_i", "0")
-      case "real" => IVariable("val_r", "0.0")
-      case "character" => IVariable("val_c", "(CHR ''0'')")
-      case "boolean" => IVariable("val_b", "True)")
-      case "std_ulogic" => IVariable("val_c", "(CHR ''0'')")
-      case "std_logic" => IVariable("val_c", "(CHR ''0'')")
-      case _ => IVariable("TODO", "Scalar unknown")
+    def _guessScalarInitVal(valType: String): IExp_con = {
+      val initValue = valType match {
+        case "integer" => IVariable("val_i", "0")
+        case "real" => IVariable("val_r", "0.0")
+        case "character" => IVariable("val_c", "(CHR ''0'')")
+        case "boolean" => IVariable("val_b", "True")
+        case "std_ulogic" => IVariable("val_c", "(CHR ''0'')")
+        case "std_logic" => IVariable("val_c", "(CHR ''0'')")
+        case _ => IVariable("TODO", "Scalar unknown")
+      }
+      IExp_con(s"${valType}", initValue)
     }
 
     def getScalarInitVal(valType: String, expOption: Option[VExp]): IExp = expOption match {
@@ -68,7 +71,10 @@ object V2I {
           _guessScalarInitVal(valType)
         } else {
           //        repr -> IExpr
-          IVariable("TODO", "Scalar repr")
+          exp.toIExp match {
+            case iVar: IVariable => IExp_con(valType, iVar)
+            case e => e
+          }
         }
       }
       case None => _guessScalarInitVal(valType)
@@ -83,7 +89,7 @@ object V2I {
         if (isListType(valType)) {
           val initVals = _guessListInitVals(valType)
           //      TODO    IValue shoud have other forms
-          IScalarOrVecIval(itemId, valType, defaultScalarValue(s"list-list: ${initVals}"))
+          IScalarOrVecIval(itemId, valType, defaultScalarValue(s"list-list ${initVals}"))
         } else {
           val initVal = if (isVectorType(valType)) {
             val range = subtypeIndication.getRange.getOrElse(defaultRange(s"guessListInit vector ${subtypeIndication}"))
@@ -97,16 +103,17 @@ object V2I {
       iVals.toList
     }
 
-    def _guessVectorInitVal(valType: String, r: RangeTy, numericVal: String = "'0'"): IExp = {
+    def _guessVectorInitVal(valType: String, r: RangeTy, numericVal: String = "'0'"): IExp_con = {
       require(valType.endsWith("_vector"), "vector")
       val genCmd = valType.substring(0, valType.length - "_vector".length) + "_vec_gen"
       val valListType = if (r._2 == "to") "val_list" else if (r._2 == "downto") "val_rlist" else "???"
-      if (List("val_lsit", "val_rlist").contains(valListType)) {
+      val initValue = if (List("val_lsit", "val_rlist").contains(valListType)) {
         val iVarChar = IVariable("val_c", s"(CHR '${numericVal}')")
         IVariable(valListType, s"(${genCmd} ${Math.abs(r._1.toInt - r._3.toInt) + 1} ${iVarChar})")
       } else {
         IVariable(valListType, s"???")
       }
+      IExp_con(valType, initValue)
     }
 
     //    expOption  is taken from definition; but type information should be record type declaration

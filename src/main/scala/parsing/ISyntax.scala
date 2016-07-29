@@ -4,9 +4,18 @@ import parsing.V2I._
 
 //////////////////////////////////////////////////////////////////////////////
 
-sealed trait IDef
+sealed trait IDef {
+}
 
-case class IVarDef(id: String, valType: String, iExp: IExp) extends IDef {
+sealed abstract class ISigPrt {
+  def repr: String
+}
+
+
+sealed abstract class IVarDef extends IDef
+
+
+case class IVarScalarDef(id: String, valType: String, iExp: IExp) extends IVarDef {
   override def toString = {
     s"""definition ${id}:: \"variable\" where
         | \"${id} ≡ (''${id}'', ${VHDLize(valType)}, ${iExp})\"""".stripMargin
@@ -15,13 +24,12 @@ case class IVarDef(id: String, valType: String, iExp: IExp) extends IDef {
   def asItem = s"""vl_v (''${id}'', ${VHDLize(valType)}, ${iExp})"""
 }
 
-case class IVarListDef(id: String, iVals: List[IScalarOrVecIval]) extends IDef {
+case class IVarListDef(id: String, iVals: List[IScalarOrVecIval]) extends IVarDef {
   override def toString = {
     val varDefs = for {
       iVal <- iVals
-    } yield {
-      IVarDef(s"${id}_${iVal.itemId}", iVal.valType, iVal.initVal)
-    }
+    } yield IVarScalarDef(s"${id}_${iVal.itemId}", iVal.valType, iVal.initVal)
+
     val itemsRepr = varDefs.map(_.asItem).mkString("[\n ", ",\n ", "\n]")
     s"""definition ${id}:: \"vl\" where
         |\"${id} ≡ vnl ('''', ${itemsRepr})\"
@@ -29,58 +37,58 @@ case class IVarListDef(id: String, iVals: List[IScalarOrVecIval]) extends IDef {
   }
 }
 
-case class IPortDef(id: String, valType: String, iExp: IExp, mode: String, conn: String = "connected") extends IDef {
+sealed abstract class IPortDef extends ISigPrt
+
+case class IPortScalarDef(id: String, valType: String, iExp: IExp, mode: String, conn: String = "connected") extends IPortDef {
   override def toString = {
     s"""definition ${id}:: \"port\" where
         | \"${id} ≡ (''${id}'', ${VHDLize(valType)}, mode_${mode}, ${conn}, ${iExp})\"""".stripMargin
   }
 
   def asItem = s"""spl_p (''${id}'', ${VHDLize(valType)}, mode_${mode}, ${conn}, ${iExp})"""
+
+  override def repr: String = s"(sp_p ${id})"
 }
 
-case class IPortListDef(id: String, iVals: List[IScalarOrVecIval], mode: String, conn: String = "connected") extends IDef {
+case class IPortListDef(id: String, iVals: List[IScalarOrVecIval], mode: String, conn: String = "connected") extends IPortDef {
   override def toString = {
     val portDefs = for {
       iVal <- iVals
-    } yield {
-      val initValue = iVal.initVal match {
-        case iVariable: IVariable => IExp_con(iVal.valType, iVariable)
-        case _ => iVal.initVal
-      }
-      IPortDef(s"${id}_${iVal.itemId}", iVal.valType, initValue, mode, conn)
-    }
+    } yield IPortScalarDef(s"${id}_${iVal.itemId}", iVal.valType, iVal.initVal, mode, conn)
     val itemsRepr = portDefs.map(_.asItem).mkString("[\n ", ",\n ", "\n]")
     s"""definition ${id}:: \"spl\" where
         |\"${id} ≡ spnl ('''', ${itemsRepr})\"
      """.stripMargin
   }
+
+  override def repr: String = s"(sp_p ${id})"
 }
 
-case class ISignalDef(id: String, valType: String, iExp: IExp, signalKind: String = "register") extends IDef {
+sealed abstract class ISignalDef extends ISigPrt
+
+case class ISignalScalarDef(id: String, valType: String, iExp: IExp, signalKind: String = "register") extends ISignalDef {
   override def toString = {
     s"""definition ${id}:: \"signal\" where
         | \"${id} ≡ (''${id}'', ${VHDLize(valType)}, ${signalKind}, ${iExp})\"""".stripMargin
   }
 
   def asItem = s"""spl_s (''${id}'', ${VHDLize(valType)}, ${signalKind}, ${iExp})"""
+
+  override def repr: String = s"(sp_s ${id})"
 }
 
-case class ISignalListDef(id: String, iVals: List[IScalarOrVecIval], signalKind: String = "register") extends IDef {
+case class ISignalListDef(id: String, iVals: List[IScalarOrVecIval], signalKind: String = "register") extends ISignalDef {
   override def toString = {
     val signalDefs = for {
       iVal <- iVals
-    } yield {
-      val initValue = iVal.initVal match {
-        case iVariable: IVariable => iVariable // IExp_con(iVal.valType, iVariable)
-        case _ => iVal.initVal
-      }
-      ISignalDef(s"${id}_${iVal.itemId}", iVal.valType, initValue, signalKind)
-    }
+    } yield ISignalScalarDef(s"${id}_${iVal.itemId}", iVal.valType, iVal.initVal, signalKind)
     val itemsRepr = signalDefs.map(_.asItem).mkString("[\n ", ",\n ", "\n]")
     s"""definition ${id}:: \"spl\" where
         |\"${id} ≡ spnl ('''', ${itemsRepr})\"
      """.stripMargin
   }
+
+  override def repr: String = s"(sp_s ${id})"
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -94,7 +102,6 @@ sealed trait IValue
 
 final case class IScalarOrVecIval(itemId: String, valType: String, initVal: IExp) extends IValue
 
-// FIXME may change isar definition
 final case class IListVal(itemId: String, valType: String) extends IValue
 
 ////////////////////////////////////////////////////////////////////////////
@@ -103,6 +110,11 @@ final case class ISignal(valType: String, iExp: IExp, signalKind: String)
 
 final case class IPort(valType: String, mode: String, iExp: IExp, conn: String = "connected")
 
+/**
+  * make it IExp since otherwise there is no "toIExp" for it
+  * It actually acts as a VALUE in Isar
+  * TODO see whether needed to add another VALUE class
+  */
 final case class IVariable(isarType: String, initVal: String) extends IExp
 
 sealed trait IExp {

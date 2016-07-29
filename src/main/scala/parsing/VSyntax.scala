@@ -29,17 +29,16 @@ object Antlr2VTy {
 import parsing.Antlr2VTy._
 
 sealed abstract class VLiteral {
-  //  FIXME if s is numeric literal, it should be transfered to decimal firstly
-
-  def toIExp: IExp = this match {
+  def toIExp: IVariable = this match {
     // numeric
+    // FIXME if s is numeric literal, it should be transfered to decimal firstly
     case VLiteralNumInt(s) => IVariable("val_i", s)
     case VLiteralNumReal(s) => IVariable("var_r", s)
     case VLiteralNumBase(s) => defaultScalarValue(s)
     // enumeral
-    // only a guess
+    // TODO only a guess, may change later
     case VLiteralEnumId(s) => defaultScalarValue(s"VLiteralEnumChar ${s}")
-    case VLiteralEnumChar(s) => IVariable("var_c", s)
+    case VLiteralEnumChar(s) => IVariable("val_c", s"(CHR '${s}')")
     // other cases
     case _ => defaultScalarValue(s"VLiteral ${this}")
   }
@@ -69,7 +68,6 @@ object VLiteral {
     } else throw VError
   }
 }
-
 
 case object VLiteralNull extends VLiteral
 
@@ -137,9 +135,6 @@ case class VLiteralNumBase(s: String) extends VLiteralNumAbs(s)
 
 case class VLiteralNumPhy(s: String) extends VLiteralNum(s)
 
-/////////////////////////////////////////////////////////////
-
-
 //////////////////////////////////////////////////////////////
 
 case class VBaseUnitDecl(id: String)
@@ -155,7 +150,8 @@ case class VFileTypeDef(subtypeIndication: VSubtypeIndication) extends VTypeDef
 
 abstract class VScalarTypeDef extends VTypeDef
 
-case class VPhysicalTypeDef(rangeConstraint: VRangeConstraint, baseUnitDecl: VBaseUnitDecl, secondaryUnitDecl: Seq[VSecondaryUnitDecl], id: Option[String]) extends VScalarTypeDef
+case class VPhysicalTypeDef(rangeConstraint: VRangeConstraint, baseUnitDecl: VBaseUnitDecl,
+                            secondaryUnitDecl: Seq[VSecondaryUnitDecl], id: Option[String]) extends VScalarTypeDef
 
 case class VEnumTypeDef(literal: VLiteral, others: Seq[VLiteral]) extends VScalarTypeDef
 
@@ -424,8 +420,9 @@ object VToleranceAspect {
   }
 }
 
-case class VSubnatureIndication(name: String, indexConstraint: Option[VIndexConstraint], exprs: Option[(VExp, VExp)]) extends VAliasIndication
-
+case class VSubnatureIndication(name: String,
+                                indexConstraint: Option[VIndexConstraint],
+                                exprs: Option[(VExp, VExp)]) extends VAliasIndication
 
 sealed trait VRange {
   def getRange: RangeTy = this match {
@@ -890,7 +887,6 @@ object VExp {
     } yield VLogicOp(op)
     VExp(relationList.head, logicalOps, relationList.tail)
   }
-
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -909,7 +905,8 @@ object VConstDecl {
 
 ///////////////////////////////////////////////////////////////////////
 
-case class VSignalDecl(idList: Seq[String], subtypeIndication: VSubtypeIndication, signalKind: Option[String], exp: Option[VExp])
+case class VSignalDecl(idList: Seq[String], subtypeIndication: VSubtypeIndication,
+                       signalKind: Option[String], exp: Option[VExp])
 
 object VSignalDecl {
   def apply(ctx: Signal_declarationContext): VSignalDecl = {
@@ -945,7 +942,8 @@ object VInterfaceConstDecl {
   }
 }
 
-case class VInterfacePortDecl(idList: Seq[String], mode: String, subtypeIndication: VSubtypeIndication, vExp: Option[VExp])
+case class VInterfacePortDecl(idList: Seq[String], mode: String,
+                              subtypeIndication: VSubtypeIndication, vExp: Option[VExp])
 
 object VInterfacePortDecl {
   def apply(ctx: Interface_port_declarationContext): VInterfacePortDecl = {
@@ -1057,11 +1055,8 @@ case class VWaveFormE(elems: Seq[VWaveFormElem]) extends VWaveForm {
 
 object VWaveFormU extends VWaveForm
 
-
 case class VCondWaveForms(vWaveForm: VWaveForm, cond: Option[VExp], elseCond: Option[VCondWaveForms])
 
-
-// TODO check whether there is an infinite recursive call
 object VCondWaveForms {
   def apply(ctx: Conditional_waveformsContext): VCondWaveForms = {
     val waveForm = VWaveForm(ctx.waveform())
@@ -1073,7 +1068,8 @@ object VCondWaveForms {
 
 //////////////////////////////////////////////////////////////////////////////
 
-case class VSelectedWaveForm(waveForm: VWaveForm, choices: VChoices, waveFormOpt: Option[VWaveForm], choicesOpt: Option[VChoices])
+case class VSelectedWaveForm(waveForm: VWaveForm, choices: VChoices,
+                             waveFormOpt: Option[VWaveForm], choicesOpt: Option[VChoices])
 
 object VSelectedWaveForm {
   def apply(ctx: Selected_waveformsContext): VSelectedWaveForm = {
@@ -1126,6 +1122,10 @@ object VConcurrentSignalAssignStat {
   }
 }
 
-case class VConcurrentSignalAssignStatC(labelColon: Option[String], postPonded: Boolean, condSignAssign: VCondSignAssign) extends VConcurrentSignalAssignStat
+case class VConcurrentSignalAssignStatC(labelColon: Option[String],
+                                        postPonded: Boolean,
+                                        condSignAssign: VCondSignAssign) extends VConcurrentSignalAssignStat
 
-case class VConcurrentSignalAssignStatS(labelColon: Option[String], postPonded: Boolean, selectSignalAssign: VSelectedSignalAssign) extends VConcurrentSignalAssignStat
+case class VConcurrentSignalAssignStatS(labelColon: Option[String],
+                                        postPonded: Boolean,
+                                        selectSignalAssign: VSelectedSignalAssign) extends VConcurrentSignalAssignStat
