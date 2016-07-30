@@ -2,21 +2,19 @@ package parsing
 
 import scala.language.implicitConversions
 
-case class IEnv_sp(ss: List[ISignalScalarDef], sl: List[ISignalListDef],
-                   ps: List[IPortScalarDef], pl: List[IPortListDef]) {
+case class IEnv_sp(signalList: List[Signal], portList: List[Port], spnlList: List[SPnl]) {
 
   override def toString: String = {
-    s"""${ss.map(_.as_sigprt).mkString("[", ",", "]")}
-       |@${sl.map(_.as_sigprt).mkString("@")}
-       |@${ps.map(_.as_sigprt).mkString("[", ",", "]")}
-       |@${pl.map(_.as_sigprt).mkString("@")}""".stripMargin
+    s"""${signalList.map(_.as_list).mkString("@")}
+       |@${portList.map(_.as_list).mkString("@")}
+       |@${spnlList.map(_.as_list).mkString("@")}""".stripMargin
   }
 }
 
-case class IEnv_v(vs: List[IVarScalarDef], vl: List[IVarListDef]) {
+case class IEnv_v(variableList: List[IVariable], vnlList: List[Vnl]) {
   override def toString: String = {
-    s"""${vs.map(_.as_v).mkString("[", ",", "]")}
-       |@${vl.map(_.as_vlist).mkString("@")}""".stripMargin
+    s"""${variableList.map(_.as_list).mkString("@")}
+       |@${vnlList.map(_.as_list) mkString ("@")}""".stripMargin
   }
 }
 
@@ -28,16 +26,16 @@ case class IEnv_t() {
 
 case class IEnv(env_sp: IEnv_sp, env_v: IEnv_v, env_t: IEnv_t) {
   def repr =
-    s"""|(env_sp = [${env_sp}],
-        | env_v = [${env_v}],
+    s"""|(env_sp = ${env_sp},
+        | env_v = ${env_v},
         | env_t = ${env_t})""".stripMargin
 }
 
 object IEnv {
   def apply(di: DefInfo): IEnv = {
-    implicit def m2l[K, V <: IDef](m: scala.collection.mutable.Map[K, V]): List[V] = m.values.toList
-    val env_sp = IEnv_sp(di.ss, di.sl, di.ps, di.pl)
-    val env_v = IEnv_v(di.vs, di.vl)
+    implicit def toSecond[T](s: Seq[T]): List[T] = s.toList
+    val env_sp = IEnv_sp(di.s_raw, di.p_raw, di.spnl_raw)
+    val env_v = IEnv_v(di.v_raw, di.vnl_raw)
     val env_t = IEnv_t()
     new IEnv(env_sp, env_v, env_t)
   }

@@ -3,9 +3,10 @@ package main
 import java.io.File
 import java.nio.file.{Files, Paths}
 
+import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{ANTLRFileStream, CommonTokenStream, Lexer, Token}
 import org.slf4j.LoggerFactory
-import parsing.{IEnv, TVisitor, VInfo}
+import parsing._
 import sg.edu.ntu.hchen.{VHDLLexer, VHDLParser}
 import utils.PErrorListener
 
@@ -43,30 +44,33 @@ class VITran(inFile: String, vInfo: Option[VInfo]) {
     }
   }
 
-  def _process(): TVisitor = {
-    val visitor = new TVisitor(vInfo)
+  def _process(): Keeper = {
     val tree = parser.design_file()
-    visitor.visit(tree)
-    visitor
+    val listener = new TListener(vInfo)
+    val walker = new ParseTreeWalker
+    walker.walk(listener, tree)
+    listener
   }
 
   def preInfo: VInfo = {
-    val visitor = _process()
-    VInfo(visitor.typeInfo, visitor.defInfo)
+    val keeper = _process()
+    VInfo(keeper.typeInfo, keeper.defInfo)
   }
 
   def dump(outDir: String) = {
-    val visitor = _process()
-    val env = IEnv(visitor.defInfo)
+    val keeper = _process()
+    val env = IEnv(keeper.defInfo)
+    logger.info(s"${env.repr}")
     val outFile = outDir + s"${moduleName}.thy"
     val file = new File(outFile)
-    if (visitor.definedEntities.nonEmpty) {
-      for (entity <- visitor.definedEntities) {
+    if (keeper.definedEntities.nonEmpty) {
+      for (entity <- keeper.definedEntities) {
         val exportRawName = s"${moduleName}_${entity}"
         printToFile(file) { p =>
           p.println(header)
           p.println("begin\n")
-          p.println(visitor.defInfo)
+          p.println(keeper.defInfo)
+          p.println("\n\n")
           p.println(foot(entity, exportRawName, "OCaml"))
           p.println("\nend")
         }

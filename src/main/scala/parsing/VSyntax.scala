@@ -28,16 +28,16 @@ object Antlr2VTy {
 import parsing.Antlr2VTy._
 
 sealed abstract class VLiteral {
-  def toIExp: IVariable = this match {
+  def toIExp: IValue = this match {
     // numeric
     // FIXME if s is numeric literal, it should be transfered to decimal firstly
-    case VLiteralNumInt(s) => IVariable("val_i", s)
-    case VLiteralNumReal(s) => IVariable("var_r", s)
+    case VLiteralNumInt(s) => IValue("val_i", s)
+    case VLiteralNumReal(s) => IValue("var_r", s)
     case VLiteralNumBase(s) => defaultScalarValue(s)
     // enumeral
     // TODO only a guess, may change later
     case VLiteralEnumId(s) => defaultScalarValue(s"VLiteralEnumChar ${s}")
-    case VLiteralEnumChar(s) => IVariable("val_c", s"(CHR '${s}')")
+    case VLiteralEnumChar(s) => IValue("val_c", s"(CHR '${s}')")
     // other cases
     case _ => defaultScalarValue(s"VLiteral ${this}")
   }

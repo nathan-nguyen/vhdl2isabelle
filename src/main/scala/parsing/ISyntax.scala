@@ -4,33 +4,20 @@ import parsing.V2IUtils._
 
 ////////////////////////////////////////////////////////////////////////////
 
-/**
-  * an IValue has name and
-  * 1. an initial value (IExp) and type
-  * 2. a list of initial value (IExp) and type
-  */
-sealed trait IValue
-
-final case class IScalarOrVecIval(itemId: String, valType: String, initVal: IExp) extends IValue
-
-final case class IListVal(itemId: String, valType: String) extends IValue
+final case class IData(itemId: String, valType: String, initVal: IExp)
 
 ////////////////////////////////////////////////////////////////////////////
-
-final case class ISignal(valType: String, iExp: IExp, signalKind: String)
-
-final case class IPort(valType: String, mode: String, iExp: IExp, conn: String = "connected")
 
 /**
   * make it IExp since otherwise there is no "toIExp" for it
   * It actually acts as a VALUE in Isar
   * TODO see whether needed to add another VALUE class
   */
-final case class IVariable(isarType: String, initVal: String) extends IExp
+final case class IValue(isarType: String, initVal: String) extends IExp
 
 sealed trait IExp {
   override def toString = this match {
-    case IVariable(isarType, initVal) => s"""(${isarType} ${initVal})"""
+    case IValue(isarType, initVal) => s"""(${isarType} ${initVal})"""
     case IExp_con(valType, const) => s"""(exp_con (${VHDLize(valType)}, ${const}))"""
     case IExp_var(valType, variable) => s"""(exp_var (${VHDLize(valType)}, ${variable}))"""
     case IExp_sig(valType, signal) => s"""(exp_sig ${signal})"""
@@ -48,13 +35,13 @@ sealed trait IExp {
   }
 }
 
-case class IExp_con(valType: String, const: IVariable) extends IExp
+case class IExp_con(valType: String, const: IValue) extends IExp
 
-case class IExp_var(valType: String, variable: IVariable) extends IExp
+case class IExp_var(valType: String, variable: IValue) extends IExp
 
-case class IExp_sig(valType: String, signal: ISignal) extends IExp
+case class IExp_sig(valType: String, signal: Signal) extends IExp
 
-case class IExp_prt(valType: String, port: IPort) extends IExp
+case class IExp_prt(valType: String, port: Port) extends IExp
 
 case class IUexp(op: VUop.Ty, e: IExp) extends IExp
 

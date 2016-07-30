@@ -18,35 +18,25 @@ case class Sensitivity_list()
 
 sealed abstract class Discrete_range
 
-case class VHDL_dis_to(l:IExp, r:IExp) extends Discrete_range
+case class VHDL_dis_to(l: IExp, r: IExp) extends Discrete_range
 
-case class VHDL_dis_downto(l:IExp, r:IExp) extends Discrete_range
+case class VHDL_dis_downto(l: IExp, r: IExp) extends Discrete_range
 
 /////////////////////////////////////////////////////////////////////////////////
 
 sealed abstract class SP_lhs
 
-case class Lhs_s(sigPrt: ISigPrt) extends SP_lhs
+case class Lhs_s(sigPrt: SigPrt) extends SP_lhs
 
-case class Lhs_sa(sigPrt: ISigPrt, discreteRange: Discrete_range) extends SP_lhs
-
-/////////////////////////////////////////////////////////////////////////////////
-
-sealed abstract class SPl
-
-case class SPl_s(iSignal: ISignalScalarDef) extends SPl
-
-case class SPl_p(iPortDef: IPortScalarDef) extends SPl
-
-case class SPnl(id: String, splList: List[SPl]) extends SPl
+case class Lhs_sa(sigPrt: SigPrt, discreteRange: Discrete_range) extends SP_lhs
 
 /////////////////////////////////////////////////////////////////////////////////
 
 sealed abstract class V_lhs
 
-case class Lhs_v(variable: IVariable) extends V_lhs
+case class Lhs_v(variable: IValue) extends V_lhs
 
-case class LHs_va(variable: IVariable, discreteRange: Discrete_range) extends V_lhs
+case class LHs_va(variable: IValue, discreteRange: Discrete_range) extends V_lhs
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -74,113 +64,182 @@ case class Sst_e(id: String, cond: IExp) extends Seq_stmt
 
 case object Sst_nl extends Seq_stmt
 
-/////////////////////////////////////////////////////////////////////////////////
-
 
 /////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
 
-sealed abstract class Vl {
-  // TODO deeper flatten?
-  override def toString = this match {
-    case Vl_v(iVarScalarDef) => s"vl_v ${iVarScalarDef.id}"
-    case Vnl(id, vlList) => s"vlist_of_v ${id}"
+case class IVariable(id: String, valType: String, iExp: IExp) extends IDef {
+  override def toString = s"""(''${id}'', ${VHDLize(valType)}, ${iExp})"""
+
+  override def as_definition: String = {
+    s"""definition ${id}:: \"variable\" where
+        | \"${id} ≡ ${toString}\"""".stripMargin
   }
+
+  override def as_list: String = s"[${id}]"
 }
 
-case class Vl_v(iVarScalarDef: IVarScalarDef) extends Vl
+sealed abstract class Vl extends IDef {
+
+  override def toString = this match {
+    case Vl_v(iVariable) => s"(vl_v ${iVariable})"
+    case Vnl(id, vlList) => s"(vnl ('''', ${vlList.mkString("[\n ", ",\n ", "\n]")}))"
+  }
+
+  def as_list: String = this match {
+    case Vl_v(iVariable) => iVariable.id
+    case Vnl(id, _) => s"(vlist_of_v ${id})"
+  }
+
+  def as_definition: String = this match {
+    /// "variable"
+    case Vl_v(v) => v.as_definition
+    /// becomes "vl"
+    case Vnl(id, _) => {
+      s"""definition ${id}:: \"vl\" where
+          |\"${id} ≡ ${toString}\"""".stripMargin
+    }
+  }
+
+}
+
+case class Vl_v(iVariable: IVariable) extends Vl
 
 case class Vnl(id: String, vlList: List[Vl]) extends Vl
 
-/////////////////////////////////////////////////////////////////////////////////
-
-abstract class IDef
-
-sealed abstract class IVarDef extends IDef
-
-case class IVarScalarDef(id: String, valType: String, iExp: IExp) extends IVarDef {
-  override def toString = {
-    s"""definition ${id}:: \"variable\" where
-        | \"${id} ≡ (''${id}'', ${VHDLize(valType)}, ${iExp})\"""".stripMargin
+object Vnl {
+  //  FIXME: this is TOO specific!
+  // TODO: currently valType is the EXACTLY type from VHDL without prefix!!!
+  def apply(id: String, dataList: List[IData])(implicit s: DummyImplicit): Vnl = {
+    val vlList = for {
+      data <- dataList
+    } yield {
+      val itemId = s"${id}_${data.itemId}"
+      Vl_v(IVariable(itemId, data.valType, data.initVal))
+    }
+    Vnl(id, vlList)
   }
-
-  def asItem = s"""vl_v (''${id}'', ${VHDLize(valType)}, ${iExp})"""
-
-  def as_v: String = id
 }
 
-case class IVarListDef(id: String, iVals: List[IScalarOrVecIval]) extends IVarDef {
-  override def toString = {
-    val varDefs = for {
-      iVal <- iVals
-    } yield IVarScalarDef(s"${id}_${iVal.itemId}", iVal.valType, iVal.initVal)
 
-    val itemsRepr = varDefs.map(_.asItem).mkString("[\n ", ",\n ", "\n]")
-    s"""definition ${id}:: \"vl\" where
-        |\"${id} ≡ vnl ('''', ${itemsRepr})\"
-     """.stripMargin
+/////////////////////////////////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////////////
+
+trait IDef {
+  def as_definition: String
+
+  def as_list: String
+}
+
+sealed abstract class SPl extends IDef {
+
+  override def toString = this match {
+    case SPl_s(s) => s"(spl_s ${s})"
+    case SPl_p(p) => s"(spl_p ${p})"
+    case SPnl(id, splList) => s"(spnl ('''', ${splList.mkString("[\n ", ",\n ", "\n]")}))"
   }
 
-  def as_vlist: String = s"(vlist_of_vl ${id})"
+  def as_definition: String = this match {
+    case SPl_s(s) => s.as_definition
+    case SPl_p(p) => p.as_definition
+    case SPnl(id, splList) => {
+      s"""definition ${id}:: \"spl\" where
+          | \"${id} ≡ ${toString}\"""".stripMargin
+    }
+  }
+
+  def as_list = this match {
+    case SPl_s(s) => s.id
+    case SPl_p(p) => p.id
+    case SPnl(id, _) => s"(splist_of_spl ${id})"
+  }
+}
+
+case class SPl_s(iSignal: Signal) extends SPl
+
+case class SPl_p(iPortDef: Port) extends SPl
+
+case class SPnl(id: String, splList: List[SPl]) extends SPl
+
+object SPnl {
+  def apply(id: String, dataList: List[IData], signalKind: SignalKind.Ty): SPnl = {
+    val splList = for {
+      data <- dataList
+    } yield {
+      val itemId = s"${id}_${data.itemId}"
+      SPl_s(Signal(itemId, data.valType, data.initVal, signalKind))
+    }
+    SPnl(id, splList)
+  }
+
+  def apply(id: String, dataList: List[IData], mode: PortMode.Ty, conn: PortConn.Ty): SPnl = {
+    val splList = for {
+      data <- dataList
+    } yield {
+      val itemId = s"${id}_${data.itemId}"
+      SPl_p(Port(itemId, data.valType, data.initVal, mode, conn))
+    }
+    SPnl(id, splList)
+  }
 }
 
 //////////////////////////////////////////////////////////////////////////////////
 
-sealed abstract class ISigPrt extends IDef {
-  def as_sigprt: String
+object SignalKind extends Enumeration {
+  type Ty = Value
+  val register, bus = Value
 }
 
-sealed abstract class IPortDef extends ISigPrt
+case class Signal(id: String, valType: String, iExp: IExp, signalKind: SignalKind.Ty) extends IDef {
+  override def toString = s"""(''${id}'', ${VHDLize(valType)}, ${signalKind}, ${iExp})"""
 
-case class IPortScalarDef(id: String, valType: String, iExp: IExp, mode: String, conn: String = "connected") extends IPortDef {
-  override def toString = {
-    s"""definition ${id}:: \"port\" where
-        | \"${id} ≡ (''${id}'', ${VHDLize(valType)}, mode_${mode}, ${conn}, ${iExp})\"""".stripMargin
-  }
-
-  def asItem = s"""spl_p (''${id}'', ${VHDLize(valType)}, mode_${mode}, ${conn}, ${iExp})"""
-
-  def as_sigprt: String = s"(sp_p ${id})"
-}
-
-case class IPortListDef(id: String, iVals: List[IScalarOrVecIval], mode: String, conn: String = "connected") extends IPortDef {
-  override def toString = {
-    val portDefs = for {
-      iVal <- iVals
-    } yield IPortScalarDef(s"${id}_${iVal.itemId}", iVal.valType, iVal.initVal, mode, conn)
-    val itemsRepr = portDefs.map(_.asItem).mkString("[\n ", ",\n ", "\n]")
-    s"""definition ${id}:: \"spl\" where
-        |\"${id} ≡ spnl ('''', ${itemsRepr})\"
-     """.stripMargin
-  }
-
-  override def as_sigprt: String = s"(sp_p ${id})"
-
-  def as_sp_lhs_s = s"(lhs_s ${as_sigprt})"
-}
-
-sealed abstract class ISignalDef extends ISigPrt
-
-case class ISignalScalarDef(id: String, valType: String, iExp: IExp, signalKind: String = "register") extends ISignalDef {
-  override def toString = {
+  override def as_definition: String = {
     s"""definition ${id}:: \"signal\" where
-        | \"${id} ≡ (''${id}'', ${VHDLize(valType)}, ${signalKind}, ${iExp})\"""".stripMargin
+        | \"${id} ≡ ${toString}\"""".stripMargin
   }
 
-  def asItem = s"""spl_s (''${id}'', ${VHDLize(valType)}, ${signalKind}, ${iExp})"""
-
-  override def as_sigprt: String = s"(sp_s ${id})"
+  override def as_list: String = s"[${SP_s(this)}]"
 }
 
-case class ISignalListDef(id: String, iVals: List[IScalarOrVecIval], signalKind: String = "register") extends ISignalDef {
-  override def toString = {
-    val signalDefs = for {
-      iVal <- iVals
-    } yield ISignalScalarDef(s"${id}_${iVal.itemId}", iVal.valType, iVal.initVal, signalKind)
-    val itemsRepr = signalDefs.map(_.asItem).mkString("[\n ", ",\n ", "\n]")
-    s"""definition ${id}:: \"spl\" where
-        |\"${id} ≡ spnl ('''', ${itemsRepr})\"
-     """.stripMargin
+object PortMode extends Enumeration {
+  type Ty = Value
+  val in = Value("mode_in")
+  val out = Value("mode_out")
+  val inout = Value("mode_inout")
+  val linkage = Value("mode_linkage")
+}
+
+object PortConn extends Enumeration {
+  type Ty = Value
+  val connected, unconnected = Value
+}
+
+case class Port(id: String, valType: String, iExp: IExp, mode: PortMode.Ty, conn: PortConn.Ty) extends IDef {
+  override def toString = s"(''${id}'', ${VHDLize(valType)}, ${mode}, ${conn}, ${iExp})"
+
+  override def as_definition: String = {
+    s"""definition ${id}:: \"port\" where
+        | \"${id} ≡ ${toString}\"""".stripMargin
   }
 
-  override def as_sigprt: String = s"(sp_s ${id})"
+  override def as_list: String = s"${SP_p(this)}"
 }
+
+/////////////////////////////////////////////////////////////////////////////////
+
+sealed abstract class SigPrt {
+  override def toString = this match {
+    case SP_s(s) => s"(sp_s ${s.id})"
+    case SP_p(p) => s"(sp_p ${p.id})"
+  }
+}
+
+// "up cast: Signal=>SigPrt"
+case class SP_s(iSignal: Signal) extends SigPrt
+
+// "up cast: Port=>SigPrt"
+case class SP_p(iPort: Port) extends SigPrt
+
+/////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////

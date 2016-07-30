@@ -5,17 +5,11 @@ import parsing.V2IUtils._
 
 import scala.collection.mutable
 
-trait Keeper {
-
-  protected def vInfo: Option[VInfo]
-
-  protected def vInfo_=(info: Option[VInfo]): Unit
+abstract class Keeper(vInfo:Option[VInfo]) {
 
   val defInfo = new DefInfo(vInfo.map(_.defInfo))
 
   val typeInfo = new TypeInfo(vInfo.map(_.typeInfo))
-
-  val cStateInfo = new CStatInfo
 
   val definedEntities = mutable.ArrayBuffer.empty[String]
 
@@ -25,8 +19,8 @@ trait Keeper {
     val valType = sti.selectedName
     if (typeInfo.isListType(valType)) {
       val initVals = typeInfo.getListInitVals(valType, expOption)
-      val vl = IVarListDef(id, initVals)
-      defInfo +=(id, vl)
+      val vnl = Vnl(id, initVals)
+      defInfo +=(id, vnl)
     } else {
       val initVal = if (typeInfo.isVectorType(valType)) {
         // TODO perhaps not guess!!!
@@ -37,17 +31,17 @@ trait Keeper {
       } else {
         typeInfo.getScalarInitVal(valType, expOption)
       }
-      val vs = IVarScalarDef(id, valType, initVal)
-      defInfo +=(id, vs)
+      val variable = IVariable(id, valType, initVal)
+      defInfo +=(id, variable)
     }
   }
 
-  def genIPort(id: String, expOption: Option[VExp], sti: VSubtypeInd, mode: String, conn: String): Unit = {
+  def genIPort(id: String, expOption: Option[VExp], sti: VSubtypeInd, mode: PortMode.Ty, conn: PortConn.Ty): Unit = {
     val valType = sti.selectedName
     if (typeInfo.isListType(valType)) {
       val initVals = typeInfo.getListInitVals(valType, expOption)
-      val pl = IPortListDef(id, initVals, mode)
-      defInfo +=(id, pl)
+      val spnl = SPnl(id, initVals, mode, conn)
+      defInfo +=(id, spnl)
     } else {
       val initVal = if (typeInfo.isVectorType(valType)) {
         val range = sti.getRange.getOrElse(defaultRange(s"Port_list vector ${typeInfo}"))
@@ -55,17 +49,17 @@ trait Keeper {
       } else {
         typeInfo.getScalarInitVal(valType, expOption)
       }
-      val ps = IPortScalarDef(id, valType, initVal, mode)
-      defInfo +=(id, ps)
+      val port = Port(id, valType, initVal, mode, conn)
+      defInfo +=(id, port)
     }
   }
 
-  def genISignal(id: String, sti: VSubtypeInd, signalKind: String): Unit = {
+  def genISignal(id: String, sti: VSubtypeInd, signalKind: SignalKind.Ty): Unit = {
     val valType = sti.selectedName
     if (typeInfo.isListType(valType)) {
       val initVals = typeInfo._guessListInitVals(valType)
-      val sl = ISignalListDef(id, initVals, signalKind)
-      defInfo +=(id, sl)
+      val spnl = SPnl(id, initVals, signalKind)
+      defInfo +=(id, spnl)
     } else {
       val initVal = if (typeInfo.isVectorType(valType)) {
         val range = sti.getRange.getOrElse(defaultRange(s"signalDecl vector ${sti}"))
@@ -73,8 +67,8 @@ trait Keeper {
       } else {
         typeInfo._guessScalarInitVal(valType)
       }
-      val ss = ISignalScalarDef(id, valType, initVal, signalKind)
-      defInfo +=(id, ss)
+      val signal = Signal(id, valType, initVal, signalKind)
+      defInfo +=(id, signal)
     }
   }
 

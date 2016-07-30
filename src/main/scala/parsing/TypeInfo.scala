@@ -3,12 +3,6 @@ package parsing
 import scala.collection.mutable
 
 ///////////////////////////////////////////////////////////////
-//  for type rather than value
-case class TVRecordItem(id: String, valType: String, range: Seq[VExplicitRange])
-
-case class TVRecord(id: String, items: Seq[TVRecordItem])
-
-///////////////////////////////////////////////////////////////
 
 class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
 
@@ -39,12 +33,12 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
 
   def _guessScalarInitVal(valType: String): IExp_con = {
     val initValue = valType match {
-      case "integer" => IVariable("val_i", "0")
-      case "real" => IVariable("val_r", "0.0")
-      case "character" => IVariable("val_c", "(CHR ''0'')")
-      case "boolean" => IVariable("val_b", "True")
-      case "std_ulogic" => IVariable("val_c", "(CHR ''0'')")
-      case "std_logic" => IVariable("val_c", "(CHR ''0'')")
+      case "integer" => IValue("val_i", "0")
+      case "real" => IValue("val_r", "0.0")
+      case "character" => IValue("val_c", "(CHR ''0'')")
+      case "boolean" => IValue("val_b", "True")
+      case "std_ulogic" => IValue("val_c", "(CHR ''0'')")
+      case "std_logic" => IValue("val_c", "(CHR ''0'')")
       case _ => defaultScalarValue(s"scalar unknown ${valType}")
     }
     IExp_con(s"${valType}", initValue)
@@ -59,7 +53,7 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
       } else {
         //        repr -> IExpr
         exp.toIExp match {
-          case iVar: IVariable => IExp_con(valType, iVar)
+          case iVar: IValue => IExp_con(valType, iVar)
           case e => e
         }
       }
@@ -67,7 +61,7 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
     case None => _guessScalarInitVal(valType)
   }
 
-  def _guessListInitVals(rawType: String): List[IScalarOrVecIval] = {
+  def _guessListInitVals(rawType: String): List[IData] = {
     val recordInfo = typeDeclTbl(rawType)
     val iVals = for {
       (itemId, subtypeIndication) <- recordInfo
@@ -76,7 +70,7 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
       if (isListType(valType)) {
         val initVals = _guessListInitVals(valType)
         //      TODO    IValue shoud have other forms
-        IScalarOrVecIval(itemId, valType, defaultScalarValue(s"list-list ${initVals}"))
+        IData(itemId, valType, defaultScalarValue(s"list-list ${initVals}"))
       } else {
         val initVal = if (isVectorType(valType)) {
           val range = subtypeIndication.getRange.getOrElse(defaultRange(s"guessListInit vector ${subtypeIndication}"))
@@ -84,7 +78,7 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
         } else {
           _guessScalarInitVal(valType)
         }
-        IScalarOrVecIval(itemId, valType, initVal)
+        IData(itemId, valType, initVal)
       }
     }
     iVals.toList
@@ -95,18 +89,18 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
     val genCmd = valType.substring(0, valType.length - "_vector".length) + "_vec_gen"
     val valListType = if (r._2 == "to") "val_list" else if (r._2 == "downto") "val_rlist" else "???"
     val initValue = if (List("val_lsit", "val_rlist").contains(valListType)) {
-      val iVarChar = IVariable("val_c", s"(CHR '${numericVal}')")
-      IVariable(valListType, s"(${genCmd} ${Math.abs(r._1.toInt - r._3.toInt) + 1} ${iVarChar})")
+      val iVarChar = IValue("val_c", s"(CHR '${numericVal}')")
+      IValue(valListType, s"(${genCmd} ${Math.abs(r._1.toInt - r._3.toInt) + 1} ${iVarChar})")
     } else {
-      IVariable(valListType, s"???")
+      IValue(valListType, s"???")
     }
     IExp_con(valType, initValue)
   }
 
   //    expOption  is taken from definition; but type information should be record type declaration
-  def getListInitVals(valType: String, expOption: Option[VExp]): List[IScalarOrVecIval] = {
+  def getListInitVals(valType: String, expOption: Option[VExp]): List[IData] = {
     require(isListType(valType), s"${valType} should be composite")
-    val iVals: Seq[IScalarOrVecIval] = expOption match {
+    val iVals: Seq[IData] = expOption match {
       case Some(vExp) => {
         vExp.getPrimary match {
           case Some(VPrimaryAggregate(aggregate)) => {
@@ -142,7 +136,7 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
               } else {
                 getScalarInitVal(itemValType, Option(itemExp))
               }
-              IScalarOrVecIval(itemId, itemValType, initValue)
+              IData(itemId, itemValType, initValue)
             } // end of yield
           }
           case _ => {

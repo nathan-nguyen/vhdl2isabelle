@@ -22,9 +22,9 @@ object V2IUtils {
     ("???", "???", "???")
   }
 
-  def defaultScalarValue(msg: String): IVariable = {
+  def defaultScalarValue(msg: String): IValue = {
     logger.warn(s"defaultScalarValue: ${msg}")
-    IVariable("???", "???")
+    IValue("???", "???")
   }
 
   def VHDLize(vhdlType: String) = s"vhdl_${vhdlType}"
