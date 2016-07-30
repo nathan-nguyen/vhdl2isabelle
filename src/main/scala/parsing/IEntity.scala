@@ -6,17 +6,17 @@ case class IEnv_sp(ss: List[ISignalScalarDef], sl: List[ISignalListDef],
                    ps: List[IPortScalarDef], pl: List[IPortListDef]) {
 
   override def toString: String = {
-    s"""${ss.map(_.repr).mkString("[", ",", "]")}
-       |@${sl.map(_.repr).mkString("@")}
-       |@${ps.map(_.repr).mkString("[", ",", "]")}
-       |@${pl.map(_.repr).mkString("@")}""".stripMargin
+    s"""${ss.map(_.as_sigprt).mkString("[", ",", "]")}
+       |@${sl.map(_.as_sigprt).mkString("@")}
+       |@${ps.map(_.as_sigprt).mkString("[", ",", "]")}
+       |@${pl.map(_.as_sigprt).mkString("@")}""".stripMargin
   }
 }
 
 case class IEnv_v(vs: List[IVarScalarDef], vl: List[IVarListDef]) {
   override def toString: String = {
-    s"""${vs.map(_.repr).mkString("[", ",", "]")}
-       |@${vl.map(_.repr).mkString("@")}""".stripMargin
+    s"""${vs.map(_.as_v).mkString("[", ",", "]")}
+       |@${vl.map(_.as_vlist).mkString("@")}""".stripMargin
   }
 }
 

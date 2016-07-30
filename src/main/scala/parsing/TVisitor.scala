@@ -118,7 +118,7 @@ final class TVisitor(protected[this] var vInfo: Option[VInfo]) extends VHDLBaseV
     concurrentSignalAssign match {
       case VConcurrentSignalAssignStatC(_, _, condSignAssign) => {
         val targetName = condSignAssign.target.getName.getOrElse(defaultTargetName(s"${concurrentSignalAssign}"))
-        logger.info(s"${targetName}")
+        logger.info(s"${condSignAssign.conditionalWaveforms}")
       }
       case VConcurrentSignalAssignStatS(_, _, selectSignalAssign) => {
         val targetName = selectSignalAssign.target.getName.getOrElse(defaultTargetName(s"${concurrentSignalAssign}"))
