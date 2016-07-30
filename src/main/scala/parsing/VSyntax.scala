@@ -1213,15 +1213,403 @@ case class VProcDeclGD(grpDecl: VGrpDecl) extends VProcDeclItem
 
 sealed abstract class VSeqStat
 
+object VSeqStat {
+  def apply(ctx: Sequential_statementContext): VSeqStat = {
+    val wait_statementContext = ctx.wait_statement()
+    val assertion_statementContext = ctx.assertion_statement()
+    val report_statementContext = ctx.report_statement()
+    val signal_assignal_statement = ctx.signal_assignment_statement()
+    val variable_assignment_statement = ctx.variable_assignment_statement()
+    val if_statement = ctx.if_statement()
+    val case_statement = ctx.case_statement()
+    val loop_statementContext = ctx.loop_statement()
+    val next_statement = ctx.next_statement()
+    val exit_statement = ctx.exit_statement()
+    val nullNode = ctx.NULL()
+    val break_statementContext = ctx.break_statement()
+    val procedure_call_statementContext = ctx.procedure_call_statement()
+    if (wait_statementContext != null) {
+      VWaitStat(wait_statementContext)
+    } else if (assertion_statementContext != null) {
+      VAssertStat(assertion_statementContext)
+    } else if (report_statementContext != null) {
+      VReportStat(report_statementContext)
+    } else if (signal_assignal_statement != null) {
+      VSignalAssignStat(signal_assignal_statement)
+    } else if (variable_assignment_statement != null) {
+      VVarAssignStat(variable_assignment_statement)
+    } else if (if_statement != null) {
+      VIfStat(if_statement)
+    } else if (case_statement != null) {
+      VCaseStat(case_statement)
+    } else if (loop_statementContext != null) {
+      VLoopStat(loop_statementContext)
+    } else if (next_statement != null) {
+      VNextStat(next_statement)
+    } else if (exit_statement != null) {
+      VExitStat(exit_statement)
+    } else if (nullNode != null) {
+      val labelColon = Option(ctx.label_colon()).map(_.getText)
+      VNullStat(labelColon)
+    } else if (break_statementContext != null) {
+      VBreakStat(break_statementContext)
+    } else if (procedure_call_statementContext != null) {
+      VProcCallStat(procedure_call_statementContext)
+    } else throw VError
+  }
+}
 
+/////////////////////////////////////////////////////////////////////////////////
+
+case class VSensitiveList(nameList: Seq[VName])
+
+object VSensitiveList {
+  def apply(ctx: Sensitivity_listContext): VSensitiveList = {
+    val nameList = ctx.name().map(VName(_))
+    VSensitiveList(nameList)
+  }
+}
+
+case class VAssert(cond: VExp, report: Option[VExp], severity: Option[VExp])
+
+object VAssert {
+  def apply(ctx: AssertionContext): VAssert = {
+    val exps = ctx.expression().map(VExp(_))
+    val exp = exps.head
+    val report = exps.lift(1)
+    val severity = exps.lift(2)
+    new VAssert(exp, report, severity)
+  }
+}
+
+case class VTimeOutClause(cond: VExp)
+
+object VTimeOutClause {
+  def apply(ctx: Timeout_clauseContext): VTimeOutClause = {
+    val cond = VExp(ctx.expression())
+    new VTimeOutClause(cond)
+  }
+}
+
+case class VCondClause(cond: VExp)
+
+object VCondClause {
+  def apply(ctx: Condition_clauseContext): VCondClause = {
+    val cond = VExp(ctx.condition().expression())
+    new VCondClause(cond)
+  }
+}
+
+// no sensitivity_clause
+case class VWaitStat(labelColon: Option[String], sensitiveList: Option[VSensitiveList],
+                     condClause: Option[VCondClause], toClause: Option[VTimeOutClause]) extends VSeqStat
+
+object VWaitStat {
+  def apply(ctx: Wait_statementContext): VWaitStat = {
+    val labelColon = Option(ctx.label_colon()).map(_.getText)
+    val sensitiveList = Option(ctx.sensitivity_clause().sensitivity_list()).map(VSensitiveList(_))
+    val condClause = Option(ctx.condition_clause()).map(VCondClause(_))
+    val toClause = Option(ctx.timeout_clause()).map(VTimeOutClause(_))
+    new VWaitStat(labelColon, sensitiveList, condClause, toClause)
+  }
+}
+
+case class VAssertStat(labelColon: Option[String], vAssert: VAssert) extends VSeqStat
+
+object VAssertStat {
+  def apply(ctx: Assertion_statementContext): VAssertStat = {
+    val labelColon = Option(ctx.label_colon()).map(_.getText)
+    val vAssert = VAssert(ctx.assertion())
+    new VAssertStat(labelColon, vAssert)
+  }
+}
+
+case class VReportStat(labelColon: Option[String], exp: VExp, otherExp: Option[VExp]) extends VSeqStat
+
+object VReportStat {
+  def apply(ctx: Report_statementContext): VReportStat = {
+    val labelColon = Option(ctx.label_colon()).map(_.getText)
+    val exps = ctx.expression().map(VExp(_))
+    val exp = exps.head
+    val otherExp = exps.lift(1)
+    new VReportStat(labelColon, exp, otherExp)
+  }
+}
+
+case class VSignalAssignStat(labelColon: Option[String], target: VTarget, delay: Option[VDelay], waveForm: VWaveForm) extends VSeqStat
+
+object VSignalAssignStat {
+  def apply(ctx: Signal_assignment_statementContext): VSignalAssignStat = {
+    val labelColon = Option(ctx.label_colon()).map(_.getText)
+    val target = VTarget(ctx.target())
+    val delay = Option(ctx.delay_mechanism()).map(VDelay(_))
+    val waveForm = VWaveForm(ctx.waveform())
+    new VSignalAssignStat(labelColon, target, delay, waveForm)
+  }
+}
+
+case class VVarAssignStat(labelColon: Option[String], target: VTarget, exp: VExp) extends VSeqStat
+
+object VVarAssignStat {
+  def apply(ctx: Variable_assignment_statementContext): VVarAssignStat = {
+    val labelColon = Option(ctx.label_colon()).map(_.getText)
+    val target = VTarget(ctx.target())
+    val exp = VExp(ctx.expression())
+    VVarAssignStat(labelColon, target, exp)
+  }
+}
+
+case class VSeqOfStats(seqElem: Seq[VSeqStat])
+
+object VSeqOfStats {
+  def apply(ctx: Sequence_of_statementsContext): VSeqOfStats = {
+    val seqStatList = ctx.sequential_statement().map(VSeqStat(_))
+    new VSeqOfStats(seqStatList)
+  }
+}
+
+case class VIfStat(labelColon: Option[String],
+                   ifCond: VExp, ifSeqOfStats: VSeqOfStats,
+                   elifConds: Seq[VExp], elifSeqofStats: Seq[VSeqOfStats],
+                   elseSeqOfStats: Option[VSeqOfStats],
+                   id: Option[String]) extends VSeqStat
+
+object VIfStat {
+  def apply(ctx: If_statementContext): VIfStat = {
+    val labelColon = Option(ctx.label_colon()).map(_.getText)
+    val conds = ctx.condition().map(c => VExp(c.expression()))
+    val seqOfStatsList = ctx.sequence_of_statements().map(VSeqOfStats(_))
+    val elifLength = ctx.ELSIF().length
+    require(conds.length <= seqOfStatsList.length && elifLength + 1 <= conds.length)
+    val ifCond = conds.head
+    val ifSeqOfStats = seqOfStatsList.head
+    val elifConds = conds.slice(1, 1 + elifLength)
+    val elifSeqOfStatsList = seqOfStatsList.slice(1, 1 + elifLength)
+    val elseSeqOfStats = seqOfStatsList.lift(1 + elifLength)
+    val id = Option(ctx.identifier()).map(_.getText)
+    new VIfStat(labelColon, ifCond, ifSeqOfStats, elifConds, elifSeqOfStatsList, elseSeqOfStats, id)
+  }
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+case class VCaseStatAlt(choices: VChoices, seqOfStats: VSeqOfStats)
+
+object VCaseStatAlt {
+  def apply(ctx: Case_statement_alternativeContext): VCaseStatAlt = {
+    val choices = VChoices(ctx.choices())
+    val seqOfStats = VSeqOfStats(ctx.sequence_of_statements())
+    new VCaseStatAlt(choices, seqOfStats)
+  }
+}
+
+case class VCaseStat(labelColon: Option[String], exp: VExp, caseStatAltList: Seq[VCaseStatAlt], id: Option[String]) extends VSeqStat {
+  require(caseStatAltList.nonEmpty, "caseStatAltList")
+}
+
+object VCaseStat {
+  def apply(ctx: Case_statementContext): VCaseStat = {
+    val labelColon = Option(ctx.label_colon()).map(_.getText)
+    val exp = VExp(ctx.expression())
+    val caseStatAltList = ctx.case_statement_alternative().map(VCaseStatAlt(_))
+    val id = Option(ctx.identifier()).map(_.getText)
+    new VCaseStat(labelColon, exp, caseStatAltList, id)
+
+  }
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+sealed abstract class VIterScheme
+
+case class VIterSchemeW(cond: VExp) extends VIterScheme
+
+case class VParamSpec(id: String, discreteRange: VDiscreteRange)
+
+case class VIterSchemeF(paramSpec: VParamSpec) extends VIterScheme
+
+case class VLoopStat(labelColon: Option[String], seqOfStats: VSeqOfStats, id: Option[String]) extends VSeqStat
+
+object VLoopStat {
+  def apply(ctx: Loop_statementContext): VLoopStat = {
+    val labelColon = Option(ctx.label_colon()).map(_.getText)
+    val seqOfStats = VSeqOfStats(ctx.sequence_of_statements())
+    val id = Option(ctx.identifier()).map(_.getText)
+    new VLoopStat(labelColon, seqOfStats, id)
+  }
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+case class VNextStat(labelColon: Option[String], id: Option[String], cond: Option[VExp]) extends VSeqStat
+
+object VNextStat {
+  def apply(ctx: Next_statementContext): VNextStat = {
+    val labelColon = Option(ctx.label_colon()).map(_.getText)
+    val id = Option(ctx.identifier()).map(_.getText)
+    val cond = Option(ctx.condition()).map(c => VExp(c.expression()))
+    new VNextStat(labelColon, id, cond)
+  }
+}
+
+
+case class VExitStat(labelColon: Option[String], id: Option[String], cond: Option[VExp]) extends VSeqStat
+
+object VExitStat {
+  def apply(ctx: Exit_statementContext): VExitStat = {
+    val labelColon = Option(ctx.label_colon()).map(_.getText)
+    val id = Option(ctx.identifier()).map(_.getText)
+    val cond = Option(ctx.condition()).map(c => VExp(c.expression()))
+    new VExitStat(labelColon, id, cond)
+  }
+}
+
+case class VRetStat(labelColon: Option[String], exp: Option[VExp]) extends VSeqStat
+
+case class VNullStat(labelColon: Option[String]) extends VSeqStat
+
+/////////////////////////////////////////////////////////////////////////////////
+
+case class VBreakSelectorClause(name: VName)
+
+object VBreakSelectorClause {
+  def apply(ctx: Break_selector_clauseContext): VBreakSelectorClause = {
+    val name = VName(ctx.name())
+    new VBreakSelectorClause(name)
+  }
+}
+
+case class VBreakElem(breakSelectorClause: Option[VBreakSelectorClause], name: VName, exp: VExp)
+
+object VBreakElem {
+  def apply(ctx: Break_elementContext): VBreakElem = {
+    val breakSelectorContext = Option(ctx.break_selector_clause()).map(VBreakSelectorClause(_))
+    val name = VName(ctx.name())
+    val exp = VExp(ctx.expression())
+    new VBreakElem(breakSelectorContext, name, exp)
+  }
+}
+
+case class VBreakList(breakElemList: Seq[VBreakElem]) {
+  require(breakElemList.nonEmpty)
+}
+
+object VBreakList {
+  def apply(ctx: Break_listContext): VBreakList = {
+    val breakElemList = ctx.break_element().map(VBreakElem(_))
+    new VBreakList(breakElemList)
+  }
+}
+
+case class VBreakStat(labelColon: Option[String], breakList: Option[VBreakList], cond: Option[VExp]) extends VSeqStat
+
+object VBreakStat {
+  def apply(ctx: Break_statementContext): VBreakStat = {
+    val labelColon = Option(ctx.label_colon()).map(_.getText)
+    val breakList = Option(ctx.break_list()).map(VBreakList(_))
+    val cond = Option(ctx.condition()).map(c => VExp(c.expression()))
+    new VBreakStat(labelColon, breakList, cond)
+  }
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+case class VProcCallStat(labelColon: Option[String], procCall: VProcCall) extends VSeqStat
+
+object VProcCallStat {
+  def apply(ctx: Procedure_call_statementContext): VProcCallStat = {
+    val labelColon = Option(ctx.label_colon()).map(_.getText)
+    val procCall = VProcCall(ctx.procedure_call())
+    new VProcCallStat(labelColon, procCall)
+  }
+}
 
 /////////////////////////////////////////////////////////////////////////////////
 case class VProcStatPart(seqStatList: List[VSeqStat])
 
 /////////////////////////////////////////////////////////////////////////////////
 
+sealed abstract class VFormalPart
 
-/////////////////////////////////////////////////////////////////////////////////
+object VFormalPart {
+  def apply(ctx: Formal_partContext): VFormalPart = {
+    val id = ctx.identifier().getText
+    val explicit_rangeContext = ctx.explicit_range()
+    if (explicit_rangeContext != null) {
+      VFormalPartR(id, VExplicitRange(explicit_rangeContext))
+    } else {
+      VFormalPartI(id)
+    }
+  }
+}
 
+case class VFormalPartI(id: String) extends VFormalPart
+
+case class VFormalPartR(id: String, explicitRange: VExplicitRange) extends VFormalPart
+
+sealed abstract class VActualDesignator
+
+object VActualDesignator {
+  def apply(ctx: Actual_designatorContext): VActualDesignator = {
+    val exp = ctx.expression()
+    if (exp != null) {
+      VActualDesignatorE(VExp(exp))
+    } else {
+      VActualDesignatorO
+    }
+  }
+}
+
+case class VActualDesignatorE(vExp: VExp) extends VActualDesignator
+
+case object VActualDesignatorO extends VActualDesignator
+
+sealed abstract class VActualPart
+
+object VActualPart {
+  def apply(ctx: Actual_partContext): VActualPart = {
+    val name = VName(ctx.name().getText)
+    val actualDesignator = VActualDesignator(ctx.actual_designator())
+    if (name != null) {
+      VActualPartN(name, actualDesignator)
+    } else {
+      VActualPartD(actualDesignator)
+    }
+  }
+}
+
+case class VActualPartN(name: VName, actualDesignator: VActualDesignator) extends VActualPart
+
+case class VActualPartD(actualDesignator: VActualDesignator) extends VActualPart
+
+case class VAssocElem(formalPart: Option[VFormalPart], ActualPart: VActualPart)
+
+object VAssocElem {
+  def apply(ctx: Association_elementContext): VAssocElem = {
+    val formalPart = Option(ctx.formal_part()).map(VFormalPart(_))
+    val actualPart = VActualPart(ctx.actual_part())
+    new VAssocElem(formalPart, actualPart)
+  }
+}
+
+case class VAssocList(assocElemList: Seq[VAssocElem]) {
+  require(assocElemList.nonEmpty, "assocElemList")
+}
+
+object VAssocList {
+  def apply(ctx: Association_listContext): VAssocList = {
+    val assocElemList = ctx.association_element().map(VAssocElem(_))
+    new VAssocList(assocElemList)
+  }
+}
+
+// no actual_parameter_part
+case class VProcCall(selectedName: String, assocList: VAssocList)
+
+object VProcCall {
+  def apply(ctx: Procedure_callContext): VProcCall = {
+    val selectedname = ctx.selected_name().getText
+    val assocList = VAssocList(ctx.actual_parameter_part().association_list())
+    new VProcCall(selectedname, assocList)
+  }
+}
 
 /////////////////////////////////////////////////////////////////////////////////
