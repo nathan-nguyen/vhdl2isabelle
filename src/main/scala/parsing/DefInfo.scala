@@ -9,11 +9,17 @@ final class DefInfo(defInfo: Option[DefInfo]) {
   val logger = LoggerFactory.getLogger(getClass)
 
   /**
+    * two strategies can be applied for table lookup:
+    * (1) flatten all table and simply check name
+    * (2) on-the-fly
+    * currently choose (2)
+    */
+
+  /**
     * there is only 5 kinds of definitions useful for table lookup
     * variable (scalar), vnl (record)
     * signal (scalar), port (scalar), spnl (record)
     */
-
 
   type V_PTy = Variable
   type Vnl_PTy = Vnl
@@ -27,9 +33,36 @@ final class DefInfo(defInfo: Option[DefInfo]) {
   val p_raw = mutable.ListBuffer.empty[P_PTy]
   val spnl_raw = mutable.ListBuffer.empty[SPnl_PTy]
 
+  //  for Env
   val v_map = mutable.Map.empty[IdTy, Variable]
   val s_map = mutable.Map.empty[IdTy, Signal]
   val p_map = mutable.Map.empty[IdTy, Port]
+
+  /**
+    * get def, which means getting
+    * 1. "variable"(v_raw), "signal"(s_raw), "port"(p_raw)
+    * 2. (1) from spnl_raw for "signal", "port", "spnl"
+    *    (2) from v_raw for "variable", "vnl"
+    * return (isarName, iDefOpt)
+    * NOTE: this could be implemented if
+    * 1. flatten the map beforehand
+    * 2. consider context to only lookup some tables
+
+    */
+
+  def getDef(selectedName: VSelectedName): IdDefPair = {
+    val nList = selectedName.suffixList.scanLeft(selectedName.id)((acc, cur) => s"${acc}_${cur.s}")
+    // only ""
+    if (nList.length == 1) {
+      // scalar
+      val n = nList.head
+      val idef = v_raw.find(_.id == n).getOrElse(s_raw.find(_.id == n).getOrElse(p_raw.find(_.id == n).orNull))
+      (n, Option(idef))
+    } else {
+      // record
+
+    }
+  }
 
   def vnl_flatten(vnl: Vnl): List[V_PTy] = vnl.vlList flatMap {
     case vnl: Vnl => vnl_flatten(vnl)

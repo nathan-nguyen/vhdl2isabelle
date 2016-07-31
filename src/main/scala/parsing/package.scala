@@ -2,6 +2,7 @@
 package object parsing {
 
   type IdTy = String
+  type DefIdPair = (Option[IDef], IdTy)
 
   // TODO define a list repr function
 

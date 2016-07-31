@@ -14,6 +14,11 @@ case class Variable(id: String, valType: String, iExp: IExp) extends IDef {
   }
 
   override def as_list: String = s"[${id}]"
+
+  /**
+    * it gets **current** level name, not recursively
+    */
+  override def getId(qId: IdTy): DefIdPair = if (id == qId) (Some(this), id) else (None, id)
 }
 
 sealed abstract class Vl extends IDef {
@@ -29,7 +34,7 @@ sealed abstract class Vl extends IDef {
   }
 
   def as_definition: String = this match {
-    /// "variable"
+    /// "variable", this case should never be called
     case Vl_v(v) => v.as_definition
     /// becomes "vl"
     case Vnl(id, _) => {
@@ -38,9 +43,14 @@ sealed abstract class Vl extends IDef {
     }
   }
 
+  override def getId(qId: IdTy): DefIdPair = this match {
+    case Vl_v(iVariable) => iVariable.getId(qId)
+    case Vnl(id, vlList) => if (id == qId) (Some(this), id) else (None, id)
+  }
 }
 
 case class Vl_v(iVariable: Variable) extends Vl
+
 
 case class Vnl(id: String, vlList: List[Vl]) extends Vl
 
@@ -66,6 +76,8 @@ trait IDef {
   def as_definition: String
 
   def as_list: String
+
+  def getId(qId: IdTy): DefIdPair
 }
 
 sealed abstract class SPl extends IDef {
@@ -77,7 +89,9 @@ sealed abstract class SPl extends IDef {
   }
 
   def as_definition: String = this match {
+    // this case should never be called
     case SPl_s(s) => s.as_definition
+    // this case should never be called
     case SPl_p(p) => p.as_definition
     case SPnl(id, splList) => {
       s"""definition ${id}:: \"spl\" where
@@ -90,6 +104,13 @@ sealed abstract class SPl extends IDef {
     case SPl_p(p) => p.id
     case SPnl(id, _) => s"(splist_of_spl ${id})"
   }
+
+  def getId(qId: IdTy): DefIdPair = this match {
+    case SPl_s(s) => s.getId(qId)
+    case SPl_p(p) => p.getId(qId)
+    case SPnl(id, splList) => if (id == qId) (Some(this), id) else (None, id)
+  }
+
 }
 
 case class SPl_s(iSignal: Signal) extends SPl
@@ -136,6 +157,8 @@ case class Signal(id: String, valType: String, iExp: IExp, signalKind: SignalKin
   }
 
   override def as_list: String = s"[${SP_s(this)}]"
+
+  override def getId(qId: IdTy): DefIdPair = if (id == qId) (Some(this), id) else (None, id)
 }
 
 object PortMode extends Enumeration {
@@ -160,6 +183,8 @@ case class Port(id: String, valType: String, iExp: IExp, mode: PortMode.Ty, conn
   }
 
   override def as_list: String = s"${SP_p(this)}"
+
+  override def getId(qId: IdTy): DefIdPair = if (id == qId) (Some(this), id) else (None, id)
 }
 
 /////////////////////////////////////////////////////////////////////////////////
