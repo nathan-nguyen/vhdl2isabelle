@@ -16,4 +16,4 @@ unmanagedClasspath in(Compile, runMain) += baseDirectory.value / ""
 antlr4Settings
 antlr4PackageName in Antlr4 := Some("sg.edu.ntu.hchen")
 antlr4GenListener in Antlr4 := true
-antlr4GenVisitor in Antlr4 := true
+antlr4GenVisitor in Antlr4 := false

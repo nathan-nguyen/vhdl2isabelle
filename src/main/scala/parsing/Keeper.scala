@@ -13,7 +13,7 @@ abstract class Keeper(vInfo:Option[VInfo]) {
 
   val definedEntities = mutable.ArrayBuffer.empty[String]
 
-  val logger = LoggerFactory.getLogger(classOf[TVisitor])
+  val logger = LoggerFactory.getLogger(this.getClass)
 
   def genIVariable(id: String, expOption: Option[VExp], sti: VSubtypeInd): Unit = {
     val valType = sti.selectedName
