@@ -16,11 +16,13 @@ object Antlr2VTy {
     } yield id.getText.toLowerCase
   }
 
-  def selectedNameFromSubtypeInd(ctx: Subtype_indicationContext) = {
+  def selectedNameFromSubtypeInd(ctx: Subtype_indicationContext): VSelectedName = {
     val names = for {
       name <- ctx.selected_name()
-    } yield name.getText
-    names.head
+    } yield VSelectedName(name)
+    val head = names.head
+    require(head.suffixList.isEmpty, "selectedNameFromSubtypeInd")
+    head
   }
 
 }
@@ -35,8 +37,9 @@ sealed abstract class VLiteral {
     case VLiteralNumReal(s) => IValue("var_r", s)
     case VLiteralNumBase(s) => defaultScalarValue(s)
     // enumeral
+    // identifiers should NOT use this method to generate IExp
+    case VLiteralEnumId(s) => throw VError
     // TODO only a guess, may change later
-    case VLiteralEnumId(s) => defaultScalarValue(s"VLiteralEnumChar ${s}")
     case VLiteralEnumChar(s) => IValue("val_c", s"(CHR '${s}')")
     // other cases
     case _ => defaultScalarValue(s"VLiteral ${this}")
@@ -175,7 +178,7 @@ object VElementDecl {
   def apply(ctx: Element_declarationContext): VElementDecl = {
     val idList = getIdList(ctx.identifier_list())
     val subtypeInd = VSubtypeInd(ctx.element_subtype_definition().subtype_indication())
-    new VElementDecl(idList, subtypeInd)
+    VElementDecl(idList, subtypeInd)
   }
 }
 
@@ -187,7 +190,7 @@ object VRecordTypeDef {
       ed <- ctx.element_declaration()
     } yield VElementDecl(ed)
     val id = Option(ctx.identifier()).map(_.getText)
-    new VRecordTypeDef(elementDecls, id)
+    VRecordTypeDef(elementDecls, id)
   }
 }
 
@@ -236,7 +239,7 @@ object VChoices {
     val choiceList = for {
       choice <- ctx.choice()
     } yield VChoice(choice)
-    new VChoices(choiceList)
+    VChoices(choiceList)
   }
 }
 
@@ -248,7 +251,7 @@ object VElemAssoc {
   def apply(ctx: Element_associationContext): VElemAssoc = {
     val choices = Option(ctx.choices()).map(VChoices(_))
     val vExp = VExp(ctx.expression())
-    new VElemAssoc(choices, vExp)
+    VElemAssoc(choices, vExp)
   }
 }
 
@@ -284,7 +287,7 @@ object VAggregate {
     val element_assocList = for {
       elemAssoc <- ctx.element_association()
     } yield VElemAssoc(elemAssoc)
-    new VAggregate(element_assocList)
+    VAggregate(element_assocList)
   }
 }
 
@@ -393,19 +396,20 @@ case class VPrimaryName(name: String) extends VPrimary
 
 sealed trait VAliasIndication
 
-case class VSubtypeInd(selectedName: String,
+case class VSubtypeInd(selectedName: VSelectedName,
                        constraint: Option[VConstraint],
                        tolerance: Option[VToleranceAspect]) extends VAliasIndication {
-  //  TODO currently suppose it is a (Int, Int)
   def getRange: Option[RangeTy] = constraint.map(_.getRange)
+
+  def getSimpleName = selectedName.getSimpleNameOpt.getOrElse(s"ERROR: ${toString}")
 }
 
 object VSubtypeInd {
   def apply(ctx: Subtype_indicationContext): VSubtypeInd = {
-    val selectedName = Antlr2VTy.selectedNameFromSubtypeInd(ctx).toLowerCase
+    val selectedName = Antlr2VTy.selectedNameFromSubtypeInd(ctx)
     val constraint = Option(ctx.constraint()).map(VConstraint(_))
     val tolerance = Option(ctx.tolerance_aspect()).map(VToleranceAspect(_))
-    new VSubtypeInd(selectedName, constraint, tolerance)
+    VSubtypeInd(selectedName, constraint, tolerance)
   }
 }
 
@@ -414,7 +418,7 @@ case class VToleranceAspect(vExp: VExp)
 object VToleranceAspect {
   def apply(ctx: Tolerance_aspectContext): VToleranceAspect = {
     val vExp = VExp(ctx.expression())
-    new VToleranceAspect(vExp)
+    VToleranceAspect(vExp)
   }
 }
 
@@ -520,7 +524,7 @@ object VIndexConstraint {
     val discrete_rangeList = for {
       discrete_range <- ctx.discrete_range()
     } yield VDiscreteRange(discrete_range)
-    new VIndexConstraint(discrete_rangeList)
+    VIndexConstraint(discrete_rangeList)
   }
 }
 
@@ -638,7 +642,7 @@ object VTerm {
     val factors = for {
       factor <- ctx.factor()
     } yield VFactor(factor)
-    new VTerm(factors.head, ops, factors.tail)
+    VTerm(factors.head, ops, factors.tail)
   }
 }
 
@@ -737,7 +741,7 @@ object VSimpleExp {
       else if (ctx.MINUS() != null) Some("-")
       else None
     }
-    new VSimpleExp(symbol, terms.head, ops, terms.tail)
+    VSimpleExp(symbol, terms.head, ops, terms.tail)
   }
 }
 
@@ -820,7 +824,7 @@ object VShiftExp {
     } yield VSimpleExp(simple_expression)
     val op = Option(ctx.shift_operator()).map(VShiftOp(_))
     val other = simple_expressionList.lift(1)
-    new VShiftExp(simple_expressionList.head, op, other)
+    VShiftExp(simple_expressionList.head, op, other)
   }
 }
 
@@ -838,7 +842,7 @@ object VRelation {
     } yield VShiftExp(shift_expression)
     val op = Option(ctx.relational_operator()).map(VRelationOp(_))
     val other = shift_expressionList.lift(1)
-    new VRelation(shift_expressionList.head, op, other)
+    VRelation(shift_expressionList.head, op, other)
   }
 }
 
@@ -896,7 +900,7 @@ object VConstDecl {
     val idList = getIdList(ctx.identifier_list())
     val subtypeInd = VSubtypeInd(ctx.subtype_indication())
     val vExp = Option(ctx.expression()).map(VExp(_))
-    new VConstDecl(idList, subtypeInd, vExp)
+    VConstDecl(idList, subtypeInd, vExp)
   }
 }
 
@@ -912,7 +916,7 @@ object VSignalDecl {
     val subtypeInd = VSubtypeInd(ctx.subtype_indication())
     val signalKind = Option(ctx.signal_kind()).map(_.getText.toLowerCase)
     val exp = Option(ctx.expression()).map(VExp(_))
-    new VSignalDecl(idList, subtypeInd, signalKind, exp)
+    VSignalDecl(idList, subtypeInd, signalKind, exp)
   }
 }
 
@@ -925,7 +929,7 @@ object VInterfaceSignalDecl {
     val idList = getIdList(ctx.identifier_list())
     val subtypeInd = VSubtypeInd(ctx.subtype_indication())
     val vExp = Option(ctx.expression()).map(VExp(_))
-    new VInterfaceSignalDecl(idList, subtypeInd, vExp)
+    VInterfaceSignalDecl(idList, subtypeInd, vExp)
   }
 }
 
@@ -936,7 +940,7 @@ object VInterfaceConstDecl {
     val idList = getIdList(ctx.identifier_list())
     val subtypeInd = VSubtypeInd(ctx.subtype_indication())
     val vExp = Option(ctx.expression()).map(VExp(_))
-    new VInterfaceConstDecl(idList, subtypeInd, vExp)
+    VInterfaceConstDecl(idList, subtypeInd, vExp)
   }
 }
 
@@ -949,7 +953,7 @@ object VInterfacePortDecl {
     val mode = ctx.signal_mode().getText
     val subtypeInd = VSubtypeInd(ctx.subtype_indication())
     val vExp = Option(ctx.expression()).map(VExp(_))
-    new VInterfacePortDecl(idList, mode, subtypeInd, vExp)
+    VInterfacePortDecl(idList, mode, subtypeInd, vExp)
   }
 }
 
@@ -958,18 +962,69 @@ case class VPortList(interfacePortDecls: Seq[VInterfacePortDecl])
 
 ///////////////////////////////////////////////////////////////
 
-// perhaps needing separation
-case class VName(s: String)
+// just a hack
+case class VSuffix(s: String)
 
-object VName {
-  def apply(ctx: NameContext): VName = {
-    new VName(ctx.getText)
+// perhaps needing separation
+sealed abstract class VName {
+
+  def getSimpleNameOpt = this match {
+    case VSelectedName(id, suffixList) => {
+      if (suffixList.nonEmpty) {
+        logger.warn(s"VSelectedName ${toString}")
+        None
+      } else
+        Some(id)
+    }
+    case VNameParts(namePartList) => {
+      logger.warn(s"VNameParts ${toString}")
+      None
+    }
   }
 }
 
+object VName {
+  def apply(ctx: NameContext): VName = {
+    val selectedName = ctx.selected_name()
+    val name_partList = ctx.name_part()
+    if (selectedName != null) {
+      VSelectedName(selectedName)
+    } else {
+      VNameParts.gen(name_partList.toList)
+    }
+  }
+}
+
+
+case class VSelectedName(id: String, suffixList: Seq[VSuffix]) extends VName
+
+object VSelectedName {
+  def apply(ctx: Selected_nameContext): VSelectedName = {
+    val id = ctx.identifier().getText
+    val suffixList = ctx.suffix().map(s => VSuffix(s.getText))
+    VSelectedName(id, suffixList)
+  }
+}
+
+// a hack
+case class VNamePart(s: String)
+
+case class VNameParts(namePartList: List[VNamePart]) extends VName {
+  require(namePartList.nonEmpty, "VNameParts")
+}
+
+object VNameParts {
+  //  Fxxk type erasure
+  def gen(ctxList: List[Name_partContext]): VNameParts = {
+    val namePartList = ctxList.map(np => VNamePart(np.getText))
+    VNameParts(namePartList)
+  }
+}
+
+
 sealed abstract class VTarget {
   def getName: Option[String] = this match {
-    case VTargetN(name) => Some(name.s)
+    case VTargetN(name) => name.getSimpleNameOpt
     case VTargetAggregate(aggregate) => None
   }
 }
@@ -1017,7 +1072,7 @@ object VOpts {
   def apply(ctx: OptsContext): VOpts = {
     val guarded = ctx.GUARDED() != null
     val delay = Option(ctx.delay_mechanism()).map(VDelay(_))
-    new VOpts(guarded, delay)
+    VOpts(guarded, delay)
   }
 }
 
@@ -1029,7 +1084,7 @@ object VWaveFormElem {
     val exprs = ctx.expression().map(VExp(_))
     val exp = exprs.head
     val expOption = exprs.lift(1)
-    new VWaveFormElem(exp, expOption)
+    VWaveFormElem(exp, expOption)
   }
 }
 
@@ -1053,14 +1108,14 @@ case class VWaveFormE(elems: Seq[VWaveFormElem]) extends VWaveForm {
 
 object VWaveFormU extends VWaveForm
 
-case class VCondWaveForms(vWaveForm: VWaveForm, cond: Option[VExp], elseCond: Option[VCondWaveForms])
+case class VCondWaveForms(whenWaveForm: VWaveForm, cond: Option[VExp], elseCond: Option[VCondWaveForms])
 
 object VCondWaveForms {
   def apply(ctx: Conditional_waveformsContext): VCondWaveForms = {
     val waveForm = VWaveForm(ctx.waveform())
     val cond = Option(ctx.condition()).map(c => VExp(c.expression()))
     val condWaves = Option(ctx.conditional_waveforms()).map(VCondWaveForms(_))
-    new VCondWaveForms(waveForm, cond, condWaves)
+    VCondWaveForms(waveForm, cond, condWaves)
   }
 }
 
@@ -1073,7 +1128,7 @@ object VSelectedWaveForm {
   def apply(ctx: Selected_waveformsContext): VSelectedWaveForm = {
     val waveFormList = ctx.waveform().map(VWaveForm(_))
     val choicesList = ctx.choices().map(VChoices(_))
-    new VSelectedWaveForm(waveFormList.head, choicesList.head, waveFormList.lift(1), choicesList.lift(1))
+    VSelectedWaveForm(waveFormList.head, choicesList.head, waveFormList.lift(1), choicesList.lift(1))
   }
 }
 
@@ -1085,7 +1140,7 @@ object VSelectedSignalAssign {
     val target = VTarget(ctx.target())
     val opts = VOpts(ctx.opts())
     val selectedWaveForm = VSelectedWaveForm(ctx.selected_waveforms())
-    new VSelectedSignalAssign(exp, target, opts, selectedWaveForm)
+    VSelectedSignalAssign(exp, target, opts, selectedWaveForm)
   }
 }
 
@@ -1098,7 +1153,7 @@ object VCondSignAssign {
     val target = VTarget(ctx.target())
     val opts = VOpts(ctx.opts())
     val condWaveForms = VCondWaveForms(ctx.conditional_waveforms())
-    new VCondSignAssign(target, opts, condWaveForms)
+    VCondSignAssign(target, opts, condWaveForms)
   }
 }
 
@@ -1139,7 +1194,7 @@ object VVarDecl {
     val idList = getIdList(ctx.identifier_list())
     val subtypeInd = VSubtypeInd(ctx.subtype_indication())
     val vExp = Option(ctx.expression()).map(VExp(_))
-    new VVarDecl(shared, idList, subtypeInd, vExp)
+    VVarDecl(shared, idList, subtypeInd, vExp)
   }
 }
 
@@ -1278,7 +1333,7 @@ object VAssert {
     val exp = exps.head
     val report = exps.lift(1)
     val severity = exps.lift(2)
-    new VAssert(exp, report, severity)
+    VAssert(exp, report, severity)
   }
 }
 
@@ -1287,7 +1342,7 @@ case class VTimeOutClause(cond: VExp)
 object VTimeOutClause {
   def apply(ctx: Timeout_clauseContext): VTimeOutClause = {
     val cond = VExp(ctx.expression())
-    new VTimeOutClause(cond)
+    VTimeOutClause(cond)
   }
 }
 
@@ -1296,7 +1351,7 @@ case class VCondClause(cond: VExp)
 object VCondClause {
   def apply(ctx: Condition_clauseContext): VCondClause = {
     val cond = VExp(ctx.condition().expression())
-    new VCondClause(cond)
+    VCondClause(cond)
   }
 }
 
@@ -1310,7 +1365,7 @@ object VWaitStat {
     val sensitiveList = Option(ctx.sensitivity_clause().sensitivity_list()).map(VSensitiveList(_))
     val condClause = Option(ctx.condition_clause()).map(VCondClause(_))
     val toClause = Option(ctx.timeout_clause()).map(VTimeOutClause(_))
-    new VWaitStat(labelColon, sensitiveList, condClause, toClause)
+    VWaitStat(labelColon, sensitiveList, condClause, toClause)
   }
 }
 
@@ -1320,7 +1375,7 @@ object VAssertStat {
   def apply(ctx: Assertion_statementContext): VAssertStat = {
     val labelColon = Option(ctx.label_colon()).map(_.getText)
     val vAssert = VAssert(ctx.assertion())
-    new VAssertStat(labelColon, vAssert)
+    VAssertStat(labelColon, vAssert)
   }
 }
 
@@ -1332,7 +1387,7 @@ object VReportStat {
     val exps = ctx.expression().map(VExp(_))
     val exp = exps.head
     val otherExp = exps.lift(1)
-    new VReportStat(labelColon, exp, otherExp)
+    VReportStat(labelColon, exp, otherExp)
   }
 }
 
@@ -1344,7 +1399,7 @@ object VSignalAssignStat {
     val target = VTarget(ctx.target())
     val delay = Option(ctx.delay_mechanism()).map(VDelay(_))
     val waveForm = VWaveForm(ctx.waveform())
-    new VSignalAssignStat(labelColon, target, delay, waveForm)
+    VSignalAssignStat(labelColon, target, delay, waveForm)
   }
 }
 
@@ -1364,7 +1419,7 @@ case class VSeqOfStats(seqElem: Seq[VSeqStat])
 object VSeqOfStats {
   def apply(ctx: Sequence_of_statementsContext): VSeqOfStats = {
     val seqStatList = ctx.sequential_statement().map(VSeqStat(_))
-    new VSeqOfStats(seqStatList)
+    VSeqOfStats(seqStatList)
   }
 }
 
@@ -1387,7 +1442,7 @@ object VIfStat {
     val elifSeqOfStatsList = seqOfStatsList.slice(1, 1 + elifLength)
     val elseSeqOfStats = seqOfStatsList.lift(1 + elifLength)
     val id = Option(ctx.identifier()).map(_.getText)
-    new VIfStat(labelColon, ifCond, ifSeqOfStats, elifConds, elifSeqOfStatsList, elseSeqOfStats, id)
+    VIfStat(labelColon, ifCond, ifSeqOfStats, elifConds, elifSeqOfStatsList, elseSeqOfStats, id)
   }
 }
 
@@ -1398,7 +1453,7 @@ object VCaseStatAlt {
   def apply(ctx: Case_statement_alternativeContext): VCaseStatAlt = {
     val choices = VChoices(ctx.choices())
     val seqOfStats = VSeqOfStats(ctx.sequence_of_statements())
-    new VCaseStatAlt(choices, seqOfStats)
+    VCaseStatAlt(choices, seqOfStats)
   }
 }
 
@@ -1412,7 +1467,7 @@ object VCaseStat {
     val exp = VExp(ctx.expression())
     val caseStatAltList = ctx.case_statement_alternative().map(VCaseStatAlt(_))
     val id = Option(ctx.identifier()).map(_.getText)
-    new VCaseStat(labelColon, exp, caseStatAltList, id)
+    VCaseStat(labelColon, exp, caseStatAltList, id)
 
   }
 }
@@ -1434,7 +1489,7 @@ object VLoopStat {
     val labelColon = Option(ctx.label_colon()).map(_.getText)
     val seqOfStats = VSeqOfStats(ctx.sequence_of_statements())
     val id = Option(ctx.identifier()).map(_.getText)
-    new VLoopStat(labelColon, seqOfStats, id)
+    VLoopStat(labelColon, seqOfStats, id)
   }
 }
 
@@ -1447,7 +1502,7 @@ object VNextStat {
     val labelColon = Option(ctx.label_colon()).map(_.getText)
     val id = Option(ctx.identifier()).map(_.getText)
     val cond = Option(ctx.condition()).map(c => VExp(c.expression()))
-    new VNextStat(labelColon, id, cond)
+    VNextStat(labelColon, id, cond)
   }
 }
 
@@ -1459,7 +1514,7 @@ object VExitStat {
     val labelColon = Option(ctx.label_colon()).map(_.getText)
     val id = Option(ctx.identifier()).map(_.getText)
     val cond = Option(ctx.condition()).map(c => VExp(c.expression()))
-    new VExitStat(labelColon, id, cond)
+    VExitStat(labelColon, id, cond)
   }
 }
 
@@ -1474,7 +1529,7 @@ case class VBreakSelectorClause(name: VName)
 object VBreakSelectorClause {
   def apply(ctx: Break_selector_clauseContext): VBreakSelectorClause = {
     val name = VName(ctx.name())
-    new VBreakSelectorClause(name)
+    VBreakSelectorClause(name)
   }
 }
 
@@ -1485,7 +1540,7 @@ object VBreakElem {
     val breakSelectorContext = Option(ctx.break_selector_clause()).map(VBreakSelectorClause(_))
     val name = VName(ctx.name())
     val exp = VExp(ctx.expression())
-    new VBreakElem(breakSelectorContext, name, exp)
+    VBreakElem(breakSelectorContext, name, exp)
   }
 }
 
@@ -1496,7 +1551,7 @@ case class VBreakList(breakElemList: Seq[VBreakElem]) {
 object VBreakList {
   def apply(ctx: Break_listContext): VBreakList = {
     val breakElemList = ctx.break_element().map(VBreakElem(_))
-    new VBreakList(breakElemList)
+    VBreakList(breakElemList)
   }
 }
 
@@ -1507,7 +1562,7 @@ object VBreakStat {
     val labelColon = Option(ctx.label_colon()).map(_.getText)
     val breakList = Option(ctx.break_list()).map(VBreakList(_))
     val cond = Option(ctx.condition()).map(c => VExp(c.expression()))
-    new VBreakStat(labelColon, breakList, cond)
+    VBreakStat(labelColon, breakList, cond)
   }
 }
 
@@ -1518,7 +1573,7 @@ object VProcCallStat {
   def apply(ctx: Procedure_call_statementContext): VProcCallStat = {
     val labelColon = Option(ctx.label_colon()).map(_.getText)
     val procCall = VProcCall(ctx.procedure_call())
-    new VProcCallStat(labelColon, procCall)
+    VProcCallStat(labelColon, procCall)
   }
 }
 
@@ -1566,7 +1621,7 @@ sealed abstract class VActualPart
 
 object VActualPart {
   def apply(ctx: Actual_partContext): VActualPart = {
-    val name = VName(ctx.name().getText)
+    val name = VName(ctx.name())
     val actualDesignator = VActualDesignator(ctx.actual_designator())
     if (name != null) {
       VActualPartN(name, actualDesignator)
@@ -1586,7 +1641,7 @@ object VAssocElem {
   def apply(ctx: Association_elementContext): VAssocElem = {
     val formalPart = Option(ctx.formal_part()).map(VFormalPart(_))
     val actualPart = VActualPart(ctx.actual_part())
-    new VAssocElem(formalPart, actualPart)
+    VAssocElem(formalPart, actualPart)
   }
 }
 
@@ -1597,7 +1652,7 @@ case class VAssocList(assocElemList: Seq[VAssocElem]) {
 object VAssocList {
   def apply(ctx: Association_listContext): VAssocList = {
     val assocElemList = ctx.association_element().map(VAssocElem(_))
-    new VAssocList(assocElemList)
+    VAssocList(assocElemList)
   }
 }
 
@@ -1608,7 +1663,7 @@ object VProcCall {
   def apply(ctx: Procedure_callContext): VProcCall = {
     val selectedname = ctx.selected_name().getText
     val assocList = VAssocList(ctx.actual_parameter_part().association_list())
-    new VProcCall(selectedname, assocList)
+    VProcCall(selectedname, assocList)
   }
 }
 

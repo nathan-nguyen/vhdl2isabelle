@@ -1,25 +1,33 @@
 package parsing
 
+import org.slf4j.LoggerFactory
+
 import scala.collection.mutable
 
 final class DefInfo(defInfo: Option[DefInfo]) {
 
-  //  TODO perhaps need preserving order for each map
+  val logger = LoggerFactory.getLogger(getClass)
 
-  type IdTy = String
-  type V_PTy = IVariable
+  /**
+    * there is only 5 kinds of definitions useful for table lookup
+    * variable (scalar), vnl (record)
+    * signal (scalar), port (scalar), spnl (record)
+    */
+
+
+  type V_PTy = Variable
   type Vnl_PTy = Vnl
   type S_PTy = Signal
   type P_PTy = Port
   type SPnl_PTy = SPnl
 
-  val v_raw = mutable.ListBuffer.empty[IVariable]
+  val v_raw = mutable.ListBuffer.empty[Variable]
   val vnl_raw = mutable.ListBuffer.empty[Vnl_PTy]
   val s_raw = mutable.ListBuffer.empty[S_PTy]
   val p_raw = mutable.ListBuffer.empty[P_PTy]
   val spnl_raw = mutable.ListBuffer.empty[SPnl_PTy]
 
-  val v_map = mutable.Map.empty[IdTy, IVariable]
+  val v_map = mutable.Map.empty[IdTy, Variable]
   val s_map = mutable.Map.empty[IdTy, Signal]
   val p_map = mutable.Map.empty[IdTy, Port]
 
@@ -58,7 +66,7 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     }
   }
 
-  def +=(id: String, d: IVariable): Unit = {
+  def +=(id: String, d: Variable): Unit = {
     v_raw += d
     v_map += (id -> d)
   }
@@ -84,6 +92,12 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     val (sl, pl) = spnl_flatten(d)
     s_map ++= sl.map(_.id).zip(sl)
     p_map ++= pl.map(_.id).zip(pl)
+  }
+
+  def dumpTables() = {
+    logger.info(s"${v_map.mkString("\n")}")
+    logger.info(s"${s_map.mkString("\n")}")
+    logger.info(s"${p_map.mkString("\n")}")
   }
 
   override def toString = {

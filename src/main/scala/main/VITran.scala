@@ -59,8 +59,6 @@ class VITran(inFile: String, vInfo: Option[VInfo]) {
 
   def dump(outDir: String) = {
     val keeper = _process()
-    val env = IEnv(keeper.defInfo)
-    logger.info(s"${env.repr}")
     val outFile = outDir + s"${moduleName}.thy"
     val file = new File(outFile)
     if (keeper.definedEntities.nonEmpty) {

@@ -2,73 +2,10 @@ package parsing
 
 import parsing.V2IUtils.VHDLize
 
-/////////////////////////////////////////////////////////////////////////////////
-
-sealed abstract class SP_clhs
-
-case class Clhs_sp(sp_clhs: SP_lhs) extends SP_clhs
-
-case class Clhs_spr(spl: SPl) extends SP_clhs
 
 /////////////////////////////////////////////////////////////////////////////////
 
-case class Sensitivity_list()
-
-/////////////////////////////////////////////////////////////////////////////////
-
-sealed abstract class Discrete_range
-
-case class VHDL_dis_to(l: IExp, r: IExp) extends Discrete_range
-
-case class VHDL_dis_downto(l: IExp, r: IExp) extends Discrete_range
-
-/////////////////////////////////////////////////////////////////////////////////
-
-sealed abstract class SP_lhs
-
-case class Lhs_s(sigPrt: SigPrt) extends SP_lhs
-
-case class Lhs_sa(sigPrt: SigPrt, discreteRange: Discrete_range) extends SP_lhs
-
-/////////////////////////////////////////////////////////////////////////////////
-
-sealed abstract class V_lhs
-
-case class Lhs_v(variable: IValue) extends V_lhs
-
-case class LHs_va(variable: IValue, discreteRange: Discrete_range) extends V_lhs
-
-/////////////////////////////////////////////////////////////////////////////////
-
-sealed abstract class Asmt_rhs
-
-case class Rhs_e(exp: IExp) extends Asmt_rhs
-
-case class Rhs_o(exp: IExp, discreteRange: Discrete_range) extends Asmt_rhs
-
-/////////////////////////////////////////////////////////////////////////////////
-
-sealed abstract class Seq_stmt
-
-case class Sst_sa(id: String, sP_lhs: SP_lhs, asmt_rhs: Asmt_rhs) extends Seq_stmt
-
-case class Sst_va(id: String, v_lhs: V_lhs, asmt_rhs: Asmt_rhs) extends Seq_stmt
-
-case class Sst_if(id: String, cond: IExp, then_seq_stmtList: List[Seq_stmt], else_seq_stmtList: List[Seq_stmt]) extends Seq_stmt
-
-case class Sst_l(id: String, cond: IExp, body_seq_stmtList: List[Seq_stmt]) extends Seq_stmt
-
-case class Sst_n(id: String, cond: IExp) extends Seq_stmt
-
-case class Sst_e(id: String, cond: IExp) extends Seq_stmt
-
-case object Sst_nl extends Seq_stmt
-
-
-/////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////
-
-case class IVariable(id: String, valType: String, iExp: IExp) extends IDef {
+case class Variable(id: String, valType: String, iExp: IExp) extends IDef {
   override def toString = s"""(''${id}'', ${VHDLize(valType)}, ${iExp})"""
 
   override def as_definition: String = {
@@ -103,7 +40,7 @@ sealed abstract class Vl extends IDef {
 
 }
 
-case class Vl_v(iVariable: IVariable) extends Vl
+case class Vl_v(iVariable: Variable) extends Vl
 
 case class Vnl(id: String, vlList: List[Vl]) extends Vl
 
@@ -115,12 +52,11 @@ object Vnl {
       data <- dataList
     } yield {
       val itemId = s"${id}_${data.itemId}"
-      Vl_v(IVariable(itemId, data.valType, data.initVal))
+      Vl_v(Variable(itemId, data.valType, data.initVal))
     }
     Vnl(id, vlList)
   }
 }
-
 
 /////////////////////////////////////////////////////////////////////////////////
 

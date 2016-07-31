@@ -16,7 +16,7 @@ abstract class Keeper(vInfo:Option[VInfo]) {
   val logger = LoggerFactory.getLogger(this.getClass)
 
   def genIVariable(id: String, expOption: Option[VExp], sti: VSubtypeInd): Unit = {
-    val valType = sti.selectedName
+    val valType = sti.getSimpleName
     if (typeInfo.isListType(valType)) {
       val initVals = typeInfo.getListInitVals(valType, expOption)
       val vnl = Vnl(id, initVals)
@@ -31,13 +31,13 @@ abstract class Keeper(vInfo:Option[VInfo]) {
       } else {
         typeInfo.getScalarInitVal(valType, expOption)
       }
-      val variable = IVariable(id, valType, initVal)
+      val variable = Variable(id, valType, initVal)
       defInfo +=(id, variable)
     }
   }
 
   def genIPort(id: String, expOption: Option[VExp], sti: VSubtypeInd, mode: PortMode.Ty, conn: PortConn.Ty): Unit = {
-    val valType = sti.selectedName
+    val valType = sti.getSimpleName
     if (typeInfo.isListType(valType)) {
       val initVals = typeInfo.getListInitVals(valType, expOption)
       val spnl = SPnl(id, initVals, mode, conn)
@@ -55,7 +55,7 @@ abstract class Keeper(vInfo:Option[VInfo]) {
   }
 
   def genISignal(id: String, sti: VSubtypeInd, signalKind: SignalKind.Ty): Unit = {
-    val valType = sti.selectedName
+    val valType = sti.getSimpleName
     if (typeInfo.isListType(valType)) {
       val initVals = typeInfo._guessListInitVals(valType)
       val spnl = SPnl(id, initVals, signalKind)

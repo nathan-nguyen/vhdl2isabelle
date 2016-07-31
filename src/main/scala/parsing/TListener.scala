@@ -152,7 +152,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
     for {
       id <- signalDecl.idList
     } {
-      val signalKind = signalDecl.signalKind.map(SignalKind.withName(_)).getOrElse(SignalKind.register)
+      val signalKind = signalDecl.signalKind.map(SignalKind.withName).getOrElse(SignalKind.register)
       val sti = signalDecl.subtypeInd
       genISignal(id, sti, signalKind)
     }
@@ -284,7 +284,9 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def exitElement_association(ctx: Element_associationContext): Unit = {}
 
-  override def exitConditional_signal_assignment(ctx: Conditional_signal_assignmentContext): Unit = {}
+  override def exitConditional_signal_assignment(ctx: Conditional_signal_assignmentContext): Unit = {
+    //    NOTE: parent is concurrent_signal_assignment
+  }
 
   override def exitLogical_name(ctx: Logical_nameContext): Unit = {}
 
@@ -555,7 +557,9 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def enterInterface_variable_declaration(ctx: Interface_variable_declarationContext): Unit = {}
 
-  override def exitDesign_file(ctx: Design_fileContext): Unit = {}
+  override def exitDesign_file(ctx: Design_fileContext): Unit = {
+    defInfo.dumpTables()
+  }
 
   override def exitBreak_statement(ctx: Break_statementContext): Unit = {}
 
@@ -1030,9 +1034,10 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def enterConcurrent_signal_assignment_statement(ctx: Concurrent_signal_assignment_statementContext): Unit = {
     val concurrentSignalAssign = VConcurrentSignalAssignStat(ctx)
     concurrentSignalAssign match {
-      case VConcurrentSignalAssignStatC(_, _, condSignAssign) => {
+      case VConcurrentSignalAssignStatC(labelColon, _, condSignAssign) => {
         val targetName = condSignAssign.target.getName.getOrElse(defaultTargetName(s"${concurrentSignalAssign}"))
-        //        logger.info(s"${condSignAssign.conditionalWaveforms}")
+
+        logger.info(s"${condSignAssign.conditionalWaveforms.whenWaveForm}")
       }
       case VConcurrentSignalAssignStatS(_, _, selectSignalAssign) => {
         val targetName = selectSignalAssign.target.getName.getOrElse(defaultTargetName(s"${concurrentSignalAssign}"))

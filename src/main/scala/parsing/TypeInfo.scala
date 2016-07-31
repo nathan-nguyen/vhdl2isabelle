@@ -3,6 +3,11 @@ package parsing
 import scala.collection.mutable
 
 ///////////////////////////////////////////////////////////////
+/**
+  * it's about the type information for variables defined in isar,
+  * which has nothing to do with entity generation
+  */
+///////////////////////////////////////////////////////////////
 
 class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
 
@@ -64,16 +69,16 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
   def _guessListInitVals(rawType: String): List[IData] = {
     val recordInfo = typeDeclTbl(rawType)
     val iVals = for {
-      (itemId, subtypeIndication) <- recordInfo
+      (itemId, sti) <- recordInfo
     } yield {
-      val valType = subtypeIndication.selectedName
+      val valType = sti.getSimpleName
       if (isListType(valType)) {
         val initVals = _guessListInitVals(valType)
         //      TODO    IValue shoud have other forms
         IData(itemId, valType, defaultScalarValue(s"list-list ${initVals}"))
       } else {
         val initVal = if (isVectorType(valType)) {
-          val range = subtypeIndication.getRange.getOrElse(defaultRange(s"guessListInit vector ${subtypeIndication}"))
+          val range = sti.getRange.getOrElse(defaultRange(s"guessListInit vector ${sti}"))
           _guessVectorInitVal(valType, range)
         } else {
           _guessScalarInitVal(valType)
@@ -107,10 +112,10 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
             val recordInfo = typeDeclTbl(valType)
             val aggregateIdExpMap = aggregate.getAssoc
             for {
-              (itemId, subtypeIndication) <- recordInfo
+              (itemId, sti) <- recordInfo
             } yield {
               val itemExp = aggregateIdExpMap(itemId)
-              val itemValType = subtypeIndication.selectedName
+              val itemValType = sti.getSimpleName
               val initValue: IExp = if (isListType(itemValType)) {
                 defaultScalarValue(s"list-list: ${itemValType}")
               } else if (isVectorType(itemValType)) {
@@ -118,7 +123,7 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
                   case Some(itemAggregate) => {
                     val (fieldName, innerExp) = itemAggregate.getFirstMap
                     if (fieldName == "others") {
-                      val range = subtypeIndication.getRange.getOrElse(defaultRange(s"getListInit vector ${subtypeIndication}"))
+                      val range = sti.getRange.getOrElse(defaultRange(s"getListInit vector ${sti}"))
                       val numericVal = innerExp.getPrimary
                       numericVal match {
                         case Some(p) => {
