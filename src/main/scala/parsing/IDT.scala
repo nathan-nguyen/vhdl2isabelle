@@ -2,7 +2,6 @@ package parsing
 
 import parsing.V2IUtils.VHDLize
 
-
 /////////////////////////////////////////////////////////////////////////////////
 
 case class Variable(id: String, valType: String, iExp: IExp) extends IDef {
@@ -18,7 +17,7 @@ case class Variable(id: String, valType: String, iExp: IExp) extends IDef {
   /**
     * it gets **current** level name, not recursively
     */
-  override def getId(qId: IdTy): DefIdPair = if (id == qId) (Some(this), id) else (None, id)
+  override def getId = id
 }
 
 sealed abstract class Vl extends IDef {
@@ -43,9 +42,33 @@ sealed abstract class Vl extends IDef {
     }
   }
 
-  override def getId(qId: IdTy): DefIdPair = this match {
-    case Vl_v(iVariable) => iVariable.getId(qId)
-    case Vnl(id, vlList) => if (id == qId) (Some(this), id) else (None, id)
+  override def getId = this match {
+    case Vl_v(v) => v.id
+    case Vnl(id, vlList) => id
+  }
+
+  /**
+    * it may return a "variable" or a "vl" (which is vnl-generated)
+    */
+  def get(nList: List[String]): Option[IDef] = {
+    def aux(l: List[String], cur: Option[Vl]): Option[Vl] = l match {
+      case h :: t => cur match {
+        case Some(vl) => vl match {
+          // vl_v contains
+          case vl_v: Vl_v => Some(vl)
+          // vnl not sure, recursive
+          case vnl: Vnl => aux(t, vnl.vlList.find(_.getId == h))
+        }
+        // no
+        case None => None
+      }
+      // no more recursive
+      case Nil => cur
+    }
+    aux(nList, Some(this)) match {
+      case Some(Vl_v(v)) => Option(v)
+      case other => other
+    }
   }
 }
 
@@ -77,7 +100,7 @@ trait IDef {
 
   def as_list: String
 
-  def getId(qId: IdTy): DefIdPair
+  def getId: IdTy
 }
 
 sealed abstract class SPl extends IDef {
@@ -105,10 +128,29 @@ sealed abstract class SPl extends IDef {
     case SPnl(id, _) => s"(splist_of_spl ${id})"
   }
 
-  def getId(qId: IdTy): DefIdPair = this match {
-    case SPl_s(s) => s.getId(qId)
-    case SPl_p(p) => p.getId(qId)
-    case SPnl(id, splList) => if (id == qId) (Some(this), id) else (None, id)
+  def getId = this match {
+    case SPl_s(s) => s.getId
+    case SPl_p(p) => p.getId
+    case SPnl(id, splList) => id
+  }
+
+  def get(nList: List[String]): Option[IDef] = {
+    def aux(l: List[String], cur: Option[SPl]): Option[SPl] = l match {
+      case h :: t => cur match {
+        case Some(spl) => spl match {
+          case _: SPl_s => Some(spl)
+          case _: SPl_p => Some(spl)
+          case spnl: SPnl => aux(t, spnl.splList.find(_.getId == h))
+        }
+        case None => None
+      }
+      case Nil => cur
+    }
+    aux(nList, Some(this)) match {
+      case Some(SPl_s(spl_s)) => Some(spl_s)
+      case Some(SPl_p(spl_p)) => Some(spl_p)
+      case other => other
+    }
   }
 
 }
@@ -158,7 +200,7 @@ case class Signal(id: String, valType: String, iExp: IExp, signalKind: SignalKin
 
   override def as_list: String = s"[${SP_s(this)}]"
 
-  override def getId(qId: IdTy): DefIdPair = if (id == qId) (Some(this), id) else (None, id)
+  override def getId = id
 }
 
 object PortMode extends Enumeration {
@@ -184,7 +226,7 @@ case class Port(id: String, valType: String, iExp: IExp, mode: PortMode.Ty, conn
 
   override def as_list: String = s"${SP_p(this)}"
 
-  override def getId(qId: IdTy): DefIdPair = if (id == qId) (Some(this), id) else (None, id)
+  override def getId = id
 }
 
 /////////////////////////////////////////////////////////////////////////////////

@@ -42,25 +42,32 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     * get def, which means getting
     * 1. "variable"(v_raw), "signal"(s_raw), "port"(p_raw)
     * 2. (1) from spnl_raw for "signal", "port", "spnl"
-    *    (2) from v_raw for "variable", "vnl"
+    * (2) from v_raw for "variable", "vnl"
     * return (isarName, iDefOpt)
     * NOTE: this could be implemented if
     * 1. flatten the map beforehand
     * 2. consider context to only lookup some tables
-
+    *
     */
 
-  def getDef(selectedName: VSelectedName): IdDefPair = {
-    val nList = selectedName.suffixList.scanLeft(selectedName.id)((acc, cur) => s"${acc}_${cur.s}")
-    // only ""
-    if (nList.length == 1) {
-      // scalar
-      val n = nList.head
-      val idef = v_raw.find(_.id == n).getOrElse(s_raw.find(_.id == n).getOrElse(p_raw.find(_.id == n).orNull))
-      (n, Option(idef))
-    } else {
-      // record
+  def getDef(selectedName: VSelectedName): Option[IDef] = {
+    val nList = selectedName.suffixList.scanLeft(selectedName.id)((acc, cur) => s"${acc}_${cur.s}").toList
+    val h = nList.head
+    // all "id"s are trusty from here
 
+    val scalar = v_raw.find(_.id == h).getOrElse(s_raw.find(_.id == h).getOrElse(p_raw.find(_.id == h).orNull))
+    if (scalar != null) Option(scalar)
+    else {
+      // vnl_raw, locate firstly
+      vnl_raw.find(_.id == h) match {
+        case Some(vl) => vl.get(nList.tail)
+        case None => {
+          spnl_raw.find(_.id == h) match {
+            case Some(spl) => spl.get(nList.tail)
+            case None => None
+          }
+        }
+      }
     }
   }
 
