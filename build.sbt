@@ -1,4 +1,4 @@
-name := "vhdl_parser"
+name := "vhdl2isar"
 
 version := "1.0"
 

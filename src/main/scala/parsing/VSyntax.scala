@@ -5,8 +5,6 @@ import sg.edu.ntu.hchen.VHDLParser._
 
 import scala.collection.JavaConversions._
 
-import
-
 ///////////////////////////////////////////////////////////////////////
 
 case class VConstDecl(idList: Seq[String], subtypeInd: VSubtypeInd, vExp: Option[VExp])
@@ -233,8 +231,11 @@ object VWaveFormElem {
 
 sealed abstract class VWaveForm {
   def toI(defInfo: DefInfo): Crhs = this match {
-    case VWaveFormE(elems) => {
-
+    case vWaveFormE@VWaveFormE(elems) => {
+      val iExp = vWaveFormE.getSpecialExp(defInfo)
+      // FIXME not sure
+      val asmt_rhs = Rhs_e(iExp)
+      Crhs_e(asmt_rhs)
     }
     case VWaveFormU => {
       throw VIErrorMsg(s"${toString}")
@@ -257,20 +258,31 @@ object VWaveForm {
 case class VWaveFormE(elems: Seq[VWaveFormElem]) extends VWaveForm {
   require(elems.nonEmpty, "VWaveFormE")
 
-  def getSpecialExp(defInfo:DefInfo): IExp = elems.head.exp.toIExp(defInfo)
+  def getSpecialExp(defInfo: DefInfo): IExp = elems.head.exp.toIExp(defInfo)
 }
 
 case object VWaveFormU extends VWaveForm
 
 case class VCondWaveForms(whenWaveForm: VWaveForm, cond: Option[VExp], elseCond: Option[VCondWaveForms]) {
+  // FIXME isar definition has many limitations here
   def toI(defInfo: DefInfo): (List[As_when], Crhs) = {
     // whenWaveForm => as_whenList.head.crhs, cond => as_whenList.head.IExp
     // elseCond build the as_whenList(1) (last one)
-
-    val ifcond = cond match {
-      case Some(c) => c.toIExp(defInfo)
-      case None => throw VIErrorMsg(s"${toString}")
+    import VCondWaveForms._
+    val as_when1 = genAsWhen(whenWaveForm, cond)(defInfo)
+    val as_when2 = elseCond match {
+      case Some(waveForms) => genAsWhen(waveForms.whenWaveForm, waveForms.cond)(defInfo)
+      case None => throw VIErrorMsg(s"${this.toString}")
     }
+    val as_whenList = List(as_when1, as_when2)
+    val else_crhs = elseCond match {
+      case Some(VCondWaveForms(_, _, finalElseOpt)) => finalElseOpt match {
+        case Some(finalElse) => finalElse.whenWaveForm.toI(defInfo)
+        case None => throw VIErrorMsg(s"${this.toString}")
+      }
+      case None => throw VIErrorMsg(s"${this.toString}")
+    }
+    (as_whenList, else_crhs)
   }
 }
 
@@ -281,6 +293,16 @@ object VCondWaveForms {
     val condWaves = Option(ctx.conditional_waveforms()).map(VCondWaveForms(_))
     VCondWaveForms(waveForm, cond, condWaves)
   }
+
+  def genAsWhen(waveForm: VWaveForm, cond: Option[VExp])(defInfo: DefInfo): As_when = {
+    val when_crhs = waveForm.toI(defInfo)
+    val when_cond = cond match {
+      case Some(c) => c.toIExp(defInfo)
+      case None => throw VIErrorMsg(s"${toString}")
+    }
+    As_when(when_crhs, when_cond)
+  }
+
 }
 
 //////////////////////////////////////////////////////////////////////////////

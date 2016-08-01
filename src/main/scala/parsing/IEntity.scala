@@ -270,7 +270,7 @@ case class If_gen(exp: IExp) extends Gen_type
 /////////////////////////////////////////////////////////////////////////////////
 
 case class As_when(crhs: Crhs, cond: IExp) {
-  override def toString = s"${crhs} WHEN ${cond} ELSE"
+  override def toString = s"(${crhs} WHEN ${cond} ELSE)"
 }
 
 case class ISensitivilist(sigprtList: List[SigPrt])

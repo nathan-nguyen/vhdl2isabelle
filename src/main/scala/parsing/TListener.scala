@@ -1039,8 +1039,8 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def enterConcurrent_signal_assignment_statement(ctx: Concurrent_signal_assignment_statementContext): Unit = {
     val concurrentSignalAssign = VConcurrentSignalAssignStat(ctx)
     concurrentSignalAssign match {
-      case VConcurrentSignalAssignStatC(labelColon, _, condSignAssign) => {
-//        logger.info(s"${condSignAssign.conditionalWaveforms.whenWaveForm}")
+      case csa@VConcurrentSignalAssignStatC(labelColon, _, condSignAssign) => {
+        logger.info(s"${csa.toI(defInfo)}")
       }
       case VConcurrentSignalAssignStatS(_, _, selectSignalAssign) => {
       }

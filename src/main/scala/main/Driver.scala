@@ -1,12 +1,14 @@
 package main
 
-import parsing.{DefInfo, TypeInfo, VInfo}
+import parsing.VInfo
 
 object Driver {
 
-  def getInFile(fileName: String) = "/home/hongxu/src/vhdl_parser/src/main/resources/files/" + fileName
+  val userHome = System.getProperty("user.home")
 
-  def getOutDir = "/home/hongxu/Dropbox/000/isabelle/VHDLModel/"
+  def getInFile(fileName: String) = s"${userHome}/src/vhdl2isar/src/main/resources/files/${fileName}"
+
+  def getOutDir = s"${userHome}/Dropbox/000/isabelle/VHDLModel/"
 
   def preInfo: VInfo = {
     val preFile = getInFile("pre.vhd")

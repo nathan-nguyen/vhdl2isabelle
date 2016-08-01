@@ -402,7 +402,7 @@ case class VSubtypeInd(selectedName: VSelectedName,
 
 object VSubtypeInd {
   def apply(ctx: Subtype_indicationContext): VSubtypeInd = {
-    val selectedName = VSyntax.selectedNameFromSubtypeInd(ctx)
+    val selectedName = selectedNameFromSubtypeInd(ctx)
     val constraint = Option(ctx.constraint()).map(VConstraint(_))
     val tolerance = Option(ctx.tolerance_aspect()).map(VToleranceAspect(_))
     VSubtypeInd(selectedName, constraint, tolerance)
@@ -673,7 +673,7 @@ object VTermOp extends Enumeration with VAOp {
 object VFactorOp extends Enumeration with VAOp {
   type Ty = Value
   val mul = Value("[*]")
-  val div = Value("[/=]")
+  val div = Value("[/]")
   //  FIXME NOT sure which to use
   val mod = Value("[mod]")
   val rem = Value("[rem]")
@@ -789,7 +789,7 @@ object VLogicOp extends Enumeration {
 object VRelationOp extends Enumeration {
   type Ty = Value
   val eq = Value("[=]")
-  val neq = Value("['/=]")
+  val neq = Value("[/=]")
   val lt = Value("[<]")
   val le = Value("[<=]")
   val gt = Value("[>]")
