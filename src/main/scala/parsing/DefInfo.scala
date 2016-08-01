@@ -47,29 +47,50 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     * NOTE: this could be implemented if
     * 1. flatten the map beforehand
     * 2. consider context to only lookup some tables
-    *
     */
 
-  def getDef(selectedName: VSelectedName): Option[IDef] = {
-    val nList = selectedName.suffixList.scanLeft(selectedName.id)((acc, cur) => s"${acc}_${cur.s}").toList
-    val h = nList.head
-    // all "id"s are trusty from here
+  def getDef(n: String): IDef = getDefOpt(List(n)).getOrElse(throw VIErrorMsg(s"${n}"))
 
-    val scalar = v_raw.find(_.id == h).getOrElse(s_raw.find(_.id == h).getOrElse(p_raw.find(_.id == h).orNull))
-    if (scalar != null) Option(scalar)
-    else {
-      // vnl_raw, locate firstly
-      vnl_raw.find(_.id == h) match {
+  def getDef(sn: VSelectedName): IDef = {
+    val nList = sn.suffixList.scanLeft(sn.id)((acc, cur) => s"${acc}_${cur.s}").toList
+    getDefOpt(nList).getOrElse(throw VIErrorMsg(s"${sn}"))
+  }
+
+  def getSPDef(sn: VSelectedName): SP_IDef = {
+    val nList = sn.suffixList.scanLeft(sn.id)((acc, cur) => s"${acc}_${cur.s}").toList
+    getSPDefOpt(nList).getOrElse(throw VIErrorMsg(s"${sn}"))
+  }
+
+  def getVDef(sn: VSelectedName): V_IDef = {
+    val nList = sn.suffixList.scanLeft(sn.id)((acc, cur) => s"${acc}_${cur.s}").toList
+    getVDefOpt(nList).getOrElse(throw VIErrorMsg(s"${sn}"))
+  }
+
+  def getSPDefOpt(nList: List[String]): Option[SP_IDef] = {
+    val h = nList.head
+    (s_raw.find(_.id == h), p_raw.find(_.id == h)) match {
+      case (None, None) => spnl_raw.find(_.id == h) match {
+        case Some(spl) => spl.get(nList.tail)
+        case None => None
+      }
+      case (s@Some(ss), None) => s
+      case (None, p@Some(sp)) => p
+      case (_, _) => throw VIErrorMsg(s"${nList}")
+    }
+  }
+
+  def getVDefOpt(nList: List[String]): Option[V_IDef] = {
+    val h = nList.head
+    v_raw.find(_.id == h) match {
+      case v@Some(sv) => v
+      case None => vnl_raw.find(_.id == h) match {
         case Some(vl) => vl.get(nList.tail)
-        case None => {
-          spnl_raw.find(_.id == h) match {
-            case Some(spl) => spl.get(nList.tail)
-            case None => None
-          }
-        }
+        case None => None
       }
     }
   }
+
+  def getDefOpt(nList: List[String]): Option[IDef] = getSPDefOpt(nList).orElse(getVDefOpt(nList))
 
   def vnl_flatten(vnl: Vnl): List[V_PTy] = vnl.vlList flatMap {
     case vnl: Vnl => vnl_flatten(vnl)
@@ -99,7 +120,7 @@ final class DefInfo(defInfo: Option[DefInfo]) {
         //    TODO ideally definition should be parsed from vhd file
         //    TODO definition should not exist in isar file
         val id = "p_clk"
-        val iVariable = IValue("val_c", "CHR ''0''")
+        val iVariable = IConst("val_c", "CHR ''0''")
         val exp_con = IExp_con("std_ulogic", iVariable)
         id -> Port(id, "std_ulogic", exp_con, PortMode.withName("mode_in"), PortConn.connected)
       }
@@ -135,9 +156,15 @@ final class DefInfo(defInfo: Option[DefInfo]) {
   }
 
   def dumpTables() = {
-    logger.info(s"${v_map.mkString("\n")}")
-    logger.info(s"${s_map.mkString("\n")}")
-    logger.info(s"${p_map.mkString("\n")}")
+    logger.info(s"${
+      v_map.mkString("\n")
+    }")
+    logger.info(s"${
+      s_map.mkString("\n")
+    }")
+    logger.info(s"${
+      p_map.mkString("\n")
+    }")
   }
 
   override def toString = {

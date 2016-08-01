@@ -18,7 +18,7 @@ abstract class Keeper(vInfo:Option[VInfo]) {
   def genIVariable(id: String, expOption: Option[VExp], sti: VSubtypeInd): Unit = {
     val valType = sti.getSimpleName
     if (typeInfo.isListType(valType)) {
-      val initVals = typeInfo.getListInitVals(valType, expOption)
+      val initVals = typeInfo.getListInitVals(valType, expOption)(defInfo)
       val vnl = Vnl(id, initVals)
       defInfo +=(id, vnl)
     } else {
@@ -29,7 +29,7 @@ abstract class Keeper(vInfo:Option[VInfo]) {
           case None => typeInfo._guessVectorInitVal(valType, defaultRange(s"ConstDecl vector ${sti}"))
         }
       } else {
-        typeInfo.getScalarInitVal(valType, expOption)
+        typeInfo.getScalarInitVal(valType, expOption)(defInfo)
       }
       val variable = Variable(id, valType, initVal)
       defInfo +=(id, variable)
@@ -39,7 +39,7 @@ abstract class Keeper(vInfo:Option[VInfo]) {
   def genIPort(id: String, expOption: Option[VExp], sti: VSubtypeInd, mode: PortMode.Ty, conn: PortConn.Ty): Unit = {
     val valType = sti.getSimpleName
     if (typeInfo.isListType(valType)) {
-      val initVals = typeInfo.getListInitVals(valType, expOption)
+      val initVals = typeInfo.getListInitVals(valType, expOption)(defInfo)
       val spnl = SPnl(id, initVals, mode, conn)
       defInfo +=(id, spnl)
     } else {
@@ -47,7 +47,7 @@ abstract class Keeper(vInfo:Option[VInfo]) {
         val range = sti.getRange.getOrElse(defaultRange(s"Port_list vector ${typeInfo}"))
         typeInfo._guessVectorInitVal(valType, range)
       } else {
-        typeInfo.getScalarInitVal(valType, expOption)
+        typeInfo.getScalarInitVal(valType, expOption)(defInfo)
       }
       val port = Port(id, valType, initVal, mode, conn)
       defInfo +=(id, port)

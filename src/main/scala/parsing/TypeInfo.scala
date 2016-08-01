@@ -36,37 +36,36 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
     if (isListType(valType)) s"${rawIdType} list" else rawIdType
   }
 
-  def _guessScalarInitVal(valType: String): IExp_con = {
-    val initValue = valType match {
-      case "integer" => IValue("val_i", "0")
-      case "real" => IValue("val_r", "0.0")
-      case "character" => IValue("val_c", "(CHR ''0'')")
-      case "boolean" => IValue("val_b", "True")
-      case "std_ulogic" => IValue("val_c", "(CHR ''0'')")
-      case "std_logic" => IValue("val_c", "(CHR ''0'')")
-      case _ => defaultScalarValue(s"scalar unknown ${valType}")
-    }
-    IExp_con(s"${valType}", initValue)
+  def _guessScalarInitVal(valType: String): IExp_con = valType match {
+    case "integer" => IExp_con(valType, IConst("val_i", "0"))
+    case "real" => IExp_con(valType, IConst("val_r", "0.0"))
+    case "character" => IExp_con(valType, IConst("val_c", "(CHR ''0'')"))
+    case "boolean" => IExp_con(valType, IConst("val_b", "True"))
+    case "std_ulogic" => IExp_con(valType, IConst("val_c", "(CHR ''0'')"))
+    case "std_logic" => IExp_con(valType, IConst("val_c", "(CHR ''0'')"))
+    case _ => defaultExpCon(s"scalar unknown ${valType}")
   }
 
-  def getScalarInitVal(valType: String, expOption: Option[VExp]): IExp = expOption match {
+  def fillValType(valType: String, exp_con: IExp_con) = IExp_con(valType, exp_con.const)
+
+  def getScalarInitVal(valType: String, expOption: Option[VExp])(defInfo: DefInfo): IExp = expOption match {
     case Some(exp) => {
-      val expRepr = exp.toIExp.toString
-      if (expRepr.contains("???")) {
+      val refined = exp.toIExp(defInfo) match {
+        case e:IExp_con => fillValType(valType, e)
+        case o => o
+      }
+      val expRepr = refined.toString
+      if (expRepr.contains(unknownString)) {
         logger.warn(s"unknown exp === ${expRepr}")
         _guessScalarInitVal(valType)
       } else {
-        //        repr -> IExpr
-        exp.toIExp match {
-          case iVar: IValue => IExp_con(valType, iVar)
-          case e => e
-        }
+        refined
       }
     }
     case None => _guessScalarInitVal(valType)
   }
 
-  def _guessListInitVals(rawType: String): List[IData] = {
+  def _guessListInitVals(rawType: String): List[MetaData] = {
     val recordInfo = typeDeclTbl(rawType)
     val iVals = for {
       (itemId, sti) <- recordInfo
@@ -75,7 +74,7 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
       if (isListType(valType)) {
         val initVals = _guessListInitVals(valType)
         //      TODO    IValue shoud have other forms
-        IData(itemId, valType, defaultScalarValue(s"list-list ${initVals}"))
+        MetaData(itemId, valType, defaultExpCon(s"list-list ${initVals}"))
       } else {
         val initVal = if (isVectorType(valType)) {
           val range = sti.getRange.getOrElse(defaultRange(s"guessListInit vector ${sti}"))
@@ -83,7 +82,7 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
         } else {
           _guessScalarInitVal(valType)
         }
-        IData(itemId, valType, initVal)
+        MetaData(itemId, valType, initVal)
       }
     }
     iVals.toList
@@ -92,20 +91,20 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
   def _guessVectorInitVal(valType: String, r: RangeTy, numericVal: String = "'0'"): IExp_con = {
     require(valType.endsWith("_vector"), "vector")
     val genCmd = valType.substring(0, valType.length - "_vector".length) + "_vec_gen"
-    val valListType = if (r._2 == "to") "val_list" else if (r._2 == "downto") "val_rlist" else "???"
+    val valListType = if (r._2 == "to") "val_list" else if (r._2 == "downto") "val_rlist" else unknownString
     val initValue = if (List("val_lsit", "val_rlist").contains(valListType)) {
-      val iVarChar = IValue("val_c", s"(CHR '${numericVal}')")
-      IValue(valListType, s"(${genCmd} ${Math.abs(r._1.toInt - r._3.toInt) + 1} ${iVarChar})")
+      val iVarChar = IConst("val_c", s"(CHR '${numericVal}')")
+      IConst(valListType, s"(${genCmd} ${Math.abs(r._1.toInt - r._3.toInt) + 1} ${iVarChar})")
     } else {
-      IValue(valListType, s"???")
+      IConst(valListType, unknownString)
     }
     IExp_con(valType, initValue)
   }
 
   //    expOption  is taken from definition; but type information should be record type declaration
-  def getListInitVals(valType: String, expOption: Option[VExp]): List[IData] = {
+  def getListInitVals(valType: String, expOption: Option[VExp])(defInfo: DefInfo): List[MetaData] = {
     require(isListType(valType), s"${valType} should be composite")
-    val iVals: Seq[IData] = expOption match {
+    val iVals: Seq[MetaData] = expOption match {
       case Some(vExp) => {
         vExp.getPrimary match {
           case Some(VPrimaryAggregate(aggregate)) => {
@@ -117,7 +116,7 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
               val itemExp = aggregateIdExpMap(itemId)
               val itemValType = sti.getSimpleName
               val initValue: IExp = if (isListType(itemValType)) {
-                defaultScalarValue(s"list-list: ${itemValType}")
+                defaultExpCon(s"list-list: ${itemValType}")
               } else if (isVectorType(itemValType)) {
                 itemExp.getAggregate match {
                   case Some(itemAggregate) => {
@@ -129,19 +128,19 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
                         case Some(p) => {
                           _guessVectorInitVal(itemValType, range, p.asVal)
                         }
-                        case None => defaultScalarValue(s"${numericVal}")
+                        case None => defaultExpCon(s"${numericVal}")
                       }
                     } else {
                       logger.info(s"${itemAggregate.getFirstMap}")
-                      defaultScalarValue(s"${itemValType}")
+                      defaultExpCon(s"${itemValType}")
                     }
                   }
-                  case None => defaultScalarValue(s"${itemExp}")
+                  case None => defaultExpCon(s"${itemExp}")
                 }
               } else {
-                getScalarInitVal(itemValType, Option(itemExp))
+                getScalarInitVal(itemValType, Option(itemExp))(defInfo)
               }
-              IData(itemId, itemValType, initValue)
+              MetaData(itemId, itemValType, initValue)
             } // end of yield
           }
           case _ => {

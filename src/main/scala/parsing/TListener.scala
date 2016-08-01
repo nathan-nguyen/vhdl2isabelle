@@ -312,7 +312,12 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def enterBreak_selector_clause(ctx: Break_selector_clauseContext): Unit = {}
 
-  override def exitInterface_constant_declaration(ctx: Interface_constant_declarationContext): Unit = {}
+  override def exitInterface_constant_declaration(ctx: Interface_constant_declarationContext): Unit = {
+    val interfaceConstDecl = VInterfaceConstDecl(ctx)
+    for(id<-interfaceConstDecl.idList){
+      genIVariable(id, interfaceConstDecl.vExp, interfaceConstDecl.subtypeInd)
+    }
+  }
 
   override def exitAttribute_declaration(ctx: Attribute_declarationContext): Unit = {}
 
@@ -558,7 +563,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def enterInterface_variable_declaration(ctx: Interface_variable_declarationContext): Unit = {}
 
   override def exitDesign_file(ctx: Design_fileContext): Unit = {
-    defInfo.dumpTables()
+//    defInfo.dumpTables()
   }
 
   override def exitBreak_statement(ctx: Break_statementContext): Unit = {}
@@ -1035,12 +1040,9 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
     val concurrentSignalAssign = VConcurrentSignalAssignStat(ctx)
     concurrentSignalAssign match {
       case VConcurrentSignalAssignStatC(labelColon, _, condSignAssign) => {
-        val targetName = condSignAssign.target.getName.getOrElse(defaultTargetName(s"${concurrentSignalAssign}"))
-
-        logger.info(s"${condSignAssign.conditionalWaveforms.whenWaveForm}")
+//        logger.info(s"${condSignAssign.conditionalWaveforms.whenWaveForm}")
       }
       case VConcurrentSignalAssignStatS(_, _, selectSignalAssign) => {
-        val targetName = selectSignalAssign.target.getName.getOrElse(defaultTargetName(s"${concurrentSignalAssign}"))
       }
     }
   }
@@ -1077,7 +1079,9 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def exitLogical_name_list(ctx: Logical_name_listContext): Unit = {}
 
-  override def exitProcess_statement(ctx: Process_statementContext): Unit = {}
+  override def exitProcess_statement(ctx: Process_statementContext): Unit = {
+
+  }
 
   override def enterGroup_declaration(ctx: Group_declarationContext): Unit = {}
 

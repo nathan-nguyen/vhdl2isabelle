@@ -101,9 +101,9 @@ sealed abstract class V_lhs {
   }
 }
 
-case class Lhs_v(variable: IValue) extends V_lhs
+case class Lhs_v(variable: Variable) extends V_lhs
 
-case class Lhs_va(variable: IValue, discreteRange: Discrete_range) extends V_lhs
+case class Lhs_va(variable: Variable, discreteRange: Discrete_range) extends V_lhs
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -154,6 +154,9 @@ sealed abstract class Rhsl {
     case Rl_p(p) => s"(rl_p ${p})"
     case Rl_v(v) => s"(rl_v ${v})"
     case Rnl(rhslList) => s"(rnl ${rhslList.ISAR})"
+    // NOTE:     these two are simulated for function
+    case Rl_spl(spl) => s"(rhsl_of_spl ${spl})"
+    case Rl_vl(vl) => s"(rhsl_of_vl ${vl})"
   }
 }
 
@@ -163,6 +166,12 @@ case class Rl_p(port: Port) extends Rhsl
 
 case class Rl_v(variable: Variable) extends Rhsl
 
+case class Rl_spl(spl: SPl) extends Rhsl
+
+// use "vl", "rhsl_of_vl"
+case class Rl_vl(vl: Vl) extends Rhsl
+
+// use "spl", "rhsl_of_spl"
 case class Rnl(rhslList: List[Rhsl]) extends Rhsl
 
 /////////////////////////////////////////////////////////////////////////////////
