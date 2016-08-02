@@ -153,8 +153,9 @@ sealed abstract class Rhsl {
     case Rl_s(s) => s"(rl_s ${s})"
     case Rl_p(p) => s"(rl_p ${p})"
     case Rl_v(v) => s"(rl_v ${v})"
-    case Rnl(rhslList) => s"(rnl ${rhslList.ISAR})"
+    // FIXME: also accept xxx evaluated to spl or vl
     // NOTE:     these two are simulated for function
+    //    case Rnl(rhslList) => s"(rnl ${rhslList.ISAR})"
     case Rl_spl(spl) => s"(rhsl_of_spl ${spl})"
     case Rl_vl(vl) => s"(rhsl_of_vl ${vl})"
   }
@@ -166,13 +167,13 @@ case class Rl_p(port: Port) extends Rhsl
 
 case class Rl_v(variable: Variable) extends Rhsl
 
+// use "spl", "rhsl_of_spl"
 case class Rl_spl(spl: SPl) extends Rhsl
 
 // use "vl", "rhsl_of_vl"
 case class Rl_vl(vl: Vl) extends Rhsl
 
-// use "spl", "rhsl_of_spl"
-case class Rnl(rhslList: List[Rhsl]) extends Rhsl
+//case class Rnl(rhslList: List[Rhsl]) extends Rhsl
 
 /////////////////////////////////////////////////////////////////////////////////
 sealed abstract class Crhs {
@@ -236,7 +237,7 @@ case class Ssc_sa(id: IdTy, sP_clhs: SP_clhs, crhs: Crhs) extends Seq_stmt_compl
 
 case class Ssc_va(id: IdTy, v_clhs: V_clhs, crhs: Crhs) extends Seq_stmt_complex
 
-case class Ssc_if(id: IdTy, cond: IExp, if_seq_stmt_complexList: List[Seq_stmt_complex],
+case class Ssc_if(id: IdTy, ifCond: IExp, if_seq_stmt_complexList: List[Seq_stmt_complex],
                   elif_complexList: List[Ssc_elif],
                   else_complexList: List[Seq_stmt_complex]) extends Seq_stmt_complex
 
@@ -273,12 +274,15 @@ case class As_when(crhs: Crhs, cond: IExp) {
   override def toString = s"(${crhs} WHEN ${cond} ELSE)"
 }
 
-case class ISensitivilist(sigprtList: List[SigPrt])
+case class ISensitiveList(sp_IDefList: List[SP_IDef]) {
+  override def toString = sp_IDefList.map(_.as_list).mkString("", "@", "")
+}
 
 sealed abstract class Conc_stmt_complex {
   override def toString = this match {
-    case Csc_ps(id, iSensitivilist, seq_stmt_complexList) => {
-      s"${id}: PROCESS (${iSensitivilist} BEGIN ${seq_stmt_complexList.ISAR} END PROCESS)"
+    case Csc_ps(id, iSensitivilistOpt, seq_stmt_complexList) => {
+      val iSensitivilistRepr = iSensitivilistOpt.map(_.toString).getOrElse("[]")
+      s"${id}: PROCESS (${iSensitivilistRepr}) BEGIN ${seq_stmt_complexList.ISAR} END PROCESS"
     }
     case Csc_ca(id, sp_clhs, casmt_rhsList, crhs) => {
       s"${id}: ${sp_clhs} <= <${casmt_rhsList.ISAR}> ${crhs}"
@@ -289,7 +293,8 @@ sealed abstract class Conc_stmt_complex {
   }
 }
 
-case class Csc_ps(id: IdTy, iSensitivilist: ISensitivilist,
+// have to make iSensitivilist option
+case class Csc_ps(id: IdTy, iSensitivilist: Option[ISensitiveList],
                   seq_stmt_complexList: List[Seq_stmt_complex]) extends Conc_stmt_complex
 
 case class Csc_ca(id: IdTy, sp_clhs: SP_clhs, casmt_rhsList: List[As_when], crhs: Crhs) extends Conc_stmt_complex

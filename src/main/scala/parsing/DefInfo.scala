@@ -43,10 +43,7 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     * 1. "variable"(v_raw), "signal"(s_raw), "port"(p_raw)
     * 2. (1) from spnl_raw for "signal", "port", "spnl"
     * (2) from v_raw for "variable", "vnl"
-    * return (isarName, iDefOpt)
-    * NOTE: this could be implemented if
-    * 1. flatten the map beforehand
-    * 2. consider context to only lookup some tables
+    * NOTE: this could be implemented by flattening the map beforehand
     */
 
   def getDef(n: String): IDef = getDefOpt(List(n)).getOrElse(throw VIErrorMsg(s"${n}"))

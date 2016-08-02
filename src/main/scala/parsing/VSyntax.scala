@@ -7,7 +7,7 @@ import scala.collection.JavaConversions._
 
 ///////////////////////////////////////////////////////////////////////
 
-case class VConstDecl(idList: Seq[String], subtypeInd: VSubtypeInd, vExp: Option[VExp])
+case class VConstDecl(idList: List[String], subtypeInd: VSubtypeInd, vExp: Option[VExp])
 
 object VConstDecl {
   def apply(ctx: Constant_declarationContext): VConstDecl = {
@@ -21,7 +21,7 @@ object VConstDecl {
 
 ///////////////////////////////////////////////////////////////////////
 
-case class VSignalDecl(idList: Seq[String], subtypeInd: VSubtypeInd,
+case class VSignalDecl(idList: List[String], subtypeInd: VSubtypeInd,
                        signalKind: Option[String], exp: Option[VExp])
 
 object VSignalDecl {
@@ -36,7 +36,7 @@ object VSignalDecl {
 
 ///////////////////////////////////////////////////////////////////////
 
-case class VInterfaceSignalDecl(idList: Seq[String], subtypeInd: VSubtypeInd, vExp: Option[VExp])
+case class VInterfaceSignalDecl(idList: List[String], subtypeInd: VSubtypeInd, vExp: Option[VExp])
 
 object VInterfaceSignalDecl {
   def apply(ctx: Interface_signal_declarationContext): VInterfaceSignalDecl = {
@@ -47,7 +47,7 @@ object VInterfaceSignalDecl {
   }
 }
 
-case class VInterfaceConstDecl(idList: Seq[String], subtypeInd: VSubtypeInd, vExp: Option[VExp])
+case class VInterfaceConstDecl(idList: List[String], subtypeInd: VSubtypeInd, vExp: Option[VExp])
 
 object VInterfaceConstDecl {
   def apply(ctx: Interface_constant_declarationContext): VInterfaceConstDecl = {
@@ -58,7 +58,7 @@ object VInterfaceConstDecl {
   }
 }
 
-case class VInterfacePortDecl(idList: Seq[String], mode: String,
+case class VInterfacePortDecl(idList: List[String], mode: String,
                               subtypeInd: VSubtypeInd, vExp: Option[VExp])
 
 object VInterfacePortDecl {
@@ -71,7 +71,7 @@ object VInterfacePortDecl {
   }
 }
 
-case class VPortList(interfacePortDecls: Seq[VInterfacePortDecl])
+case class VPortList(interfacePortDecls: List[VInterfacePortDecl])
 
 
 ///////////////////////////////////////////////////////////////
@@ -82,7 +82,7 @@ case class VSuffix(s: String)
 // perhaps needing separation
 sealed abstract class VName {
 
-  def getSimpleNameOpt = this match {
+  def getSimpleNameOpt: Option[String] = this match {
     case VSelectedName(id, suffixList) => {
       if (suffixList.nonEmpty) {
         logger.warn(s"VSelectedName ${toString}")
@@ -94,6 +94,11 @@ sealed abstract class VName {
       logger.warn(s"VNameParts ${toString}")
       None
     }
+  }
+
+  def getSimpleName: String = getSimpleNameOpt match {
+    case Some(s) => s
+    case None => throw VIErrorMsg(s"${toString}")
   }
 
   def isarTName: String = this match {
@@ -120,12 +125,12 @@ object VName {
 }
 
 
-case class VSelectedName(id: String, suffixList: Seq[VSuffix]) extends VName
+case class VSelectedName(id: String, suffixList: List[VSuffix]) extends VName
 
 object VSelectedName {
   def apply(ctx: Selected_nameContext): VSelectedName = {
     val id = ctx.identifier().getText
-    val suffixList = ctx.suffix().map(s => VSuffix(s.getText))
+    val suffixList = ctx.suffix().map(s => VSuffix(s.getText)).toList
     VSelectedName(id, suffixList)
   }
 }
@@ -147,7 +152,7 @@ object VNameParts {
 
 
 sealed abstract class VTarget {
-  def getSelectedName: Option[VSelectedName] = this match {
+  def getSelectedNameOpt: Option[VSelectedName] = this match {
     case VTargetN(name) => name match {
       case s: VSelectedName => Some(s)
       case p: VNameParts => None
@@ -155,14 +160,30 @@ sealed abstract class VTarget {
     case VTargetAggregate(aggregate) => None
   }
 
-  def toI(defInfo: DefInfo): SP_clhs = {
-    val sn = getSelectedName match {
+  def toI_SP(defInfo: DefInfo): SP_clhs = {
+    val sn = getSelectedNameOpt match {
       case Some(s) => s
       case None => throw VIErrorMsg(s"${toString}")
     }
     val idef = defInfo.getSPDef(sn)
+    // FIXME
     def__sp_clhs(idef, None)
   }
+
+  def toI_V(defInfo: DefInfo): V_IDef = {
+    val sn = getSelectedNameOpt match {
+      case Some(s) => s
+      case None => throw VIErrorMsg(s"${toString}")
+    }
+    defInfo.getVDef(sn)
+  }
+
+  def toI_V_Clhs(defInfo: DefInfo): V_clhs = {
+    val idef = toI_V(defInfo)
+    // FIXME may not be None
+    def__v_clhs(idef, None)
+  }
+
 }
 
 object VTarget {
@@ -215,8 +236,6 @@ object VOpts {
 //////////////////////////////////////////////////////////////////////////////
 /**
   * 2nd exp is "after", not useful?
-  *
-  * @param exp
   */
 case class VWaveFormElem(exp: VExp, expOption: Option[VExp])
 
@@ -233,9 +252,7 @@ sealed abstract class VWaveForm {
   def toI(defInfo: DefInfo): Crhs = this match {
     case vWaveFormE@VWaveFormE(elems) => {
       val iExp = vWaveFormE.getSpecialExp(defInfo)
-      // FIXME not sure
-      val asmt_rhs = Rhs_e(iExp)
-      Crhs_e(asmt_rhs)
+      iExp.crhs_e()
     }
     case VWaveFormU => {
       throw VIErrorMsg(s"${toString}")
@@ -250,12 +267,12 @@ object VWaveForm {
     if (unaffected != null) {
       VWaveFormU
     } else if (waveFormElemList != null) {
-      VWaveFormE(waveFormElemList.map(VWaveFormElem(_)))
+      VWaveFormE(waveFormElemList.map(VWaveFormElem(_)).toList)
     } else throw VIError
   }
 }
 
-case class VWaveFormE(elems: Seq[VWaveFormElem]) extends VWaveForm {
+case class VWaveFormE(elems: List[VWaveFormElem]) extends VWaveForm {
   require(elems.nonEmpty, "VWaveFormE")
 
   def getSpecialExp(defInfo: DefInfo): IExp = elems.head.exp.toIExp(defInfo)
@@ -334,7 +351,7 @@ object VSelectedSignalAssign {
 
 case class VCondSignalAssign(vTarget: VTarget, opts: VOpts, conditionalWaveforms: VCondWaveForms) {
   def toI(defInfo: DefInfo): (SP_clhs, List[As_when], Crhs) = {
-    val sp_chls = vTarget.toI(defInfo)
+    val sp_chls = vTarget.toI_SP(defInfo)
     val (as_whenList, crhs) = conditionalWaveforms.toI(defInfo)
     (sp_chls, as_whenList, crhs)
   }
@@ -371,7 +388,7 @@ case class VConcurrentSignalAssignStatC(labelColon: Option[String],
                                         postPonded: Boolean,
                                         condSignAssign: VCondSignalAssign) extends VConcurrentSignalAssignStat {
   def toI(defInfo: DefInfo): Csc_ca = {
-    val id = labelColon.getOrElse("''''")
+    val id = labelColon.getOrElse(defaultId)
     val (sp_clhs, casmt_rhsList, crhs) = condSignAssign.toI(defInfo)
     Csc_ca(id, sp_clhs, casmt_rhsList, crhs)
   }
@@ -383,7 +400,7 @@ case class VConcurrentSignalAssignStatS(labelColon: Option[String],
 
 
 ///////////////////////////////////////////////////////////////////////////////////
-case class VVarDecl(shared: Boolean, idList: Seq[String],
+case class VVarDecl(shared: Boolean, idList: List[String],
                     subtypeInd: VSubtypeInd, vExp: Option[VExp])
 
 object VVarDecl {
@@ -398,11 +415,36 @@ object VVarDecl {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-case class VSubProgSpec()
+case class VSubProgDecl(vSubProgSpec: VSubProgSpec)
+
+object VSubProgDecl {
+  def apply(ctx: Subprogram_declarationContext): VSubProgDecl = {
+    val spec = ctx.subprogram_specification()
+    VSubProgDecl(VSubProgSpec(spec))
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+sealed abstract class VSubProgSpec
+
+object VSubProgSpec {
+  def apply(ctx: Subprogram_specificationContext): VSubProgSpec = ???
+}
+
+case class VProcSpec() extends VSubProgSpec
+
+case class VFuncSpec() extends VSubProgSpec
 
 ////////////////////////////////////////////////////////////////////////////////
 
 case class VSubProgBody()
+
+object VSubProgBody {
+  def apply(ctx: Subprogram_bodyContext): VSubProgBody = {
+    ???
+  }
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -412,31 +454,110 @@ case class VTypeDecl()
 
 case class VFileDecl()
 
+object VFileDecl {
+  def apply(ctx: File_declarationContext): VFileDecl = {
+    ???
+  }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 case class VAliasDecl()
 
+object VAliasDecl {
+  def apply(ctx: Alias_declarationContext): VAliasDecl = {
+    ???
+  }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 case class VAttrDecl()
+
+object VAttrDecl {
+  def apply(ctx: Attribute_declarationContext): VAttrDecl = {
+    ???
+  }
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 case class VAttrSpec()
 
+object VAttrSpec {
+  def apply(ctx: Attribute_specificationContext): VAttrSpec = {
+    ???
+  }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 case class VUseClause()
 
+object VUseClause {
+  def apply(ctx: Use_clauseContext): VUseClause = ???
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 case class VGrpTempDecl()
+
+object VGrpTempDecl {
+  def apply(ctx: Group_template_declarationContext): VGrpTempDecl = ???
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
 case class VGrpDecl()
 
+object VGrpDecl {
+  def apply(ctx: Group_declarationContext): VGrpDecl = ???
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 sealed abstract class VProcDeclItem
 
+object VProcDeclItem {
+  def apply(ctx: Process_declarative_itemContext): VProcDeclItem = {
+    val spDecl = ctx.subprogram_declaration()
+    val spBody = ctx.subprogram_body()
+    val typeDecl = ctx.type_declaration()
+    val subtypeDecl = ctx.subtype_declaration()
+    val constDecl = ctx.constant_declaration()
+    val varDecl = ctx.variable_declaration()
+    val fileDecl = ctx.file_declaration()
+    val aliasDecl = ctx.alias_declaration()
+    val attrDecl = ctx.attribute_declaration()
+    val attrSpec = ctx.attribute_specification()
+    val useClause = ctx.use_clause()
+    val grpTempDecl = ctx.group_template_declaration()
+    val grpDecl = ctx.group_declaration()
+    if (spDecl != null) {
+      VProcDeclItemSPD(VSubProgDecl(spDecl))
+    } else if (spBody != null) {
+      VProcDeclItemSPB(VSubProgBody(spBody))
+    } else if (typeDecl != null) {
+      VProcDeclItemSTD(VSubtypeDecl(subtypeDecl))
+    } else if (constDecl != null) {
+      VProcDeclItemCD(VConstDecl(constDecl))
+    } else if (varDecl != null) {
+      VProcDeclItemVD(VVarDecl(varDecl))
+    } else if (fileDecl != null) {
+      VProcDeclItemFD(VFileDecl(fileDecl))
+    } else if (aliasDecl != null) {
+      VProcDeclItemAliasD(VAliasDecl(aliasDecl))
+    } else if (attrDecl != null) {
+      VProcDeclItemAttrD(VAttrDecl(attrDecl))
+    } else if (attrSpec != null) {
+      VProcDeclItemAttrS(VAttrSpec(attrSpec))
+    } else if (useClause != null) {
+      VProcDeclItemUC(VUseClause(useClause))
+    } else if (grpTempDecl != null) {
+      VProcDeclGTD(VGrpTempDecl(grpTempDecl))
+    } else if (grpDecl != null) {
+      VProcDeclGD(VGrpDecl(grpDecl))
+    } else throw VIError
+  }
+}
+
 // subprogram_declaration not defined
-case class VProcDeclItemSPD(subProgDecl: VSubProgSpec) extends VProcDeclItem
+case class VProcDeclItemSPD(subProgDecl: VSubProgDecl) extends VProcDeclItem
 
 case class VProcDeclItemSPB(subProgBody: VSubProgBody) extends VProcDeclItem
 
@@ -464,7 +585,9 @@ case class VProcDeclGD(grpDecl: VGrpDecl) extends VProcDeclItem
 
 /////////////////////////////////////////////////////////////////////////////////
 
-sealed abstract class VSeqStat
+sealed abstract class VSeqStat {
+  def toI(defInfo: DefInfo): Seq_stmt_complex
+}
 
 object VSeqStat {
   def apply(ctx: Sequential_statementContext): VSeqStat = {
@@ -514,14 +637,22 @@ object VSeqStat {
 
 /////////////////////////////////////////////////////////////////////////////////
 
-case class VSensitiveList(nameList: Seq[VName])
+case class VSensitiveList(nameList: List[VName]) {
+  // from list, checked from table
+  def toI(defInfo: DefInfo): ISensitiveList = {
+    val simpleNames = nameList.map(_.asInstanceOf[VSelectedName])
+    val sp_idefs = simpleNames.map(n => defInfo.getSPDef(n)).toList
+    ISensitiveList(sp_idefs)
+  }
+}
 
 object VSensitiveList {
   def apply(ctx: Sensitivity_listContext): VSensitiveList = {
-    val nameList = ctx.name().map(VName(_))
+    val nameList = ctx.name().map(VName(_)).toList
     VSensitiveList(nameList)
   }
 }
+
 
 case class VAssert(cond: VExp, report: Option[VExp], severity: Option[VExp])
 
@@ -555,7 +686,9 @@ object VCondClause {
 
 // no sensitivity_clause
 case class VWaitStat(labelColon: Option[String], sensitiveList: Option[VSensitiveList],
-                     condClause: Option[VCondClause], toClause: Option[VTimeOutClause]) extends VSeqStat
+                     condClause: Option[VCondClause], toClause: Option[VTimeOutClause]) extends VSeqStat {
+  override def toI(defInfo: DefInfo): Seq_stmt_complex = ???
+}
 
 object VWaitStat {
   def apply(ctx: Wait_statementContext): VWaitStat = {
@@ -567,7 +700,9 @@ object VWaitStat {
   }
 }
 
-case class VAssertStat(labelColon: Option[String], vAssert: VAssert) extends VSeqStat
+case class VAssertStat(labelColon: Option[String], vAssert: VAssert) extends VSeqStat {
+  override def toI(defInfo: DefInfo): Seq_stmt_complex = ???
+}
 
 object VAssertStat {
   def apply(ctx: Assertion_statementContext): VAssertStat = {
@@ -577,7 +712,9 @@ object VAssertStat {
   }
 }
 
-case class VReportStat(labelColon: Option[String], exp: VExp, otherExp: Option[VExp]) extends VSeqStat
+case class VReportStat(labelColon: Option[String], exp: VExp, otherExp: Option[VExp]) extends VSeqStat {
+  override def toI(defInfo: DefInfo): Seq_stmt_complex = ???
+}
 
 object VReportStat {
   def apply(ctx: Report_statementContext): VReportStat = {
@@ -589,7 +726,9 @@ object VReportStat {
   }
 }
 
-case class VSignalAssignStat(labelColon: Option[String], target: VTarget, delay: Option[VDelay], waveForm: VWaveForm) extends VSeqStat
+case class VSignalAssignStat(labelColon: Option[String], target: VTarget, delay: Option[VDelay], waveForm: VWaveForm) extends VSeqStat {
+  override def toI(defInfo: DefInfo): Seq_stmt_complex = ???
+}
 
 object VSignalAssignStat {
   def apply(ctx: Signal_assignment_statementContext): VSignalAssignStat = {
@@ -601,7 +740,34 @@ object VSignalAssignStat {
   }
 }
 
-case class VVarAssignStat(labelColon: Option[String], target: VTarget, exp: VExp) extends VSeqStat
+case class VVarAssignStat(labelColon: Option[String], target: VTarget, exp: VExp) extends VSeqStat {
+  override def toI(defInfo: DefInfo): Seq_stmt_complex = {
+    val id = labelColon.getOrElse(defaultId)
+    //////////////////////////////////////
+    val v_clhs = target.toI_V_Clhs(defInfo)
+    // TODO
+    // rhs may still have inconsistencies from vhdl to isar
+    // currently suppose lhs, rhs must be consistent as to [Scalar, Record]
+    val crhs: Crhs = v_clhs match {
+      case _: Clhs_v => exp.toIExp(defInfo).crhs_e()
+      case _: Clhs_vr => {
+        val literal = exp.getLiteral match {
+          case Some(l) => l
+          case None => throw VIErrorMsg(s"${exp}")
+        }
+        val identifier = literal.asInstanceOf[VLiteralEnumId].identifier
+        val rhs_def = defInfo.getDef(identifier)
+        rhs_def match {
+          case _: Variable | _: Signal | _: Port => exp.toIExp(defInfo).crhs_e()
+          case spl: SPl => Crhs_r(Rl_spl(spl))
+          case vl: Vl => Crhs_r(Rl_vl(vl))
+        }
+      }
+    }
+    Ssc_va(id, v_clhs, crhs)
+
+  }
+}
 
 object VVarAssignStat {
   def apply(ctx: Variable_assignment_statementContext): VVarAssignStat = {
@@ -612,20 +778,35 @@ object VVarAssignStat {
   }
 }
 
-case class VSeqOfStats(seqElem: Seq[VSeqStat])
+case class VSeqOfStats(seqElem: List[VSeqStat])
 
 object VSeqOfStats {
   def apply(ctx: Sequence_of_statementsContext): VSeqOfStats = {
-    val seqStatList = ctx.sequential_statement().map(VSeqStat(_))
+    val seqStatList = ctx.sequential_statement().map(VSeqStat(_)).toList
     VSeqOfStats(seqStatList)
   }
 }
 
 case class VIfStat(labelColon: Option[String],
-                   ifCond: VExp, ifSeqOfStats: VSeqOfStats,
-                   elifConds: Seq[VExp], elifSeqofStats: Seq[VSeqOfStats],
+                   ifVCond: VExp, ifSeqOfStats: VSeqOfStats,
+                   elifConds: List[VExp], elifSeqofStats: List[VSeqOfStats],
                    elseSeqOfStats: Option[VSeqOfStats],
-                   id: Option[String]) extends VSeqStat
+                   vId: Option[String]) extends VSeqStat {
+
+  override def toI(defInfo: DefInfo): Seq_stmt_complex = {
+    import VIfStat._
+    val id = labelColon.orElse(vId).getOrElse(defaultId)
+    val ifCond = ifVCond.toIExp(defInfo)
+    val if_stmt_complexList = seq_stmt_complex_list(ifSeqOfStats)(defInfo)
+    val elif_complexList = elif_complex_list(elifConds, elifSeqofStats)(defInfo)
+    val else_stmt_complexList = elseSeqOfStats match {
+      case Some(s) => seq_stmt_complex_list(s)(defInfo)
+      // FIXME
+      case None => ???
+    }
+    Ssc_if(id, ifCond, if_stmt_complexList, elif_complexList, else_stmt_complexList)
+  }
+}
 
 object VIfStat {
   def apply(ctx: If_statementContext): VIfStat = {
@@ -636,16 +817,34 @@ object VIfStat {
     require(conds.length <= seqOfStatsList.length && elifLength + 1 <= conds.length)
     val ifCond = conds.head
     val ifSeqOfStats = seqOfStatsList.head
-    val elifConds = conds.slice(1, 1 + elifLength)
-    val elifSeqOfStatsList = seqOfStatsList.slice(1, 1 + elifLength)
+    val elifConds = conds.slice(1, 1 + elifLength).toList
+    val elifSeqOfStatsList = seqOfStatsList.slice(1, 1 + elifLength).toList
     val elseSeqOfStats = seqOfStatsList.lift(1 + elifLength)
     val id = Option(ctx.identifier()).map(_.getText)
     VIfStat(labelColon, ifCond, ifSeqOfStats, elifConds, elifSeqOfStatsList, elseSeqOfStats, id)
   }
+
+  def seq_stmt_complex_list(seqOfStats: VSeqOfStats)(defInfo: DefInfo): List[Seq_stmt_complex] = {
+    seqOfStats.seqElem.map(_.toI(defInfo))
+  }
+
+  def elif_complex_list(cl: List[VExp], sl: List[VSeqOfStats])(defInfo: DefInfo): List[Ssc_elif] = {
+    val ssll = sl.map(s => seq_stmt_complex_list(s)(defInfo))
+    cl.zip(ssll).map {
+      case (exp, ssl) => Ssc_elif(exp.toIExp(defInfo), ssl)
+    }
+  }
+
 }
 
 /////////////////////////////////////////////////////////////////////////////////
-case class VCaseStatAlt(choices: VChoices, seqOfStats: VSeqOfStats)
+case class VCaseStatAlt(choices: VChoices, seqOfStats: VSeqOfStats) {
+  def toI(defInfo:DefInfo):Ssc_when = {
+    val exps = choices.choiceList.map(_.getSimplExp.toIExp(defInfo))
+    val sstList = seqOfStats.seqElem.map(_.toI(defInfo))
+    Ssc_when(IChoices(exps), sstList)
+  }
+}
 
 object VCaseStatAlt {
   def apply(ctx: Case_statement_alternativeContext): VCaseStatAlt = {
@@ -655,15 +854,35 @@ object VCaseStatAlt {
   }
 }
 
-case class VCaseStat(labelColon: Option[String], exp: VExp, caseStatAltList: Seq[VCaseStatAlt], id: Option[String]) extends VSeqStat {
+case class VCaseStat(labelColon: Option[String],
+                     exp: VExp, caseStatAltList: List[VCaseStatAlt],
+                     vId: Option[String]) extends VSeqStat {
   require(caseStatAltList.nonEmpty, "caseStatAltList")
+
+  override def toI(defInfo: DefInfo): Seq_stmt_complex = {
+    val id = labelColon.orElse(vId).getOrElse(defaultId)
+    val cond = exp.toIExp(defInfo)
+    /// TODO may need to ensure default case only deal with one "choice"
+    val lastCase = caseStatAltList.last
+    val (when_complexList: List[Ssc_when], defaultList: List[Seq_stmt_complex]) =
+      lastCase.choices.choiceList.head match {
+        case VChoiceOthers => {
+          val initCases = caseStatAltList.init
+          (initCases.map(_.toI(defInfo)), lastCase.seqOfStats.seqElem.map(_.toI(defInfo)))
+        }
+        case _ => ???
+
+      }
+
+    Ssc_case(id, cond, when_complexList, defaultList)
+  }
 }
 
 object VCaseStat {
   def apply(ctx: Case_statementContext): VCaseStat = {
     val labelColon = Option(ctx.label_colon()).map(_.getText)
     val exp = VExp(ctx.expression())
-    val caseStatAltList = ctx.case_statement_alternative().map(VCaseStatAlt(_))
+    val caseStatAltList = ctx.case_statement_alternative().map(VCaseStatAlt(_)).toList
     val id = Option(ctx.identifier()).map(_.getText)
     VCaseStat(labelColon, exp, caseStatAltList, id)
 
@@ -680,7 +899,9 @@ case class VParamSpec(id: String, discreteRange: VDiscreteRange)
 
 case class VIterSchemeF(paramSpec: VParamSpec) extends VIterScheme
 
-case class VLoopStat(labelColon: Option[String], seqOfStats: VSeqOfStats, id: Option[String]) extends VSeqStat
+case class VLoopStat(labelColon: Option[String], seqOfStats: VSeqOfStats, id: Option[String]) extends VSeqStat {
+  override def toI(defInfo: DefInfo): Seq_stmt_complex = ???
+}
 
 object VLoopStat {
   def apply(ctx: Loop_statementContext): VLoopStat = {
@@ -693,7 +914,9 @@ object VLoopStat {
 
 /////////////////////////////////////////////////////////////////////////////////
 
-case class VNextStat(labelColon: Option[String], id: Option[String], cond: Option[VExp]) extends VSeqStat
+case class VNextStat(labelColon: Option[String], id: Option[String], cond: Option[VExp]) extends VSeqStat {
+  override def toI(defInfo: DefInfo): Seq_stmt_complex = ???
+}
 
 object VNextStat {
   def apply(ctx: Next_statementContext): VNextStat = {
@@ -705,7 +928,9 @@ object VNextStat {
 }
 
 
-case class VExitStat(labelColon: Option[String], id: Option[String], cond: Option[VExp]) extends VSeqStat
+case class VExitStat(labelColon: Option[String], id: Option[String], cond: Option[VExp]) extends VSeqStat {
+  override def toI(defInfo: DefInfo): Seq_stmt_complex = ???
+}
 
 object VExitStat {
   def apply(ctx: Exit_statementContext): VExitStat = {
@@ -716,9 +941,13 @@ object VExitStat {
   }
 }
 
-case class VRetStat(labelColon: Option[String], exp: Option[VExp]) extends VSeqStat
+case class VRetStat(labelColon: Option[String], exp: Option[VExp]) extends VSeqStat {
+  override def toI(defInfo: DefInfo): Seq_stmt_complex = ???
+}
 
-case class VNullStat(labelColon: Option[String]) extends VSeqStat
+case class VNullStat(labelColon: Option[String]) extends VSeqStat {
+  override def toI(defInfo: DefInfo): Seq_stmt_complex = ???
+}
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -742,18 +971,20 @@ object VBreakElem {
   }
 }
 
-case class VBreakList(breakElemList: Seq[VBreakElem]) {
+case class VBreakList(breakElemList: List[VBreakElem]) {
   require(breakElemList.nonEmpty)
 }
 
 object VBreakList {
   def apply(ctx: Break_listContext): VBreakList = {
-    val breakElemList = ctx.break_element().map(VBreakElem(_))
+    val breakElemList = ctx.break_element().map(VBreakElem(_)).toList
     VBreakList(breakElemList)
   }
 }
 
-case class VBreakStat(labelColon: Option[String], breakList: Option[VBreakList], cond: Option[VExp]) extends VSeqStat
+case class VBreakStat(labelColon: Option[String], breakList: Option[VBreakList], cond: Option[VExp]) extends VSeqStat {
+  override def toI(defInfo: DefInfo): Seq_stmt_complex = ???
+}
 
 object VBreakStat {
   def apply(ctx: Break_statementContext): VBreakStat = {
@@ -765,7 +996,9 @@ object VBreakStat {
 }
 
 /////////////////////////////////////////////////////////////////////////////////
-case class VProcCallStat(labelColon: Option[String], procCall: VProcCall) extends VSeqStat
+case class VProcCallStat(labelColon: Option[String], procCall: VProcCall) extends VSeqStat {
+  override def toI(defInfo: DefInfo): Seq_stmt_complex = ???
+}
 
 object VProcCallStat {
   def apply(ctx: Procedure_call_statementContext): VProcCallStat = {
@@ -776,7 +1009,69 @@ object VProcCallStat {
 }
 
 /////////////////////////////////////////////////////////////////////////////////
-case class VProcStatPart(seqStatList: List[VSeqStat])
+case class VProcStatPart(seqStatList: List[VSeqStat]) {
+  def toI(defInfo: DefInfo): List[Seq_stmt_complex] = {
+    seqStatList.map(_.toI(defInfo))
+  }
+}
+
+object VProcStatPart {
+  def apply(ctx: Process_statement_partContext): VProcStatPart = {
+    val seqStatList = ctx.sequential_statement().map(VSeqStat(_)).toList
+    VProcStatPart(seqStatList)
+  }
+}
+
+case class VProcDeclPart(procDeclItem: List[VProcDeclItem])
+
+object VProcDeclPart {
+  def apply(ctx: Process_declarative_partContext): VProcDeclPart = {
+    val processDeclItemList = ctx.process_declarative_item().map(VProcDeclItem(_)).toList
+    VProcDeclPart(processDeclItemList)
+  }
+}
+
+case class VProcStat(labelColon: Option[String],
+                     p1: Boolean,
+                     sensitivitylist: Option[VSensitiveList],
+                     is: Boolean,
+                     procDeclPart: VProcDeclPart,
+                     procStatPart: VProcStatPart,
+                     p2: Boolean,
+                     identifier: Option[String]) {
+  def toI(defInfo: DefInfo): Csc_ps = {
+    // guess
+    val id = labelColon.orElse(identifier).getOrElse(defaultId)
+    val iSensitiveList = sensitivitylist.map(_.toI(defInfo))
+    logger.info(s"${iSensitiveList}")
+    // don't care about procDeclPart
+    // procStatPart => seq_stmt_complexList
+    val seq_stmt_complexList: List[Seq_stmt_complex] = procStatPart.toI(defInfo)
+    Csc_ps(id, iSensitiveList, seq_stmt_complexList)
+  }
+
+}
+
+object VProcStat {
+  def apply(ctx: Process_statementContext): VProcStat = {
+    val labelColon = Option(ctx.label_colon()).map(_.getText)
+    val posponds = ctx.POSTPONED()
+    val (p1, p2) = if (posponds.length == 2) {
+      (true, true)
+    } else if (posponds.isEmpty) {
+      (false, false)
+    } else if (posponds.length == 1) {
+      // FIXME don't know
+      (true, false)
+    } else throw VIError
+    val sensitivilist = Option(ctx.sensitivity_list()).map(VSensitiveList(_))
+    val is = ctx.IS() != null
+    val procDeclPart = VProcDeclPart(ctx.process_declarative_part())
+    val procStatPart = VProcStatPart(ctx.process_statement_part())
+    val id = Option(ctx.identifier()).map(_.getText)
+    VProcStat(labelColon, p1, sensitivilist, is, procDeclPart, procStatPart, p2, id)
+  }
+}
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -843,13 +1138,13 @@ object VAssocElem {
   }
 }
 
-case class VAssocList(assocElemList: Seq[VAssocElem]) {
+case class VAssocList(assocElemList: List[VAssocElem]) {
   require(assocElemList.nonEmpty, "assocElemList")
 }
 
 object VAssocList {
   def apply(ctx: Association_listContext): VAssocList = {
-    val assocElemList = ctx.association_element().map(VAssocElem(_))
+    val assocElemList = ctx.association_element().map(VAssocElem(_)).toList
     VAssocList(assocElemList)
   }
 }

@@ -1080,7 +1080,8 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def exitLogical_name_list(ctx: Logical_name_listContext): Unit = {}
 
   override def exitProcess_statement(ctx: Process_statementContext): Unit = {
-
+    val procStat = VProcStat(ctx)
+    procStat.toI(defInfo)
   }
 
   override def enterGroup_declaration(ctx: Group_declarationContext): Unit = {}

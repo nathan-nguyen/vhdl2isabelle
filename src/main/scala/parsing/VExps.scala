@@ -1,19 +1,10 @@
 package parsing
-import sg.edu.ntu.hchen.VHDLParser._
+
+import parsing.V2IUtils._
 
 import scala.collection.JavaConversions._
 
-import V2IUtils._
-
-
-object VSyntax {
-
-
-
-}
-
-import parsing.VSyntax._
-import sg.edu.ntu.hchen.VHDLParser.{ExpressionContext, RelationContext, Shift_expressionContext, _}
+import sg.edu.ntu.hchen.VHDLParser._
 
 sealed abstract class VLiteral {
   def toIExp(defInfo: DefInfo): IExp = {
@@ -31,7 +22,7 @@ sealed abstract class VLiteral {
           case ivariable: Variable => IExp_var(ivariable)
           case signal: Signal => IExp_sig(signal)
           case port: Port => IExp_prt(port)
-          case _ => throw VIError
+          case _ => throw VIErrorMsg(s"${idef}")
         }
       }
       // TODO only a guess, may change later
@@ -149,9 +140,9 @@ case class VFileTypeDef(subtypeInd: VSubtypeInd) extends VTypeDef
 abstract class VScalarTypeDef extends VTypeDef
 
 case class VPhysicalTypeDef(rangeConstraint: VRangeConstraint, baseUnitDecl: VBaseUnitDecl,
-                            secondaryUnitDecl: Seq[VSecondaryUnitDecl], id: Option[String]) extends VScalarTypeDef
+                            secondaryUnitDecl: List[VSecondaryUnitDecl], id: Option[String]) extends VScalarTypeDef
 
-case class VEnumTypeDef(literal: VLiteral, others: Seq[VLiteral]) extends VScalarTypeDef
+case class VEnumTypeDef(literal: VLiteral, others: List[VLiteral]) extends VScalarTypeDef
 
 case class VRangeConstraintTypeDef(rangeConstraint: VRangeConstraint) extends VScalarTypeDef
 
@@ -161,12 +152,12 @@ abstract class VArrayTypeDecl extends VCompositeTypeDecl
 
 case class VIndexSubtypeDef(name: String)
 
-case class VUArrayDef(indexSubtypeDef: Seq[VIndexSubtypeDef], subtypeInd: VSubtypeInd) extends VArrayTypeDecl
+case class VUArrayDef(indexSubtypeDef: List[VIndexSubtypeDef], subtypeInd: VSubtypeInd) extends VArrayTypeDecl
 
 case class VCArrayDef(indexConstraint: VIndexConstraint, subtypeInd: VSubtypeInd) extends VArrayTypeDecl
 
 // no element_subtype_definition
-case class VElementDecl(ids: Seq[String], subtypeInd: VSubtypeInd) {
+case class VElementDecl(ids: List[String], subtypeInd: VSubtypeInd) {
   def flatten = for (id <- ids) yield (id, subtypeInd)
 }
 
@@ -178,13 +169,13 @@ object VElementDecl {
   }
 }
 
-case class VRecordTypeDef(elementDecls: Seq[VElementDecl], id: Option[String]) extends VCompositeTypeDecl
+case class VRecordTypeDef(elementDecls: List[VElementDecl], id: Option[String]) extends VCompositeTypeDecl
 
 object VRecordTypeDef {
   def apply(ctx: Record_type_definitionContext): VRecordTypeDef = {
-    val elementDecls = for {
+    val elementDecls = (for {
       ed <- ctx.element_declaration()
-    } yield VElementDecl(ed)
+    } yield VElementDecl(ed)).toList
     val id = Option(ctx.identifier()).map(_.getText)
     VRecordTypeDef(elementDecls, id)
   }
@@ -196,11 +187,22 @@ sealed trait VBlockDeclItem
 
 case class VSubtypeDecl(id: String, subtypeInd: VSubtypeInd) extends VBlockDeclItem
 
-// TODO more here
+object VSubtypeDecl {
+  def apply(ctx: Subtype_declarationContext): VSubtypeDecl = {
+    val id = ctx.identifier().getText
+    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
+    VSubtypeDecl(id, subtypeInd)
+  }
+}
 
 //////////////////////////////////////////////////////////////
 
-abstract class VChoice
+abstract class VChoice {
+  def getSimplExp:VSimpleExp = this match {
+    case VChoiceE(simpleExp) => simpleExp
+    case _ => ???
+  }
+}
 
 object VChoice {
   def apply(ctx: ChoiceContext): VChoice = {
@@ -224,17 +226,20 @@ case class VChoiceId(id: String) extends VChoice
 
 case class VChoiceR(discreteRange: VDiscreteRange) extends VChoice
 
-case class VChoiceE(simpleExpr: VSimpleExp) extends VChoice
+case class VChoiceE(simpleExp: VSimpleExp) extends VChoice
 
 case object VChoiceOthers extends VChoice
 
-final case class VChoices(choiceList: Seq[VChoice])
+case class VChoices(choiceList: List[VChoice]) {
+  def toI(defInfo:DefInfo):List[IExp] = {
+    // FIXME wrong
+    choiceList.map(_.getSimplExp.toIExp(defInfo))
+  }
+}
 
 object VChoices {
   def apply(ctx: ChoicesContext): VChoices = {
-    val choiceList = for {
-      choice <- ctx.choice()
-    } yield VChoice(choice)
+    val choiceList = ctx.choice().map(VChoice(_)).toList
     VChoices(choiceList)
   }
 }
@@ -251,10 +256,10 @@ object VElemAssoc {
   }
 }
 
-case class VAggregate(elemAssocList: Seq[VElemAssoc]) {
+case class VAggregate(elemAssocList: List[VElemAssoc]) {
   require(elemAssocList.nonEmpty, "elemAssocList")
 
-  lazy val _getAssoc: Seq[(String, VExp)] = {
+  lazy val _getAssoc: List[(String, VExp)] = {
     for {
       elemAssoc <- elemAssocList
       choice <- elemAssoc.choices match {
@@ -280,9 +285,7 @@ case class VAggregate(elemAssocList: Seq[VElemAssoc]) {
 
 object VAggregate {
   def apply(ctx: AggregateContext): VAggregate = {
-    val element_assocList = for {
-      elemAssoc <- ctx.element_association()
-    } yield VElemAssoc(elemAssoc)
+    val element_assocList = ctx.element_association().map(VElemAssoc(_)).toList
     VAggregate(element_assocList)
   }
 }
@@ -511,15 +514,13 @@ object VRangeConstraint {
   }
 }
 
-case class VIndexConstraint(discreteRanges: Seq[VDiscreteRange]) extends VConstraint {
+case class VIndexConstraint(discreteRanges: List[VDiscreteRange]) extends VConstraint {
   require(discreteRanges.nonEmpty, "discrete ranges")
 }
 
 object VIndexConstraint {
   def apply(ctx: Index_constraintContext): VIndexConstraint = {
-    val discrete_rangeList = for {
-      discrete_range <- ctx.discrete_range()
-    } yield VDiscreteRange(discrete_range)
+    val discrete_rangeList = ctx.discrete_range().map(VDiscreteRange(_)).toList
     VIndexConstraint(discrete_rangeList)
   }
 }
@@ -604,7 +605,7 @@ case class VAbsFactor(primary: VPrimary) extends VFactor
 
 case class VNotFactor(primary: VPrimary) extends VFactor
 
-case class VTerm(factor: VFactor, ops: Seq[VFactorOp.Ty], others: Seq[VFactor]) {
+case class VTerm(factor: VFactor, ops: List[VFactorOp.Ty], others: List[VFactor]) {
   def toIExp(defInfo: DefInfo): IExp = {
     ops.zip(others).foldLeft(factor.toIExp(defInfo)) {
       case (accExp, (op, curFactor)) => IBexpfa(accExp, op, curFactor.toIExp(defInfo))
@@ -632,12 +633,8 @@ case class VTerm(factor: VFactor, ops: Seq[VFactorOp.Ty], others: Seq[VFactor]) 
 
 object VTerm {
   def apply(ctx: TermContext): VTerm = {
-    val ops = for {
-      op <- ctx.multiplying_operator()
-    } yield VFactorOp(op)
-    val factors = for {
-      factor <- ctx.factor()
-    } yield VFactor(factor)
+    val ops = ctx.multiplying_operator().map(VFactorOp(_)).toList
+    val factors = ctx.factor().map(VFactor(_)).toList
     VTerm(factors.head, ops, factors.tail)
   }
 }
@@ -691,7 +688,7 @@ object VFactorOp extends Enumeration with VAOp {
 
 ////////////////////////////////////////////////////////////
 
-case class VSimpleExp(termSign: Option[String], term: VTerm, ops: Seq[VTermOp.Ty], others: Seq[VTerm]) {
+case class VSimpleExp(termSign: Option[String], term: VTerm, ops: List[VTermOp.Ty], others: List[VTerm]) {
   def toIExp(defInfo: DefInfo): IExp = {
     val firstExp: IExp = termSign match {
       case Some("-") => IUexp(VUop.neg, term.toIExp(defInfo))
@@ -726,12 +723,8 @@ case class VSimpleExp(termSign: Option[String], term: VTerm, ops: Seq[VTermOp.Ty
 
 object VSimpleExp {
   def apply(ctx: Simple_expressionContext): VSimpleExp = {
-    val terms = for {
-      term <- ctx.term()
-    } yield VTerm(term)
-    val ops = for {
-      op <- ctx.adding_operator()
-    } yield VTermOp(op)
+    val terms = ctx.term().map(VTerm(_)).toList
+    val ops = ctx.adding_operator().map(VTermOp(_)).toList
     val symbol = {
       if (ctx.PLUS() != null) Some("+")
       else if (ctx.MINUS() != null) Some("-")
@@ -842,7 +835,7 @@ object VRelation {
   }
 }
 
-case class VExp(relation: VRelation, ops: Seq[VLogicOp.Ty], others: Seq[VRelation]) {
+case class VExp(relation: VRelation, ops: List[VLogicOp.Ty], others: List[VRelation]) {
   def toIExp(defInfo: DefInfo): IExp = {
     ops.zip(others).foldLeft(relation.toIExp(defInfo)) {
       case (acc, (op, curRelation)) => IBexpl(acc, op, curRelation.toIExp(defInfo))
@@ -877,12 +870,8 @@ case class VExp(relation: VRelation, ops: Seq[VLogicOp.Ty], others: Seq[VRelatio
 
 object VExp {
   def apply(ctx: ExpressionContext): VExp = {
-    val relationList = for {
-      relation <- ctx.relation()
-    } yield VRelation(relation)
-    val logicalOps = for {
-      op <- ctx.logical_operator()
-    } yield VLogicOp(op)
+    val relationList = ctx.relation().map(VRelation(_)).toList
+    val logicalOps = ctx.logical_operator().map(VLogicOp(_)).toList
     VExp(relationList.head, logicalOps, relationList.tail)
   }
 }

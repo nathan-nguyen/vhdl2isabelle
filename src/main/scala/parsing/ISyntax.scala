@@ -12,7 +12,7 @@ final case class IConst(isarType: String, initVal: String) {
 
 sealed trait IExp {
   override def toString = this match {
-//    case IValue(isarType, initVal) => s"""(${isarType} ${initVal})"""
+    //    case IValue(isarType, initVal) => s"""(${isarType} ${initVal})"""
     case IExp_con(valType, const) => s"""(exp_con (${VHDLize(valType)}, ${const}))"""
     case IExp_var(variable) => s"""(exp_var ${variable.getId})"""
     case IExp_sig(signal) => s"""(exp_sig ${signal.getId})"""
@@ -28,6 +28,15 @@ sealed trait IExp {
     case IExp_tl(e1, e2) => s"""(exp_tl ${e1} ${e2})"""
     case IExp_trl(e) => s"""(exp_trl ${e})"""
   }
+
+  def crhs_e(): Crhs_e = {
+    // FIXME not sure
+    val asmt_rhs = Rhs_e(this)
+    Crhs_e(asmt_rhs)
+  }
+
+  def crhs_o(defInfo: DefInfo): Crhs_r = ???
+
 }
 
 case class IExp_con(valType: String, const: IConst) extends IExp

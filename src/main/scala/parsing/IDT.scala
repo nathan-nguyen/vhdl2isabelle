@@ -235,7 +235,7 @@ case class Port(id: String, valType: String, iExp: IExp, mode: PortMode.Ty, conn
         | \"${id} ≡ ${toString}\"""".stripMargin
   }
 
-  override def as_list: String = s"${SP_p(this)}"
+  override def as_list: String = s"[${SP_p(this)}]"
 
   override def getId = id
 }

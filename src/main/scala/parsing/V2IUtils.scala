@@ -3,22 +3,24 @@ package parsing
 import org.slf4j.LoggerFactory
 import sg.edu.ntu.hchen.VHDLParser.{Identifier_listContext, Subtype_indicationContext}
 
-import scala.language.implicitConversions
-
 import scala.collection.JavaConversions._
+import scala.language.implicitConversions
 
 case class VInfo(typeInfo: TypeInfo, defInfo: DefInfo)
 
 object V2IUtils {
 
+  val defaultId = "''''"
+
   val logger = LoggerFactory.getLogger(this.getClass)
 
   type RangeTy = (String, String, String)
 
-  def getIdList(ctx: Identifier_listContext) = {
-    for {
+  def getIdList(ctx: Identifier_listContext): List[String] = {
+    val ids = for {
       id <- ctx.identifier()
     } yield id.getText.toLowerCase
+    ids.toList
   }
 
   def selectedNameFromSubtypeInd(ctx: Subtype_indicationContext): VSelectedName = {
@@ -47,6 +49,7 @@ object V2IUtils {
 
   def VHDLize(vhdlType: String) = s"vhdl_${vhdlType}"
 
+  // TODO
   def def__v_clhs(idef: V_IDef, range: Option[Discrete_range]): V_clhs = idef match {
     case variable: Variable => {
       val v_lhs = range match {
@@ -59,6 +62,7 @@ object V2IUtils {
     case _ => throw VIErrorMsg(s"${idef}")
   }
 
+  // TODO
   def def__sp_clhs(idef: SP_IDef, range: Option[Discrete_range]): SP_clhs = idef match {
     case signal: Signal => {
       val sp_s = SP_s(signal)
@@ -79,8 +83,6 @@ object V2IUtils {
     case spl: SPl => Clhs_spr(spl)
     case _ => throw VIErrorMsg(s"${idef}")
   }
-
-
 
 
 }
