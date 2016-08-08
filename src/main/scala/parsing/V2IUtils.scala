@@ -10,7 +10,7 @@ case class VInfo(typeInfo: TypeInfo, defInfo: DefInfo)
 
 object V2IUtils {
 
-  val defaultId = "''''"
+  val defaultId = ""
 
   val logger = LoggerFactory.getLogger(this.getClass)
 

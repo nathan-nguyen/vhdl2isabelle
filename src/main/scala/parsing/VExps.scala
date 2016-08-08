@@ -1,12 +1,12 @@
 package parsing
 
 import parsing.V2IUtils._
+import sg.edu.ntu.hchen.VHDLParser._
 
 import scala.collection.JavaConversions._
 
-import sg.edu.ntu.hchen.VHDLParser._
-
 sealed abstract class VLiteral {
+
   def toIExp(defInfo: DefInfo): IExp = {
     //    logger.info(s"${toString}")
     this match {
@@ -31,6 +31,12 @@ sealed abstract class VLiteral {
       case _ => defaultExpCon(s"VLiteral ${toString}")
     }
   }
+
+  def to_IDiscreteRange(defInfo: DefInfo) = this match {
+    case ln: VLiteralNumAbs => VHDL_dis_to(toIExp(defInfo), toIExp(defInfo))
+    case _ => ???
+  }
+
 
   def asVal: String = this match {
     case VLiteralNumInt(s) => s
@@ -85,7 +91,9 @@ case class VLiteralEnumChar(s: String) extends VLiteralEnum(s)
 
 ///////////////////////////////////////////////////////////////
 
-sealed abstract class VLiteralNum(s: String) extends VLiteral
+sealed abstract class VLiteralNum extends VLiteral {
+  val s: String
+}
 
 object VLiteralNum {
   def apply(ctx: Numeric_literalContext): VLiteralNum = {
@@ -99,7 +107,9 @@ object VLiteralNum {
   }
 }
 
-sealed abstract class VLiteralNumAbs(s: String) extends VLiteralNum(s)
+sealed abstract class VLiteralNumAbs extends VLiteralNum {
+  val s: String
+}
 
 object VLiteralNumAbs {
   def apply(ctx: Abstract_literalContext): VLiteralNumAbs = {
@@ -116,45 +126,177 @@ object VLiteralNumAbs {
   }
 }
 
-case class VLiteralNumInt(s: String) extends VLiteralNumAbs(s)
+case class VLiteralNumInt(s: String) extends VLiteralNumAbs
 
-case class VLiteralNumReal(s: String) extends VLiteralNumAbs(s)
+case class VLiteralNumReal(s: String) extends VLiteralNumAbs
 
-case class VLiteralNumBase(s: String) extends VLiteralNumAbs(s)
+case class VLiteralNumBase(s: String) extends VLiteralNumAbs
 
-case class VLiteralNumPhy(s: String) extends VLiteralNum(s)
+case class VLiteralNumPhy(s: String) extends VLiteralNum
+
+object VLiteralNumPhy {
+  def apply(ctx: Physical_literalContext): VLiteralNumPhy = {
+    val s = ctx.identifier().getText
+    VLiteralNumPhy(s)
+  }
+}
 
 //////////////////////////////////////////////////////////////
 
 case class VBaseUnitDecl(id: String)
 
-case class VSecondaryUnitDecl(id: String, literal: VLiteral)
+object VBaseUnitDecl {
+  def apply(ctx: Base_unit_declarationContext): VBaseUnitDecl = {
+    VBaseUnitDecl(ctx.identifier().getText)
+  }
+}
+
+case class VSecondaryUnitDecl(id: String, phyLiteral: VLiteralNumPhy)
+
+object VSecondaryUnitDecl {
+  def apply(ctx: Secondary_unit_declarationContext): VSecondaryUnitDecl = {
+    val id = ctx.identifier().getText
+    val phyLiteral = VLiteralNumPhy(ctx.physical_literal())
+    VSecondaryUnitDecl(id, phyLiteral)
+  }
+}
 
 //////////////////////////////////////////////////////////////
 sealed trait VTypeDef
 
+object VTypeDef {
+  def apply(ctx: Type_definitionContext): VTypeDef = {
+    val scalar_type_definitionContext = ctx.scalar_type_definition()
+    val composite_type_definitionContext = ctx.composite_type_definition()
+    val access_type_definition = ctx.access_type_definition()
+    val file_type_definition = ctx.file_type_definition()
+    if (scalar_type_definitionContext != null) {
+      VScalarTypeDef(scalar_type_definitionContext)
+    } else if (composite_type_definitionContext != null) {
+      VCompositeTypeDef(composite_type_definitionContext)
+    } else if (access_type_definition != null) {
+      VAccessTypeDef(access_type_definition)
+    } else if (file_type_definition != null) {
+      VFileTypeDef(file_type_definition)
+    } else throw VIError
+  }
+}
+
 case class VAccessTypeDef(subtypeInd: VSubtypeInd) extends VTypeDef
+
+object VAccessTypeDef {
+  def apply(ctx: Access_type_definitionContext): VAccessTypeDef = {
+    ???
+  }
+}
 
 case class VFileTypeDef(subtypeInd: VSubtypeInd) extends VTypeDef
 
+object VFileTypeDef {
+  def apply(ctx: File_type_definitionContext): VFileTypeDef = {
+    ???
+  }
+}
+
 abstract class VScalarTypeDef extends VTypeDef
 
-case class VPhysicalTypeDef(rangeConstraint: VRangeConstraint, baseUnitDecl: VBaseUnitDecl,
-                            secondaryUnitDecl: List[VSecondaryUnitDecl], id: Option[String]) extends VScalarTypeDef
+object VScalarTypeDef {
+  def apply(ctx: Scalar_type_definitionContext): VScalarTypeDef = {
+    val physical_type_definitionContext = ctx.physical_type_definition()
+    val enumeration_type_defnition = ctx.enumeration_type_definition()
+    val range_constraint = ctx.range_constraint()
+    if (physical_type_definitionContext != null) {
+      VScalarTypeDefP(physical_type_definitionContext)
+    } else if (enumeration_type_defnition != null) {
+      VScalarTypeE(enumeration_type_defnition)
+    } else if (range_constraint != null) {
+      VScalarTypeDefR(range_constraint)
+    } else throw VIError
+  }
+}
 
-case class VEnumTypeDef(literal: VLiteral, others: List[VLiteral]) extends VScalarTypeDef
+case class VScalarTypeDefP(rangeConstraint: VRangeConstraint, baseUnitDecl: VBaseUnitDecl,
+                           secondaryUnitDecl: List[VSecondaryUnitDecl], id: Option[String]) extends VScalarTypeDef
 
-case class VRangeConstraintTypeDef(rangeConstraint: VRangeConstraint) extends VScalarTypeDef
+object VScalarTypeDefP {
+  def apply(ctx: Physical_type_definitionContext): VScalarTypeDefP = {
+    val rangeConstraint = VRangeConstraint(ctx.range_constraint())
+    val baseUnitDecl = VBaseUnitDecl(ctx.base_unit_declaration())
+    val secondaryUnitDeclList = ctx.secondary_unit_declaration().map(VSecondaryUnitDecl(_)).toList
+    val id = Option(ctx.identifier()).map(_.getText)
+    VScalarTypeDefP(rangeConstraint, baseUnitDecl, secondaryUnitDeclList, id)
+  }
+}
 
-abstract class VCompositeTypeDecl extends VTypeDef
+case class VScalarTypeE(enumLiteralList: List[VLiteralEnum]) extends VScalarTypeDef
 
-abstract class VArrayTypeDecl extends VCompositeTypeDecl
+object VScalarTypeE {
+  def apply(ctx: Enumeration_type_definitionContext): VScalarTypeE = {
+    val literalList = ctx.enumeration_literal().map(VLiteralEnum(_)).toList
+    VScalarTypeE(literalList)
+  }
+}
+
+case class VScalarTypeDefR(rangeConstraint: VRangeConstraint) extends VScalarTypeDef
+
+object VScalarTypeDefR {
+  def apply(ctx: Range_constraintContext): VScalarTypeDefR = {
+    val rangeConstraint = VRangeConstraint(ctx)
+    VScalarTypeDefR(rangeConstraint)
+  }
+}
+
+abstract class VCompositeTypeDef extends VTypeDef
+
+object VCompositeTypeDef {
+  def apply(ctx: Composite_type_definitionContext): VCompositeTypeDef = {
+    val array_type_definitionContext = ctx.array_type_definition()
+    val record_type_definitionContext = ctx.record_type_definition()
+    if (array_type_definitionContext != null) {
+      VArrayTypeDef(array_type_definitionContext)
+    } else if (record_type_definitionContext != null) {
+      VRecordTypeDef(record_type_definitionContext)
+    } else throw VIError
+  }
+}
+
+abstract class VArrayTypeDef extends VCompositeTypeDef
+
+object VArrayTypeDef {
+  def apply(ctx: Array_type_definitionContext): VArrayTypeDef = {
+    val uad = ctx.unconstrained_array_definition()
+    val cad = ctx.constrained_array_definition()
+    if (uad != null) {
+      VUArrayDef(uad)
+    } else if (cad != null) {
+      VCArrayDef(cad)
+    } else throw VIError
+  }
+}
 
 case class VIndexSubtypeDef(name: String)
 
-case class VUArrayDef(indexSubtypeDef: List[VIndexSubtypeDef], subtypeInd: VSubtypeInd) extends VArrayTypeDecl
+case class VUArrayDef(indexSubtypeDefList: List[VIndexSubtypeDef],
+                      subtypeInd: VSubtypeInd) extends VArrayTypeDef
 
-case class VCArrayDef(indexConstraint: VIndexConstraint, subtypeInd: VSubtypeInd) extends VArrayTypeDecl
+object VUArrayDef {
+  def apply(ctx: Unconstrained_array_definitionContext): VUArrayDef = {
+    val indexSubtypeDefList = ctx.index_subtype_definition().map(d => VIndexSubtypeDef(d.name().getText)).toList
+    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
+    VUArrayDef(indexSubtypeDefList, subtypeInd)
+  }
+}
+
+case class VCArrayDef(indexConstraint: VIndexConstraint,
+                      subtypeInd: VSubtypeInd) extends VArrayTypeDef
+
+object VCArrayDef {
+  def apply(ctx: Constrained_array_definitionContext): VCArrayDef = {
+    val indexConstraint = VIndexConstraint(ctx.index_constraint())
+    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
+    VCArrayDef(indexConstraint, subtypeInd)
+  }
+}
 
 // no element_subtype_definition
 case class VElementDecl(ids: List[String], subtypeInd: VSubtypeInd) {
@@ -169,7 +311,7 @@ object VElementDecl {
   }
 }
 
-case class VRecordTypeDef(elementDecls: List[VElementDecl], id: Option[String]) extends VCompositeTypeDecl
+case class VRecordTypeDef(elementDecls: List[VElementDecl], id: Option[String]) extends VCompositeTypeDef
 
 object VRecordTypeDef {
   def apply(ctx: Record_type_definitionContext): VRecordTypeDef = {
@@ -183,22 +325,8 @@ object VRecordTypeDef {
 
 //////////////////////////////////////////////////////////////
 
-sealed trait VBlockDeclItem
-
-case class VSubtypeDecl(id: String, subtypeInd: VSubtypeInd) extends VBlockDeclItem
-
-object VSubtypeDecl {
-  def apply(ctx: Subtype_declarationContext): VSubtypeDecl = {
-    val id = ctx.identifier().getText
-    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
-    VSubtypeDecl(id, subtypeInd)
-  }
-}
-
-//////////////////////////////////////////////////////////////
-
 abstract class VChoice {
-  def getSimplExp:VSimpleExp = this match {
+  def getSimplExp: VSimpleExp = this match {
     case VChoiceE(simpleExp) => simpleExp
     case _ => ???
   }
@@ -231,7 +359,7 @@ case class VChoiceE(simpleExp: VSimpleExp) extends VChoice
 case object VChoiceOthers extends VChoice
 
 case class VChoices(choiceList: List[VChoice]) {
-  def toI(defInfo:DefInfo):List[IExp] = {
+  def toI(defInfo: DefInfo): List[IExp] = {
     // FIXME wrong
     choiceList.map(_.getSimplExp.toIExp(defInfo))
   }
@@ -506,7 +634,6 @@ object VConstraint {
 
 case class VRangeConstraint(range: VRange) extends VConstraint
 
-
 object VRangeConstraint {
   def apply(ctx: Range_constraintContext): VRangeConstraint = {
     val range = ctx.range()
@@ -527,6 +654,14 @@ object VIndexConstraint {
 
 case class VExplicitRange(l: VSimpleExp, d: String, r: VSimpleExp) {
   def getRange: RangeTy = (l.asVal, d.toLowerCase, r.asVal)
+
+  def toI(defInfo: DefInfo): Discrete_range = {
+    if (d == "downto") {
+      VHDL_dis_downto(l.toIExp(defInfo), r.toIExp(defInfo))
+    } else if (d == "to") {
+      VHDL_dis_to(l.toIExp(defInfo), r.toIExp(defInfo))
+    } else throw VIErrorMsg(s"${toString}")
+  }
 }
 
 object VExplicitRange {

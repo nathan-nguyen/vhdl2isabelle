@@ -54,7 +54,7 @@ case class IResFn() {
 sealed abstract class SP_clhs {
   override def toString = this match {
     case Clhs_sp(sp_clhs) => s"(clhs_sp ${sp_clhs})"
-    case Clhs_spr(spl) => s"(clhs_spr ${spl})"
+    case Clhs_spr(spl) => s"(clhs_spr ${spl.getId})"
   }
 }
 
@@ -156,8 +156,8 @@ sealed abstract class Rhsl {
     // FIXME: also accept xxx evaluated to spl or vl
     // NOTE:     these two are simulated for function
     //    case Rnl(rhslList) => s"(rnl ${rhslList.ISAR})"
-    case Rl_spl(spl) => s"(rhsl_of_spl ${spl})"
-    case Rl_vl(vl) => s"(rhsl_of_vl ${vl})"
+    case Rl_spl(spl) => s"(rhsl_of_spl ${spl.getId})"
+    case Rl_vl(vl) => s"(rhsl_of_vl ${vl.getId})"
   }
 }
 
@@ -191,7 +191,7 @@ case class Crhs_r(rhsl: Rhsl) extends Crhs
 sealed abstract class V_clhs {
   override def toString = this match {
     case Clhs_v(v_lhs) => s"(clhs_v ${v_lhs})"
-    case Clhs_vr(vl) => s"(clhs_vr ${vl})"
+    case Clhs_vr(vl) => s"(clhs_vr ${vl.getId})"
   }
 }
 
@@ -204,7 +204,7 @@ case class Clhs_vr(vl: Vl) extends V_clhs
 case class IChoices(expList: List[IExp])
 
 case class Ssc_when(choices: IChoices, Seq_stmt_complexList: List[Seq_stmt_complex]) {
-  override def toString = s"WHEN ${choices} => ${Seq_stmt_complexList.ISAR}"
+  override def toString = s"WHEN ${choices.expList.ISAR} => ${Seq_stmt_complexList.ISAR}"
 }
 
 case class Ssc_elif(cond: IExp, Seq_stmt_complexList: List[Seq_stmt_complex]) {
@@ -216,16 +216,16 @@ sealed abstract class Seq_stmt_complex {
     case Ssc_sa(id, sP_clhs, crhs) => s"${id}: ${sP_clhs} <= ${crhs}"
     case Ssc_va(id, v_clhs, crhs) => s"${id}: ${v_clhs} := ${crhs}"
     case Ssc_if(id, cond, if_seq_stmt_complexList, elif_complexList, else_complexList) => {
-      s"${id}: IF ${cond} THEN ${if_seq_stmt_complexList} ${elif_complexList} ELSE ${else_complexList} END IF"
+      s"''${id}'': IF ${cond} THEN ${if_seq_stmt_complexList.ISAR} ${elif_complexList.ISAR} ELSE ${else_complexList.ISAR} END IF"
     }
     case Ssc_case(id, cond, when_complexList, defaultSeq_stmt_complexList) => {
-      s"${id}: CASE ${cond} IS ${when_complexList} OTHERS =>  ${defaultSeq_stmt_complexList} END CASE"
+      s"''${id}'': CASE ${cond} IS ${when_complexList.ISAR} OTHERS =>  ${defaultSeq_stmt_complexList} END CASE"
     }
     case Ssc_while(id, cond, bodySeq_stmt_complexList) => {
-      s"${id}: WHILE ${cond} LOOP ${bodySeq_stmt_complexList} END LOOP"
+      s"''${id}'': WHILE ${cond} LOOP ${bodySeq_stmt_complexList.ISAR} END LOOP"
     }
     case Ssc_for(id, cond, discrete_range, seq_stmt_complexList) => {
-      s"${id}: FOR ${cond} IN ${discrete_range} LOOP ${seq_stmt_complexList} END LOOP"
+      s"''${id}'': FOR ${cond} IN ${discrete_range} LOOP ${seq_stmt_complexList.ISAR} END LOOP"
     }
     case Ssc_n(id, tId, cond) => s"${id}: NEXT ${tId} WHEN ${cond}"
     case Ssc_e(id, tId, cond) => s"${id}: EXIT ${tId} WHEN ${cond}"
@@ -264,6 +264,7 @@ sealed abstract class Gen_type {
   }
 }
 
+// FIXME seems wrong definition in isar, "no IExp"!!!
 case class For_gen(exp: IExp, discrete_range: Discrete_range) extends Gen_type
 
 case class If_gen(exp: IExp) extends Gen_type
@@ -282,13 +283,13 @@ sealed abstract class Conc_stmt_complex {
   override def toString = this match {
     case Csc_ps(id, iSensitivilistOpt, seq_stmt_complexList) => {
       val iSensitivilistRepr = iSensitivilistOpt.map(_.toString).getOrElse("[]")
-      s"${id}: PROCESS (${iSensitivilistRepr}) BEGIN ${seq_stmt_complexList.ISAR} END PROCESS"
+      s"''${id}'': PROCESS (${iSensitivilistRepr}) BEGIN ${seq_stmt_complexList.ISAR} END PROCESS"
     }
     case Csc_ca(id, sp_clhs, casmt_rhsList, crhs) => {
-      s"${id}: ${sp_clhs} <= <${casmt_rhsList.ISAR}> ${crhs}"
+      s"''${id}'': ${sp_clhs} <= <${casmt_rhsList.ISAR}> ${crhs}"
     }
     case Csc_gen(id, gen_type, conc_stmt_complexList) => {
-      s"${id}: ${gen_type} BEGIN ${conc_stmt_complexList.ISAR} END GENERATE"
+      s"''${id}'': ${gen_type} BEGIN ${conc_stmt_complexList.ISAR} END GENERATE"
     }
   }
 }

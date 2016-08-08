@@ -43,7 +43,10 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
     }
   }
 
-  override def exitGenerate_statement(ctx: Generate_statementContext): Unit = {}
+  override def exitGenerate_statement(ctx: Generate_statementContext): Unit = {
+    val genStat = VGenStat(ctx)
+    logger.info(s"${genStat.toI(defInfo)}")
+  }
 
   override def exitEntity_declarative_item(ctx: Entity_declarative_itemContext): Unit = {}
 
@@ -1037,12 +1040,12 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def exitAssertion(ctx: AssertionContext): Unit = {}
 
   override def enterConcurrent_signal_assignment_statement(ctx: Concurrent_signal_assignment_statementContext): Unit = {
-    val concurrentSignalAssign = VConcurrentSignalAssignStat(ctx)
+    val concurrentSignalAssign = VConcSignalAssignStat(ctx)
     concurrentSignalAssign match {
-      case csa@VConcurrentSignalAssignStatC(labelColon, _, condSignAssign) => {
+      case csa@VConcSignalAssignStatC(labelColon, _, condSignAssign) => {
         logger.info(s"${csa.toI(defInfo)}")
       }
-      case VConcurrentSignalAssignStatS(_, _, selectSignalAssign) => {
+      case VConcSignalAssignStatS(_, _, selectSignalAssign) => {
       }
     }
   }
@@ -1081,7 +1084,8 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def exitProcess_statement(ctx: Process_statementContext): Unit = {
     val procStat = VProcStat(ctx)
-    procStat.toI(defInfo)
+    val isar = procStat.toI(defInfo)
+    logger.info(s"${isar}")
   }
 
   override def enterGroup_declaration(ctx: Group_declarationContext): Unit = {}
