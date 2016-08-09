@@ -69,6 +69,8 @@ class VITran(inFile: String, vInfo: Option[VInfo]) {
           p.println("begin\n")
           p.println(keeper.defInfo)
           p.println("\n\n")
+          p.println(keeper.entity)
+          p.println("\n\n")
           p.println(foot(entity, exportRawName, "OCaml"))
           p.println("\nend")
         }
@@ -96,7 +98,7 @@ class VITran(inFile: String, vInfo: Option[VInfo]) {
       case Some(x) => x
       case None => throw new IllegalArgumentException(s"${target} not supported")
     }
-    s"""export_code ${entityName} simulation init_state arch_state_power sim_arch trans_vhdl_desc_complex in ${target}
+    s"""export_code ${entityName} simulation init_state sim_arch trans_vhdl_desc_complex in ${target}
         |module_name ${moduleName} file \"${outFileName}\"""".stripMargin
   }
 }

@@ -7,28 +7,49 @@ import scala.collection.JavaConversions._
 
 sealed abstract class VLiteral {
 
+  val true_false_type = Set("true", "false")
+
+  def _getTrueFalseVal(valType: String, s: String): IExp_con = {
+    IExp_con(valType, IConstS("val_b", s.capitalize))
+  }
+
   def toIExp(defInfo: DefInfo): IExp = {
     //    logger.info(s"${toString}")
     this match {
       // numeric
       // FIXME if s is numeric literal, it should be transfered to decimal firstly
-      case VLiteralNumInt(s) => IExp_con("integer", IConst("val_i", s))
-      case VLiteralNumReal(s) => IExp_con("real", IConst("var_r", s))
-      case VLiteralNumBase(s) => defaultExpCon(s)
-      // enumeral
-      case VLiteralEnumId(s) => {
-        val idef = defInfo.getDef(s)
-        idef match {
-          case ivariable: Variable => IExp_var(ivariable)
-          case signal: Signal => IExp_sig(signal)
-          case port: Port => IExp_prt(port)
-          case _ => throw VIErrorMsg(s"${idef}")
+      case numL: VLiteralNum => numL match {
+        case numAbsL: VLiteralNumAbs => numAbsL match {
+          case VLiteralNumInt(s) => IExp_con("integer", IConstS("val_i", s))
+          case VLiteralNumReal(s) => IExp_con("real", IConstS("val_r", s))
+          case VLiteralNumBase(s) => defaultExpCon(s)
         }
+        case VLiteralNumPhy(s) => defaultExpCon(s)
       }
-      // TODO only a guess, may change later
-      case VLiteralEnumChar(s) => IExp_con("character", IConst("val_c", s"(CHR '${s}')"))
-      // other cases
-      case _ => defaultExpCon(s"VLiteral ${toString}")
+      // enumeral
+      case enumL: VLiteralEnum => enumL match {
+        case VLiteralEnumId(s) => {
+          if (true_false_type(s)) {
+            _getTrueFalseVal("boolean", s)
+          } else {
+            val idef = defInfo.getDef(s)
+            idef match {
+              // NOTE: this should always use IExp_var/IExp_sig/IExp_prt
+              case ivariable: Variable => IExp_var(ivariable)
+              case signal: Signal => IExp_sig(signal)
+              case port: Port => IExp_prt(port)
+              case _ => throw VIErrorMsg(s"${idef}, ${s}")
+            }
+          }
+        }
+        // TODO only a guess, may change later
+        case VLiteralEnumChar(s) => IExp_con("character", IConstS("val_c", s"(CHR '${s}')"))
+      }
+      case VLiteralBitS(s) => defaultExpCon(s)
+      case vLiteralS@VLiteralS(s) => {
+        vLiteralS.num2Exp
+      }
+      case VLiteralNull => defaultExpCon("null")
     }
   }
 
@@ -36,7 +57,6 @@ sealed abstract class VLiteral {
     case ln: VLiteralNumAbs => VHDL_dis_to(toIExp(defInfo), toIExp(defInfo))
     case _ => ???
   }
-
 
   def asVal: String = this match {
     case VLiteralNumInt(s) => s
@@ -68,7 +88,15 @@ case object VLiteralNull extends VLiteral
 
 case class VLiteralBitS(s: String) extends VLiteral
 
-case class VLiteralS(s: String) extends VLiteral
+case class VLiteralS(s: String) extends VLiteral {
+  def num2Exp: IExp_con = {
+    val valType = "CHARACTER".toLowerCase
+    val ss = s.substring(1, s.length - 1)
+    require(ss.forall(_.isDigit), s"${s} not all digits")
+    val iConstList = ss.toList.map(c => IConstS("val_c", s"(CHR ''${c}'')"))
+    IExp_con(valType, IConstRL(iConstList))
+  }
+}
 
 //////////////////////////////////////////////////////////////
 sealed abstract class VLiteralEnum(s: String) extends VLiteral
@@ -358,12 +386,7 @@ case class VChoiceE(simpleExp: VSimpleExp) extends VChoice
 
 case object VChoiceOthers extends VChoice
 
-case class VChoices(choiceList: List[VChoice]) {
-  def toI(defInfo: DefInfo): List[IExp] = {
-    // FIXME wrong
-    choiceList.map(_.getSimplExp.toIExp(defInfo))
-  }
-}
+case class VChoices(choiceList: List[VChoice])
 
 object VChoices {
   def apply(ctx: ChoicesContext): VChoices = {
@@ -386,7 +409,6 @@ object VElemAssoc {
 
 case class VAggregate(elemAssocList: List[VElemAssoc]) {
   require(elemAssocList.nonEmpty, "elemAssocList")
-
   lazy val _getAssoc: List[(String, VExp)] = {
     for {
       elemAssoc <- elemAssocList
@@ -462,8 +484,9 @@ abstract class VPrimary {
     case VPrimaryQExp(vQExp) => defaultExpCon(s"${toString}")
     case VPrimaryExpLR(vExp) => vExp.toIExp(defInfo)
     case VPrimaryAllocator(allocator) => defaultExpCon(s"${toString}")
-    case VPrimaryAggregate(aggregate) => defaultExpCon(s"${toString}")
-    case VPrimaryName(name) => defaultExpCon(s"${toString}")
+    // FIXME should be incorrect, haven't considered OTHERS case
+    case VPrimaryAggregate(aggregate) => aggregate.getFirstMap._2.toIExp(defInfo)
+    case VPrimaryName(name) => name.toI_rhs(defInfo)
   }
 
   def asVal: String = this match {
@@ -502,7 +525,7 @@ object VPrimary {
     } else if (aggregate != null) {
       VPrimaryAggregate(VAggregate(aggregate))
     } else if (name != null) {
-      VPrimaryName(name.getText)
+      VPrimaryName(VName(name))
     } else throw VIError
   }
 }
@@ -517,7 +540,281 @@ case class VPrimaryAllocator(allocator: VAllocator) extends VPrimary
 
 case class VPrimaryAggregate(aggregate: VAggregate) extends VPrimary
 
-case class VPrimaryName(name: String) extends VPrimary
+case class VPrimaryName(name: VName) extends VPrimary
+
+// just a hack
+case class VSuffix(s: String) {
+  override def toString = s"${s}"
+}
+
+
+// perhaps needing separation
+sealed abstract class VName {
+
+  def getSimpleNameOpt: Option[String] = this match {
+    case VSelectedName(id, suffixList) => {
+      if (suffixList.nonEmpty) {
+        logger.warn(s"VSelectedName ${toString}")
+        None
+      } else
+        Some(id)
+    }
+    case VNameParts(namePartList) => {
+      logger.warn(s"VNameParts ${toString}")
+      None
+    }
+  }
+
+  def getSimpleName: String = getSimpleNameOpt match {
+    case Some(s) => s
+    case None => throw VIErrorMsg(s"${toString}")
+  }
+
+  def toI_rhs(defInfo: DefInfo): IExp
+
+}
+
+object VName {
+  def apply(ctx: NameContext): VName = {
+    val selectedName = ctx.selected_name()
+    val name_partList = ctx.name_part()
+    if (selectedName != null) {
+      VSelectedName(selectedName)
+    } else {
+      VNameParts.gen(name_partList.toList)
+    }
+  }
+}
+
+
+case class VSelectedName(id: String, suffixList: List[VSuffix]) extends VName {
+
+  def extracted(extractor: String): String = {
+    val nList = suffixList.scanLeft(id)((acc, cur) => s"${acc}_${cur}")
+    nList.tail.foldLeft(nList.head)((acc, cur) => s"(${acc} ${extractor}''${cur}'')")
+  }
+
+  def isar_v = extracted("v.")
+
+  def isar_sp = extracted("s.")
+
+  override def toI_rhs(defInfo: DefInfo): IExp = {
+    //    logger.info(s"${toString}")
+    val idef = defInfo.getDef(this)
+    idef match {
+      case vl: Vl => IExp_vl_rhs(vl, this)
+      case v: Variable => suffixList match {
+        case Nil => IExp_var(v)
+        case _ => IExp_vl_rhs(v, this)
+      }
+      case spl: SPl => IExp_spl_rhs(spl, this)
+      case s: Signal => suffixList match {
+        case Nil => IExp_sig(s)
+        case _ => IExp_spl_rhs(s, this)
+      }
+      case p: Port => suffixList match {
+        case Nil => IExp_prt(p)
+        case _ => IExp_spl_rhs(p, this)
+      }
+    }
+  }
+
+}
+
+object VSelectedName {
+  def apply(ctx: Selected_nameContext): VSelectedName = {
+    val id = ctx.identifier().getText.toLowerCase
+    val suffixList = ctx.suffix().map(s => VSuffix(s.getText)).toList
+    VSelectedName(id, suffixList)
+  }
+}
+
+sealed abstract class VAttrDesignator
+
+object VAttrDesignator {
+  def apply(ctx: Attribute_designatorContext): VAttrDesignator = {
+    val id = ctx.identifier()
+    val range = ctx.RANGE()
+    val rrange = ctx.REVERSE_RANGE()
+    val across = ctx.ACROSS()
+    val through = ctx.THROUGH()
+    val reference = ctx.REFERENCE()
+    val tolerance = ctx.TOLERANCE()
+    if (id != null) {
+      VAttrDesignatorId(id.getText)
+    } else if (range != null) {
+      VAttrDesignatorR
+    } else if (rrange != null) {
+      VAttrDesignatorRR
+    } else if (across != null) {
+      VAttrDesignatorA
+    } else if (through != null) {
+      VAttrDesignatorTh
+    } else if (reference != null) {
+      VAttrDesignatorRef
+    } else if (tolerance != null) {
+      VAttrDesignatorT
+    } else throw VIError
+  }
+}
+
+case class VAttrDesignatorId(id: String) extends VAttrDesignator
+
+object VAttrDesignatorR extends VAttrDesignator
+
+object VAttrDesignatorRR extends VAttrDesignator
+
+object VAttrDesignatorA extends VAttrDesignator
+
+object VAttrDesignatorTh extends VAttrDesignator
+
+object VAttrDesignatorRef extends VAttrDesignator
+
+object VAttrDesignatorT extends VAttrDesignator
+
+case class VNameAttrPart(attrDesignator: VAttrDesignator, exprList: List[VExp])
+
+object VNameAttrPart {
+  def apply(ctx: Name_attribute_partContext): VNameAttrPart = {
+    val attrDesignator = VAttrDesignator(ctx.attribute_designator())
+    val exps = ctx.expression().map(VExp(_)).toList
+    VNameAttrPart(attrDesignator, exps)
+  }
+}
+
+case class VNameFnCallOrIndexPart(assocListOpt: Option[VAssocList]) {
+  def getExp: VExp = assocListOpt match {
+    case Some(al) => {
+      val elem = al.assocElemList.head.actualPart
+      val designator = elem match {
+        case VActualPartD(d) => d
+        case VActualPartN(sn, d) => d
+      }
+      designator match {
+        case VActualDesignatorE(vExp) => vExp
+        case VActualDesignatorO => ???
+      }
+    }
+    case None => throw VIErrorMsg(s"${toString}")
+  }
+
+  def toI_rhs(defInfo: DefInfo): IExp = {
+    getExp.toIExp(defInfo)
+  }
+}
+
+object VNameFnCallOrIndexPart {
+  def apply(ctx: Name_function_call_or_indexed_partContext): VNameFnCallOrIndexPart = {
+    val assocList = Option(ctx.actual_parameter_part()).map(al => VAssocList(al.association_list()))
+    VNameFnCallOrIndexPart(assocList)
+  }
+}
+
+case class VNameSlicePart(r1: VExplicitRange, r2: Option[VExplicitRange]) {
+  // FIXME r2
+  def toI_lhs(defInfo: DefInfo): Discrete_range = {
+    r1.toI(defInfo)
+  }
+
+  // FIXME r2
+  def toI_rhs(defInfo: DefInfo): (IExp, IExp) = {
+    if (r1.d == "downto") {
+      (r1.r.toIExp(defInfo), r1.l.toIExp(defInfo))
+    } else if (r1.d == "to") {
+      (r1.l.toIExp(defInfo), r1.r.toIExp(defInfo))
+    } else throw VIError
+  }
+}
+
+object VNameSlicePart {
+  def apply(ctx: Name_slice_partContext): VNameSlicePart = {
+    val rangeList = ctx.explicit_range().map(VExplicitRange(_))
+    VNameSlicePart(rangeList.head, rangeList.lift(1))
+  }
+}
+
+sealed abstract class VNamePart {
+  def toI_lhs(defInfo: DefInfo): (VSelectedName, Option[Discrete_range]) = this match {
+    case VNamePartAttr(selectedName, nameAttrPart) => ???
+    case VNamePartFnI(selectedName, nameFnCallOrIndexPart) => {
+      val literal = nameFnCallOrIndexPart.getExp.getLiteral
+      val range = literal match {
+        case Some(l) => Some(l.to_IDiscreteRange(defInfo))
+        case None => None
+      }
+      (selectedName, range)
+    }
+    case VNamePartSlice(selectedName, nameSlicePart) => {
+      (selectedName, Option(nameSlicePart.toI_lhs(defInfo)))
+    }
+  }
+
+  def toI_rhs(defInfo: DefInfo): IExp = this match {
+    case VNamePartAttr(selectedName, nameAttrPart) => ???
+    case VNamePartFnI(selectedName, nameFnCallOrIndexPart) => {
+      //      logger.info(s"${toString}")
+      val iexp = selectedName.toI_rhs(defInfo)
+      val nth = nameFnCallOrIndexPart.toI_rhs(defInfo)
+      IExp_nth(iexp, nth)
+    }
+    case vNamePartSlice@VNamePartSlice(selectedName, nameSlicePart) => {
+      val iexp = selectedName.toI_rhs(defInfo)
+      // not checked type, trust VHDL semantics
+      val (e1, e2) = nameSlicePart.toI_rhs(defInfo)
+      IExp_sl(iexp, e1, e2)
+    }
+  }
+}
+
+object VNamePart {
+  def apply(ctx: Name_partContext): VNamePart = {
+    val selectedName = VSelectedName(ctx.selected_name())
+    val nameAttrPart = ctx.name_attribute_part()
+    val nameFnCallOrIndexPart = ctx.name_function_call_or_indexed_part()
+    val nameSlicePart = ctx.name_slice_part()
+    if (nameAttrPart != null) {
+      VNamePartAttr(selectedName, VNameAttrPart(nameAttrPart))
+    } else if (nameFnCallOrIndexPart != null) {
+      VNamePartFnI(selectedName, VNameFnCallOrIndexPart(nameFnCallOrIndexPart))
+    } else if (nameSlicePart != null) {
+      VNamePartSlice(selectedName, VNameSlicePart(nameSlicePart))
+    } else throw VIError
+  }
+}
+
+case class VNamePartAttr(selectedName: VSelectedName,
+                         nameAttrPart: VNameAttrPart) extends VNamePart
+
+case class VNamePartFnI(selectedName: VSelectedName,
+                        nameFnCallOrIndexPart: VNameFnCallOrIndexPart) extends VNamePart {
+}
+
+case class VNamePartSlice(selectedName: VSelectedName,
+                          nameSlicePart: VNameSlicePart) extends VNamePart
+
+
+case class VNameParts(namePartList: List[VNamePart]) extends VName {
+  require(namePartList.nonEmpty, "VNameParts")
+
+  def toI_lhs(defInfo: DefInfo): (VSelectedName, Option[Discrete_range]) = {
+    namePartList.head.toI_lhs(defInfo)
+  }
+
+  // FIXME only deal with ONE
+  override def toI_rhs(defInfo: DefInfo): IExp = {
+    namePartList.head.toI_rhs(defInfo)
+  }
+}
+
+object VNameParts {
+  //  Fxxk type erasure
+  def gen(ctxList: List[Name_partContext]): VNameParts = {
+    val namePartList = ctxList.map(np => VNamePart(np))
+    VNameParts(namePartList)
+  }
+}
+
+///////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////
 
@@ -747,6 +1044,7 @@ case class VTerm(factor: VFactor, ops: List[VFactorOp.Ty], others: List[VFactor]
     }
   }
 
+  //  FIXME rem is incorrect; generally, asVal SHOULDN'T be used
   def asVal: String = {
     import VFactorOp._
     try {
@@ -756,7 +1054,6 @@ case class VTerm(factor: VFactor, ops: List[VFactorOp.Ty], others: List[VFactor]
           case `mul` => acc * f
           case `div` => acc / f
           case `mod` => acc % f
-          //        FIXME  rem is incorrect
           case `rem` => acc % f
         }
       }).toString
@@ -806,7 +1103,6 @@ object VFactorOp extends Enumeration with VAOp {
   type Ty = Value
   val mul = Value("[*]")
   val div = Value("[/]")
-  //  FIXME NOT sure which to use
   val mod = Value("[mod]")
   val rem = Value("[rem]")
   //  DOUBLESTAR

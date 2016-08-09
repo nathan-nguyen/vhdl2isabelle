@@ -1,5 +1,5 @@
 - list-list
-- vector string init
-- architecture definition
-- abbrevation seems impossible in translation
-- cannot distiguish "integer" and "natural"
+- OTHERS
+- abbrev
+- character, std_logic, std_ulogic; natural, integer
+- exp_tl, exp_trl

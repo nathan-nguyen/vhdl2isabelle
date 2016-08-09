@@ -22,29 +22,15 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
 
   def +=(id: String, items: RecordInfoTy): Unit = typeDeclTbl += (id -> items)
 
-  val knownListType = Set("div32_in_type", "div32_out_type")
+//  val knownListType = Set("div32_in_type", "div32_out_type")
 
   def isListType(valType: String) = {
-    if (knownListType.contains(valType)) true
-    else if (typeDeclTbl.contains(valType)) true
+//    if (knownListType.contains(valType)) true
+    if (typeDeclTbl.contains(valType)) true
     else false
   }
 
   def isVectorType(valType: String) = valType.contains("_vector")
-
-  def decorate(rawIdType: String, valType: String) = {
-    if (isListType(valType)) s"${rawIdType} list" else rawIdType
-  }
-
-  def _guessScalarInitVal(valType: String): IExp_con = valType match {
-    case "integer" => IExp_con(valType, IConst("val_i", "0"))
-    case "real" => IExp_con(valType, IConst("val_r", "0.0"))
-    case "character" => IExp_con(valType, IConst("val_c", "(CHR ''0'')"))
-    case "boolean" => IExp_con(valType, IConst("val_b", "True"))
-    case "std_ulogic" => IExp_con(valType, IConst("val_c", "(CHR ''0'')"))
-    case "std_logic" => IExp_con(valType, IConst("val_c", "(CHR ''0'')"))
-    case _ => defaultExpCon(s"scalar unknown ${valType}")
-  }
 
   def fillValType(valType: String, exp_con: IExp_con) = IExp_con(valType, exp_con.const)
 
@@ -57,12 +43,12 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
       val expRepr = refined.toString
       if (expRepr.contains(unknownString)) {
         logger.warn(s"unknown exp === ${expRepr}")
-        _guessScalarInitVal(valType)
+        fillInDefaultScalaVal(valType)
       } else {
         refined
       }
     }
-    case None => _guessScalarInitVal(valType)
+    case None => fillInDefaultScalaVal(valType)
   }
 
   def _guessListInitVals(rawType: String): List[MetaData] = {
@@ -80,7 +66,7 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
           val range = sti.getRange.getOrElse(defaultRange(s"guessListInit vector ${sti}"))
           _guessVectorInitVal(valType, range)
         } else {
-          _guessScalarInitVal(valType)
+          fillInDefaultScalaVal(valType)
         }
         MetaData(itemId, valType, initVal)
       }
@@ -93,10 +79,10 @@ class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
     val genCmd = valType.substring(0, valType.length - "_vector".length) + "_vec_gen"
     val valListType = if (r._2 == "to") "val_list" else if (r._2 == "downto") "val_rlist" else unknownString
     val initValue = if (List("val_lsit", "val_rlist").contains(valListType)) {
-      val iVarChar = IConst("val_c", s"(CHR '${numericVal}')")
-      IConst(valListType, s"(${genCmd} ${Math.abs(r._1.toInt - r._3.toInt) + 1} ${iVarChar})")
+      val iVarChar = IConstS("val_c", s"(CHR '${numericVal}')")
+      IConstS(valListType, s"(${genCmd} ${Math.abs(r._1.toInt - r._3.toInt) + 1} ${iVarChar})")
     } else {
-      IConst(valListType, unknownString)
+      IConstS(valListType, unknownString)
     }
     IExp_con(valType, initValue)
   }

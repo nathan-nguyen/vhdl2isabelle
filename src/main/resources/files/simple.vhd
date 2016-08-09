@@ -28,8 +28,10 @@ type div_regtype is record
 end record;
 
 -- constant definition
-constant RESET_ALL : boolean := GRLIB_CONFIG_ARRAY(grlib_sync_reset_enable_all) = 1;
-constant ASYNC_RESET : boolean := GRLIB_CONFIG_ARRAY(grlib_async_reset_enable) = 1;
+-- constant RESET_ALL : boolean := GRLIB_CONFIG_ARRAY(grlib_sync_reset_enable_all) = 1;
+constant RESET_ALL : boolean := true;
+-- constant ASYNC_RESET : boolean := GRLIB_CONFIG_ARRAY(grlib_async_reset_enable) = 1;
+constant ASYNC_RESET : boolean := true;
 constant RRES : div_regtype := (
   x      => (others => '0'),
   state  => (others => '0'),
@@ -162,7 +164,8 @@ begin
   syncrregs : if not ASYNC_RESET generate
     reg : process(clk)
     begin
-      if rising_edge(clk) then
+      -- if rising_edge(clk) then
+      if (clk = '0') then
         if (holdn = '1') then r <= rin; end if;
         if (rst = '0') then
           if RESET_ALL then
@@ -182,7 +185,8 @@ begin
     begin
       if (arst = '0') then
         r <= RRES;
-      elsif rising_edge(clk) then
+--      elsif rising_edge(clk) then
+      elsif (clk = '0') then
         if (holdn = '1') then r <= rin; end if;
       end if;
     end process;

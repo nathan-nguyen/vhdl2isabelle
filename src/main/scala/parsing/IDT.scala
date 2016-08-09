@@ -33,7 +33,7 @@ sealed trait Vl extends V_IDef {
 
   def as_list: String = this match {
     case Vl_v(iVariable) => iVariable.id
-    case Vnl(id, _) => s"(vlist_of_v ${id})"
+    case Vnl(id, _) => s"(vlist_of_vl ${id})"
   }
 
   def as_definition: String = this match {
@@ -99,7 +99,7 @@ object Vnl {
 
 /////////////////////////////////////////////////////////////////////////////////
 
-trait IDef {
+sealed trait IDef {
   def as_definition: String
 
   def as_list: String
@@ -209,7 +209,7 @@ case class Signal(id: String, valType: String, iExp: IExp, signalKind: SignalKin
         | \"${id} ≡ ${toString}\"""".stripMargin
   }
 
-  override def as_list: String = s"[${SP_s(this)}]"
+  override def as_list: String = s"[(sp_s ${id})]"
 
   override def getId = id
 }
@@ -235,7 +235,7 @@ case class Port(id: String, valType: String, iExp: IExp, mode: PortMode.Ty, conn
         | \"${id} ≡ ${toString}\"""".stripMargin
   }
 
-  override def as_list: String = s"[${SP_p(this)}]"
+  override def as_list: String = s"[(sp_p ${id})]"
 
   override def getId = id
 }
@@ -244,16 +244,26 @@ case class Port(id: String, valType: String, iExp: IExp, mode: PortMode.Ty, conn
 
 sealed abstract class SigPrt {
   override def toString = this match {
-    case SP_s(s) => s"(sp_s ${s.id})"
-    case SP_p(p) => s"(sp_p ${p.id})"
+    case SP_s(s, sn) => sn.suffixList match {
+      case Nil => s"(sp_s ${s.getId})"
+      case _ => s"(sp_s ${sn.isar_sp})"
+    }
+    case SP_p(p, sn) => sn.suffixList match {
+      case Nil => s"(sp_p ${p.getId})"
+      case _ => s"(sp_p ${sn.isar_sp})"
+    }
+    // shouldn't be called
+    case SP_spl(spl) => throw VIErrorMsg(s"${spl}")
   }
 }
 
 // "up cast: Signal=>SigPrt"
-case class SP_s(iSignal: Signal) extends SigPrt
+case class SP_s(iSignal: Signal, sn: VSelectedName) extends SigPrt
 
 // "up cast: Port=>SigPrt"
-case class SP_p(iPort: Port) extends SigPrt
+case class SP_p(iPort: Port, sn: VSelectedName) extends SigPrt
 
-/////////////////////////////////////////////////////////////////////////////////
+// FAKE sp_of_spl
+case class SP_spl(spl: SPl) extends SigPrt
+
 /////////////////////////////////////////////////////////////////////////////////

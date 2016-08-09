@@ -23,12 +23,11 @@ case class IEnv_t() {
   override def toString: String = "[]"
 }
 
-
 case class IEnv(env_sp: IEnv_sp, env_v: IEnv_v, env_t: IEnv_t) {
   override def toString =
-    s"""|(env_sp = ${env_sp},
+    s"""| ⦇env_sp = ${env_sp},
         | env_v = ${env_v},
-        | env_t = ${env_t})""".stripMargin
+        | env_t = ${env_t}⦈""".stripMargin
 }
 
 object IEnv {
@@ -82,28 +81,41 @@ case class VHDL_dis_downto(l: IExp, r: IExp) extends Discrete_range
 /////////////////////////////////////////////////////////////////////////////////
 
 sealed abstract class SP_lhs {
+  // since "Nil" case is wrapped inside "SigPrt", it cannot be directly used with "sn.isar_sp"
   override def toString = this match {
-    case Lhs_s(sigPrt) => s"(lhs_s ${sigPrt})"
-    case Lhs_sa(sigPrt, discreteRange) => s"(lhs_sa ${sigPrt} ${discreteRange})"
+    case Lhs_s(sigPrt, sn) => sn.suffixList match {
+      case Nil => s"(lhs_s ${sigPrt})"
+      case _ => s"(lhs_s (sp_of_spl ${sn.isar_sp}))"
+    }
+    case Lhs_sa(sigPrt, discreteRange, sn) => sn.suffixList match{
+      case Nil => s"(lhs_sa ${sigPrt} ${discreteRange})"
+      case _ => s"(lhs_sa (sp_of_spl ${sn.isar_sp}) ${discreteRange})"
+    }
   }
 }
 
-case class Lhs_s(sigPrt: SigPrt) extends SP_lhs
+case class Lhs_s(sigPrt: SigPrt, sn: VSelectedName) extends SP_lhs
 
-case class Lhs_sa(sigPrt: SigPrt, discreteRange: Discrete_range) extends SP_lhs
+case class Lhs_sa(sigPrt: SigPrt, discreteRange: Discrete_range, sn: VSelectedName) extends SP_lhs
 
 /////////////////////////////////////////////////////////////////////////////////
 
 sealed abstract class V_lhs {
   override def toString = this match {
-    case Lhs_v(v) => s"(lhs_v ${v})"
-    case Lhs_va(v, discreteRange) => s"(lhs_va ${discreteRange})"
+    case Lhs_v(v, sn) => sn.suffixList match {
+      case Nil => s"(lhs_v ${sn.isar_v})"
+      case _ => s"(lhs_v (var_of_vl ${sn.isar_v}))"
+    }
+    case Lhs_va(v, discreteRange, sn) => sn.suffixList match {
+      case Nil => s"(lhs_va ${sn.isar_v} ${discreteRange})"
+      case _ => s"(lhs_va (var_of_vl ${sn.isar_v}) ${discreteRange})"
+    }
   }
 }
 
-case class Lhs_v(variable: Variable) extends V_lhs
+case class Lhs_v(variable: Variable, sn: VSelectedName) extends V_lhs
 
-case class Lhs_va(variable: Variable, discreteRange: Discrete_range) extends V_lhs
+case class Lhs_va(variable: Variable, discreteRange: Discrete_range, sn: VSelectedName) extends V_lhs
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -153,8 +165,8 @@ sealed abstract class Rhsl {
     case Rl_s(s) => s"(rl_s ${s})"
     case Rl_p(p) => s"(rl_p ${p})"
     case Rl_v(v) => s"(rl_v ${v})"
-    // FIXME: also accept xxx evaluated to spl or vl
-    // NOTE:     these two are simulated for function
+    // FIXME: should also accept xxx evaluated to spl or vl
+    // NOTE: these two are simulated for function
     //    case Rnl(rhslList) => s"(rnl ${rhslList.ISAR})"
     case Rl_spl(spl) => s"(rhsl_of_spl ${spl.getId})"
     case Rl_vl(vl) => s"(rhsl_of_vl ${vl.getId})"
@@ -183,6 +195,7 @@ sealed abstract class Crhs {
   }
 }
 
+
 case class Crhs_e(asmt_rhs: Asmt_rhs) extends Crhs
 
 case class Crhs_r(rhsl: Rhsl) extends Crhs
@@ -204,32 +217,32 @@ case class Clhs_vr(vl: Vl) extends V_clhs
 case class IChoices(expList: List[IExp])
 
 case class Ssc_when(choices: IChoices, Seq_stmt_complexList: List[Seq_stmt_complex]) {
-  override def toString = s"WHEN ${choices.expList.ISAR} => ${Seq_stmt_complexList.ISAR}"
+  override def toString = s"(WHEN ${choices.expList.ISAR} => ${Seq_stmt_complexList.ISAR})"
 }
 
 case class Ssc_elif(cond: IExp, Seq_stmt_complexList: List[Seq_stmt_complex]) {
-  override def toString = s"ELSEIF ${cond} THEN ${Seq_stmt_complexList.ISAR}"
+  override def toString = s"(ELSIF ${cond} THEN ${Seq_stmt_complexList.ISAR})"
 }
 
 sealed abstract class Seq_stmt_complex {
   override def toString = this match {
-    case Ssc_sa(id, sP_clhs, crhs) => s"${id}: ${sP_clhs} <= ${crhs}"
-    case Ssc_va(id, v_clhs, crhs) => s"${id}: ${v_clhs} := ${crhs}"
+    case Ssc_sa(id, sP_clhs, crhs) => s"(''${id}'': ${sP_clhs} <= ${crhs})"
+    case Ssc_va(id, v_clhs, crhs) => s"(''${id}'': ${v_clhs} := ${crhs})"
     case Ssc_if(id, cond, if_seq_stmt_complexList, elif_complexList, else_complexList) => {
-      s"''${id}'': IF ${cond} THEN ${if_seq_stmt_complexList.ISAR} ${elif_complexList.ISAR} ELSE ${else_complexList.ISAR} END IF"
+      s"(''${id}'': IF ${cond} THEN ${if_seq_stmt_complexList.ISAR} ${elif_complexList.ISAR} ELSE ${else_complexList.ISAR} END IF)"
     }
     case Ssc_case(id, cond, when_complexList, defaultSeq_stmt_complexList) => {
-      s"''${id}'': CASE ${cond} IS ${when_complexList.ISAR} OTHERS =>  ${defaultSeq_stmt_complexList} END CASE"
+      s"(''${id}'': CASE ${cond} IS ${when_complexList.ISAR} WHEN OTHERS => ${defaultSeq_stmt_complexList.ISAR} END CASE)"
     }
     case Ssc_while(id, cond, bodySeq_stmt_complexList) => {
-      s"''${id}'': WHILE ${cond} LOOP ${bodySeq_stmt_complexList.ISAR} END LOOP"
+      s"(''${id}'': WHILE ${cond} LOOP ${bodySeq_stmt_complexList.ISAR} END LOOP)"
     }
     case Ssc_for(id, cond, discrete_range, seq_stmt_complexList) => {
-      s"''${id}'': FOR ${cond} IN ${discrete_range} LOOP ${seq_stmt_complexList.ISAR} END LOOP"
+      s"(''${id}'': FOR ${cond} IN ${discrete_range} LOOP ${seq_stmt_complexList.ISAR} END LOOP)"
     }
-    case Ssc_n(id, tId, cond) => s"${id}: NEXT ${tId} WHEN ${cond}"
-    case Ssc_e(id, tId, cond) => s"${id}: EXIT ${tId} WHEN ${cond}"
-    case Ssc_nl => "NULL"
+    case Ssc_n(id, tId, cond) => s"(''${id}'': NEXT ${tId} WHEN ${cond})"
+    case Ssc_e(id, tId, cond) => s"(''${id}'': EXIT ${tId} WHEN ${cond})"
+    case Ssc_nl => "(NULL)"
   }
 }
 
@@ -264,7 +277,7 @@ sealed abstract class Gen_type {
   }
 }
 
-// FIXME seems wrong definition in isar, "no IExp"!!!
+// TODO test definition in isar
 case class For_gen(exp: IExp, discrete_range: Discrete_range) extends Gen_type
 
 case class If_gen(exp: IExp) extends Gen_type
@@ -283,13 +296,13 @@ sealed abstract class Conc_stmt_complex {
   override def toString = this match {
     case Csc_ps(id, iSensitivilistOpt, seq_stmt_complexList) => {
       val iSensitivilistRepr = iSensitivilistOpt.map(_.toString).getOrElse("[]")
-      s"''${id}'': PROCESS (${iSensitivilistRepr}) BEGIN ${seq_stmt_complexList.ISAR} END PROCESS"
+      s"(''${id}'': PROCESS (${iSensitivilistRepr}) BEGIN \n${seq_stmt_complexList.ISAR_conc} \nEND PROCESS)"
     }
     case Csc_ca(id, sp_clhs, casmt_rhsList, crhs) => {
-      s"''${id}'': ${sp_clhs} <= <${casmt_rhsList.ISAR}> ${crhs}"
+      s"(''${id}'': ${sp_clhs} <= <${casmt_rhsList.ISAR_conc}> ${crhs})"
     }
     case Csc_gen(id, gen_type, conc_stmt_complexList) => {
-      s"''${id}'': ${gen_type} BEGIN ${conc_stmt_complexList.ISAR} END GENERATE"
+      s"(''${id}'': ${gen_type} BEGIN \n${conc_stmt_complexList.ISAR_conc} \nEND GENERATE)"
     }
   }
 }
@@ -307,7 +320,7 @@ case class Csc_gen(id: IdTy, gen_type: Gen_type,
 
 // it is an IDef however not treated so
 case class IEntity(id: String, env: IEnv, resFn: IResFn, conc_stmt_complexList: List[Conc_stmt_complex]) {
-  def repr =
+  override def toString =
     s"""definition ${id}:: \"vhdl_desc_complex\" where
         |"${id} ≡
         |  let env = ${env};

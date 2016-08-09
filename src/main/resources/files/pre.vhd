@@ -9,6 +9,8 @@ type div32_in_type is record
   start            : std_logic;
 end record;
 
+type boolean is (false,true);
+
 type div32_out_type is record
   ready           : std_logic;
   nready          : std_logic;

@@ -84,219 +84,12 @@ object VInterfacePortDecl {
 
 ///////////////////////////////////////////////////////////////
 
-// just a hack
-case class VSuffix(s: String)
-
-// perhaps needing separation
-sealed abstract class VName {
-
-  def getSimpleNameOpt: Option[String] = this match {
-    case VSelectedName(id, suffixList) => {
-      if (suffixList.nonEmpty) {
-        logger.warn(s"VSelectedName ${toString}")
-        None
-      } else
-        Some(id)
-    }
-    case VNameParts(namePartList) => {
-      logger.warn(s"VNameParts ${toString}")
-      None
-    }
-  }
-
-  def getSimpleName: String = getSimpleNameOpt match {
-    case Some(s) => s
-    case None => throw VIErrorMsg(s"${toString}")
-  }
-
-  def isarTName: String = this match {
-    case VSelectedName(id, suffixList) => {
-      val (sp_of_spl, extractor) = ("sp_of_spl", "s.")
-      val nList = suffixList.scanLeft(id)((acc, cur) => s"${acc}_${cur}")
-      nList.tail.foldLeft(nList.head)((acc, cur) => s"(${sp_of_spl} (${extractor}''${cur}''))")
-    }
-    case VNameParts(namePartList) => unknownString
-  }
-
-}
-
-object VName {
-  def apply(ctx: NameContext): VName = {
-    val selectedName = ctx.selected_name()
-    val name_partList = ctx.name_part()
-    if (selectedName != null) {
-      VSelectedName(selectedName)
-    } else {
-      VNameParts.gen(name_partList.toList)
-    }
-  }
-}
-
-
-case class VSelectedName(id: String, suffixList: List[VSuffix]) extends VName
-
-object VSelectedName {
-  def apply(ctx: Selected_nameContext): VSelectedName = {
-    val id = ctx.identifier().getText
-    val suffixList = ctx.suffix().map(s => VSuffix(s.getText)).toList
-    VSelectedName(id, suffixList)
-  }
-}
-
-sealed abstract class VAttrDesignator
-
-object VAttrDesignator {
-  def apply(ctx: Attribute_designatorContext): VAttrDesignator = {
-    val id = ctx.identifier()
-    val range = ctx.RANGE()
-    val rrange = ctx.REVERSE_RANGE()
-    val across = ctx.ACROSS()
-    val through = ctx.THROUGH()
-    val reference = ctx.REFERENCE()
-    val tolerance = ctx.TOLERANCE()
-    if (id != null) {
-      VAttrDesignatorId(id.getText)
-    } else if (range != null) {
-      VAttrDesignatorR
-    } else if (rrange != null) {
-      VAttrDesignatorRR
-    } else if (across != null) {
-      VAttrDesignatorA
-    } else if (through != null) {
-      VAttrDesignatorTh
-    } else if (reference != null) {
-      VAttrDesignatorRef
-    } else if (tolerance != null) {
-      VAttrDesignatorT
-    } else throw VIError
-  }
-}
-
-case class VAttrDesignatorId(id: String) extends VAttrDesignator
-
-object VAttrDesignatorR extends VAttrDesignator
-
-object VAttrDesignatorRR extends VAttrDesignator
-
-object VAttrDesignatorA extends VAttrDesignator
-
-object VAttrDesignatorTh extends VAttrDesignator
-
-object VAttrDesignatorRef extends VAttrDesignator
-
-object VAttrDesignatorT extends VAttrDesignator
-
-case class VNameAttrPart(attrDesignator: VAttrDesignator, exprList: List[VExp])
-
-object VNameAttrPart {
-  def apply(ctx: Name_attribute_partContext): VNameAttrPart = {
-    val attrDesignator = VAttrDesignator(ctx.attribute_designator())
-    val exps = ctx.expression().map(VExp(_)).toList
-    VNameAttrPart(attrDesignator, exps)
-  }
-}
-
-case class VNameFnCallOrIndexPart(assocListOpt: Option[VAssocList]) {
-  def getExp: VExp = assocListOpt match {
-    case Some(al) => {
-      val elem = al.assocElemList.head.actualPart
-      val designator = elem match {
-        case VActualPartD(d) => d
-        case VActualPartN(sn, d) => d
-      }
-      designator match {
-        case VActualDesignatorE(vExp) => vExp
-        case VActualDesignatorO => ???
-      }
-    }
-    case None => throw VIErrorMsg(s"${toString}")
-  }
-}
-
-object VNameFnCallOrIndexPart {
-  def apply(ctx: Name_function_call_or_indexed_partContext): VNameFnCallOrIndexPart = {
-    val assocList = Option(ctx.actual_parameter_part()).map(al => VAssocList(al.association_list()))
-    VNameFnCallOrIndexPart(assocList)
-  }
-}
-
-case class VNameSlicePart(r1: VExplicitRange, r2: Option[VExplicitRange]) {
-  // FIXME r2
-  def toI(defInfo: DefInfo): Option[Discrete_range] = Option {
-    r1.toI(defInfo)
-  }
-}
-
-object VNameSlicePart {
-  def apply(ctx: Name_slice_partContext): VNameSlicePart = {
-    val rangeList = ctx.explicit_range().map(VExplicitRange(_))
-    VNameSlicePart(rangeList.head, rangeList.lift(1))
-  }
-}
-
-sealed abstract class VNamePart {
-  def toI(defInfo: DefInfo): (VSelectedName, Option[Discrete_range]) = this match {
-    case VNamePartAttr(selectedName, nameAttrPart) => ???
-    case VNamePartFnI(selectedName, nameFnCallOrIndexPart) => {
-      val literal = nameFnCallOrIndexPart.getExp.getLiteral
-      val range = literal match {
-        case Some(l) => Some(l.to_IDiscreteRange(defInfo))
-        case None => None
-      }
-      (selectedName, range)
-    }
-    case VNamePartSlice(selectedName, nameSlicePart) => {
-      (selectedName, nameSlicePart.toI(defInfo))
-    }
-  }
-}
-
-object VNamePart {
-  def apply(ctx: Name_partContext): VNamePart = {
-    val selectedName = VSelectedName(ctx.selected_name())
-    val nameAttrPart = ctx.name_attribute_part()
-    val nameFnCallOrIndexPart = ctx.name_function_call_or_indexed_part()
-    val nameSlicePart = ctx.name_slice_part()
-    if (nameAttrPart != null) {
-      VNamePartAttr(selectedName, VNameAttrPart(nameAttrPart))
-    } else if (nameFnCallOrIndexPart != null) {
-      VNamePartFnI(selectedName, VNameFnCallOrIndexPart(nameFnCallOrIndexPart))
-    } else if (nameSlicePart != null) {
-      VNamePartSlice(selectedName, VNameSlicePart(nameSlicePart))
-    } else throw VIError
-  }
-}
-
-case class VNamePartAttr(selectedName: VSelectedName,
-                         nameAttrPart: VNameAttrPart) extends VNamePart
-
-case class VNamePartFnI(selectedName: VSelectedName,
-                        nameFnCallOrIndexPart: VNameFnCallOrIndexPart) extends VNamePart {
-}
-
-case class VNamePartSlice(selectedName: VSelectedName,
-                          nameSlicePart: VNameSlicePart) extends VNamePart
-
-
-case class VNameParts(namePartList: List[VNamePart]) extends VName {
-  require(namePartList.nonEmpty, "VNameParts")
-}
-
-object VNameParts {
-  //  Fxxk type erasure
-  def gen(ctxList: List[Name_partContext]): VNameParts = {
-    val namePartList = ctxList.map(np => VNamePart(np))
-    VNameParts(namePartList)
-  }
-}
-
-
 sealed abstract class VTarget {
   def getInfo(defInfo: DefInfo): (VSelectedName, Option[Discrete_range]) = this match {
     case VTargetN(name) => name match {
       case s: VSelectedName => (s, None)
       case p: VNameParts => {
-        p.namePartList.head.toI(defInfo)
+        p.toI_lhs(defInfo)
       }
     }
     case VTargetAggregate(aggregate) => throw VIErrorMsg(s"${toString}")
@@ -305,13 +98,13 @@ sealed abstract class VTarget {
   def toI_SP(defInfo: DefInfo): SP_clhs = {
     val (sn, r) = getInfo(defInfo)
     val idef = defInfo.getSPDef(sn)
-    def__sp_clhs(idef, r)
+    def__sp_clhs(idef, r, sn)
   }
 
   def toI_V_Clhs(defInfo: DefInfo): V_clhs = {
     val (sn, r) = getInfo(defInfo)
     val idef = defInfo.getVDef(sn)
-    def__v_clhs(idef, r)
+    def__v_clhs(idef, r, sn)
   }
 
 }
@@ -413,7 +206,7 @@ case class VWaveFormE(elems: List[VWaveFormElem]) extends VWaveForm {
 case object VWaveFormU extends VWaveForm
 
 case class VCondWaveForms(whenWaveForm: VWaveForm, cond: Option[VExp], elseCond: Option[VCondWaveForms]) {
-  // FIXME isar definition has many limitations here
+  // NOTE: isar definition has many limitations, but may be enough
   def toI(defInfo: DefInfo): (List[As_when], Crhs) = {
     // whenWaveForm => as_whenList.head.crhs, cond => as_whenList.head.IExp
     // elseCond build the as_whenList(1) (last one)
@@ -972,7 +765,6 @@ case class VIfStat(labelColon: Option[String],
     val elif_complexList = elif_complex_list(elifConds, elifSeqofStats)(defInfo)
     val else_stmt_complexList = elseSeqOfStats match {
       case Some(s) => seq_stmt_complex_list(s)(defInfo)
-      // FIXME
       case None => List.empty
     }
     Ssc_if(id, ifCond, if_stmt_complexList, elif_complexList, else_stmt_complexList)
@@ -1214,7 +1006,7 @@ case class VProcStat(labelColon: Option[String],
     // guess
     val id = labelColon.orElse(identifier).getOrElse(defaultId)
     val iSensitiveList = sensitivitylist.map(_.toI(defInfo))
-    logger.info(s"${iSensitiveList}")
+//    logger.info(s"${iSensitiveList}")
     // don't care about procDeclPart
     // procStatPart => seq_stmt_complexList
     val seq_stmt_complexList: List[Seq_stmt_complex] = procStatPart.toI(defInfo)
@@ -1232,7 +1024,7 @@ object VProcStat {
     } else if (posponds.isEmpty) {
       (false, false)
     } else if (posponds.length == 1) {
-      // FIXME don't know
+    // FIXME not sure
       (true, false)
     } else throw VIError
     val sensitivilist = Option(ctx.sensitivity_list()).map(VSensitiveList(_))

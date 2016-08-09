@@ -2,12 +2,10 @@ package parsing
 
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.{ErrorNode, TerminalNode}
-import parsing.V2IUtils._
 import sg.edu.ntu.hchen.VHDLListener
 import sg.edu.ntu.hchen.VHDLParser._
 
 import scala.collection.JavaConversions._
-
 
 class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def enterAbstract_literal(ctx: Abstract_literalContext): Unit = {}
@@ -45,7 +43,8 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def exitGenerate_statement(ctx: Generate_statementContext): Unit = {
     val genStat = VGenStat(ctx)
-    logger.info(s"${genStat.toI(defInfo)}")
+    conc_stmt_complexes += genStat.toI(defInfo)
+    //    logger.info(s"${genStat.toI(defInfo)}")
   }
 
   override def exitEntity_declarative_item(ctx: Entity_declarative_itemContext): Unit = {}
@@ -317,7 +316,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def exitInterface_constant_declaration(ctx: Interface_constant_declarationContext): Unit = {
     val interfaceConstDecl = VInterfaceConstDecl(ctx)
-    for(id<-interfaceConstDecl.idList){
+    for (id <- interfaceConstDecl.idList) {
       genIVariable(id, interfaceConstDecl.vExp, interfaceConstDecl.subtypeInd)
     }
   }
@@ -566,7 +565,12 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def enterInterface_variable_declaration(ctx: Interface_variable_declarationContext): Unit = {}
 
   override def exitDesign_file(ctx: Design_fileContext): Unit = {
-//    defInfo.dumpTables()
+    if (vInfo.isDefined) {
+      val iEnv = IEnv(defInfo)
+      entity = IEntity(definedEntities.head, iEnv, IResFn(), conc_stmt_complexes.toList)
+    } else {
+//      logger.info(s"${typeInfo.typeDeclTbl.mkString("[", ",\n\n", "]")}")
+    }
   }
 
   override def exitBreak_statement(ctx: Break_statementContext): Unit = {}
@@ -941,7 +945,10 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def exitAlias_indication(ctx: Alias_indicationContext): Unit = {}
 
-  override def exitScalar_type_definition(ctx: Scalar_type_definitionContext): Unit = {}
+  override def exitScalar_type_definition(ctx: Scalar_type_definitionContext): Unit = {
+    val scalarTypeDef = VScalarTypeDef(ctx)
+    // TODO
+  }
 
   override def exitRange(ctx: RangeContext): Unit = {}
 
@@ -961,7 +968,17 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def enterEnumeration_type_definition(ctx: Enumeration_type_definitionContext): Unit = {}
 
-  override def exitConcurrent_signal_assignment_statement(ctx: Concurrent_signal_assignment_statementContext): Unit = {}
+  override def exitConcurrent_signal_assignment_statement(ctx: Concurrent_signal_assignment_statementContext): Unit = {
+    val concurrentSignalAssign = VConcSignalAssignStat(ctx)
+    concurrentSignalAssign match {
+      case csa@VConcSignalAssignStatC(labelColon, _, condSignAssign) => {
+        conc_stmt_complexes += csa.toI(defInfo)
+        //        logger.info(s"${csa.toI(defInfo)}")
+      }
+      case VConcSignalAssignStatS(_, _, selectSignalAssign) => {
+      }
+    }
+  }
 
   override def exitInterface_element(ctx: Interface_elementContext): Unit = {}
 
@@ -1039,16 +1056,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def exitAssertion(ctx: AssertionContext): Unit = {}
 
-  override def enterConcurrent_signal_assignment_statement(ctx: Concurrent_signal_assignment_statementContext): Unit = {
-    val concurrentSignalAssign = VConcSignalAssignStat(ctx)
-    concurrentSignalAssign match {
-      case csa@VConcSignalAssignStatC(labelColon, _, condSignAssign) => {
-        logger.info(s"${csa.toI(defInfo)}")
-      }
-      case VConcSignalAssignStatS(_, _, selectSignalAssign) => {
-      }
-    }
-  }
+  override def enterConcurrent_signal_assignment_statement(ctx: Concurrent_signal_assignment_statementContext): Unit = {}
 
   override def exitFile_type_definition(ctx: File_type_definitionContext): Unit = {}
 
@@ -1085,7 +1093,8 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def exitProcess_statement(ctx: Process_statementContext): Unit = {
     val procStat = VProcStat(ctx)
     val isar = procStat.toI(defInfo)
-    logger.info(s"${isar}")
+    conc_stmt_complexes += isar
+    //    logger.info(s"${isar}")
   }
 
   override def enterGroup_declaration(ctx: Group_declarationContext): Unit = {}

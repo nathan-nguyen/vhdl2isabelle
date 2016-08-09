@@ -44,22 +44,23 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     * 2. (1) from spnl_raw for "signal", "port", "spnl"
     * (2) from v_raw for "variable", "vnl"
     * NOTE: this could be implemented by flattening the map beforehand
+    * NOTE: isar representation of "top level scalar" and "inside scalar" should be different!
     */
 
   def getDef(n: String): IDef = getDefOpt(List(n)).getOrElse(throw VIErrorMsg(s"${n}"))
 
   def getDef(sn: VSelectedName): IDef = {
-    val nList = sn.suffixList.scanLeft(sn.id)((acc, cur) => s"${acc}_${cur.s}").toList
+    val nList = sn.suffixList.scanLeft(sn.id)((acc, cur) => s"${acc}_${cur.s}")
     getDefOpt(nList).getOrElse(throw VIErrorMsg(s"${sn}"))
   }
 
   def getSPDef(sn: VSelectedName): SP_IDef = {
-    val nList = sn.suffixList.scanLeft(sn.id)((acc, cur) => s"${acc}_${cur.s}").toList
+    val nList = sn.suffixList.scanLeft(sn.id)((acc, cur) => s"${acc}_${cur.s}")
     getSPDefOpt(nList).getOrElse(throw VIErrorMsg(s"${sn}"))
   }
 
   def getVDef(sn: VSelectedName): V_IDef = {
-    val nList = sn.suffixList.scanLeft(sn.id)((acc, cur) => s"${acc}_${cur.s}").toList
+    val nList = sn.suffixList.scanLeft(sn.id)((acc, cur) => s"${acc}_${cur.s}")
     getVDefOpt(nList).getOrElse(throw VIErrorMsg(s"${sn}"))
   }
 
@@ -117,7 +118,7 @@ final class DefInfo(defInfo: Option[DefInfo]) {
         //    TODO ideally definition should be parsed from vhd file
         //    TODO definition should not exist in isar file
         val id = "p_clk"
-        val iVariable = IConst("val_c", "CHR ''0''")
+        val iVariable = IConstS("val_c", "CHR ''0''")
         val exp_con = IExp_con("std_ulogic", iVariable)
         id -> Port(id, "std_ulogic", exp_con, PortMode.withName("mode_in"), PortConn.connected)
       }

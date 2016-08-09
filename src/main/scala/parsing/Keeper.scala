@@ -7,6 +7,10 @@ import scala.collection.mutable
 
 abstract class Keeper(vInfo:Option[VInfo]) {
 
+  var entity:IEntity = _
+
+  val conc_stmt_complexes = mutable.ArrayBuffer.empty[Conc_stmt_complex]
+
   val defInfo = new DefInfo(vInfo.map(_.defInfo))
 
   val typeInfo = new TypeInfo(vInfo.map(_.typeInfo))
@@ -65,7 +69,7 @@ abstract class Keeper(vInfo:Option[VInfo]) {
         val range = sti.getRange.getOrElse(defaultRange(s"signalDecl vector ${sti}"))
         typeInfo._guessVectorInitVal(valType, range)
       } else {
-        typeInfo._guessScalarInitVal(valType)
+        fillInDefaultScalaVal(valType)
       }
       val signal = Signal(id, valType, initVal, signalKind)
       defInfo +=(id, signal)

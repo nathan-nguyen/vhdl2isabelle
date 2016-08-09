@@ -13,6 +13,8 @@ package object parsing {
 
   implicit class IsarList[A](l: List[A]) {
     def ISAR: String = l.mkString("[", ",\n", "]")
+    def ISAR_r: String = l.mkString("[", ",", "]")
+    def ISAR_conc:String = l.mkString("[\n\t", ",\n\t", "\n]")
   }
 
 }
