@@ -1,4 +1,4 @@
-package parsing
+package core
 
 import org.slf4j.LoggerFactory
 

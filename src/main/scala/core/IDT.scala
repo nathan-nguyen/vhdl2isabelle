@@ -1,6 +1,6 @@
-package parsing
+package core
 
-import parsing.V2IUtils.VHDLize
+import core.V2IUtils.VHDLize
 
 /**
   * it's only used for idef generation

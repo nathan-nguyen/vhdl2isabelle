@@ -1,4 +1,4 @@
-package parsing
+package core
 
 import org.antlr.v4.runtime.{ANTLRInputStream, CommonTokenStream}
 import sg.edu.ntu.hchen.{VHDLLexer, VHDLParser}

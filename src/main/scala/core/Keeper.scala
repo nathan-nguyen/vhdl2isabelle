@@ -1,7 +1,7 @@
-package parsing
+package core
 
 import org.slf4j.LoggerFactory
-import parsing.V2IUtils._
+import core.V2IUtils._
 
 import scala.collection.mutable
 

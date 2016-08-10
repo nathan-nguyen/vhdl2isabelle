@@ -1,5 +1,5 @@
 
-package object parsing {
+package object core {
 
   object VIError extends Throwable
 

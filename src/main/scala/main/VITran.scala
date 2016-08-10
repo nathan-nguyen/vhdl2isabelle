@@ -6,7 +6,7 @@ import java.nio.file.{Files, Paths}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{ANTLRFileStream, CommonTokenStream, Lexer, Token}
 import org.slf4j.LoggerFactory
-import parsing._
+import core._
 import sg.edu.ntu.hchen.{VHDLLexer, VHDLParser}
 import utils.PErrorListener
 

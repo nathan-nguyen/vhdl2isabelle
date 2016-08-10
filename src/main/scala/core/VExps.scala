@@ -1,6 +1,6 @@
-package parsing
+package core
 
-import parsing.V2IUtils._
+import core.V2IUtils._
 import sg.edu.ntu.hchen.VHDLParser._
 
 import scala.collection.JavaConversions._
@@ -485,7 +485,10 @@ abstract class VPrimary {
     case VPrimaryExpLR(vExp) => vExp.toIExp(defInfo)
     case VPrimaryAllocator(allocator) => defaultExpCon(s"${toString}")
     // FIXME should be incorrect, haven't considered OTHERS case
-    case VPrimaryAggregate(aggregate) => aggregate.getFirstMap._2.toIExp(defInfo)
+    case VPrimaryAggregate(aggregate) => {
+      logger.info(s"${aggregate}")
+      aggregate.getFirstMap._2.toIExp(defInfo)
+    }
     case VPrimaryName(name) => name.toI_rhs(defInfo)
   }
 
@@ -1086,6 +1089,7 @@ sealed trait VAOp
 
 object VTermOp extends Enumeration with VAOp {
   type Ty = Value
+  // TODO VHDL overloads this, should make it homomorphic
   val plus = Value("[+]")
   val minus = Value("[-]")
   val ampersand = Value("[&]")

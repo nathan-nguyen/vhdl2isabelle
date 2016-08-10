@@ -1,4 +1,4 @@
-package parsing
+package core
 
 import org.slf4j.LoggerFactory
 import sg.edu.ntu.hchen.VHDLParser.{Identifier_listContext, Subtype_indicationContext}

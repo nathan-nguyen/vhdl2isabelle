@@ -1,6 +1,6 @@
-package parsing
+package core
 
-import parsing.V2IUtils._
+import core.V2IUtils._
 import sg.edu.ntu.hchen.VHDLParser._
 
 import scala.collection.JavaConversions._
@@ -210,19 +210,19 @@ case class VCondWaveForms(whenWaveForm: VWaveForm, cond: Option[VExp], elseCond:
   def toI(defInfo: DefInfo): (List[As_when], Crhs) = {
     // whenWaveForm => as_whenList.head.crhs, cond => as_whenList.head.IExp
     // elseCond build the as_whenList(1) (last one)
-    import VCondWaveForms._
+    import VCondWaveForms.genAsWhen
     val as_when1 = genAsWhen(whenWaveForm, cond)(defInfo)
     val as_when2 = elseCond match {
       case Some(waveForms) => genAsWhen(waveForms.whenWaveForm, waveForms.cond)(defInfo)
-      case None => throw VIErrorMsg(s"${this.toString}")
+      case None => throw VIErrorMsg(s"${toString}")
     }
     val as_whenList = List(as_when1, as_when2)
     val else_crhs = elseCond match {
       case Some(VCondWaveForms(_, _, finalElseOpt)) => finalElseOpt match {
         case Some(finalElse) => finalElse.whenWaveForm.toI(defInfo)
-        case None => throw VIErrorMsg(s"${this.toString}")
+        case None => throw VIErrorMsg(s"${toString}")
       }
-      case None => throw VIErrorMsg(s"${this.toString}")
+      case None => throw VIErrorMsg(s"${toString}")
     }
     (as_whenList, else_crhs)
   }

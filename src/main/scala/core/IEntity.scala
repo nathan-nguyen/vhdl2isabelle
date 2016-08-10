@@ -1,4 +1,4 @@
-package parsing
+package core
 
 import scala.language.implicitConversions
 

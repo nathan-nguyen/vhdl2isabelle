@@ -3,3 +3,8 @@
 - abbrev
 - character, std_logic, std_ulogic; natural, integer
 - exp_tl, exp_trl
+- remove function (preprocessing)
+- serialize
+
+--------------------
+sbt ~run seems to have bugs on package renaming
