@@ -1,6 +1,5 @@
 package core
 
-import org.slf4j.LoggerFactory
 import sg.edu.ntu.hchen.VHDLParser.{Identifier_listContext, Subtype_indicationContext}
 
 import scala.collection.JavaConversions._
@@ -10,27 +9,62 @@ case class VInfo(typeInfo: TypeInfo, defInfo: DefInfo)
 
 object V2IUtils {
 
-  val defaultId = ""
+  def refine_IExp_on(e: IExp_con, valType: VValType, v2s: Boolean): IExp_con = {
+    val newValType = if (v2s) {
+      val tyString = valType.s
+      require(tyString.endsWith("_vector"))
+      VValType(tyString.substring(0, tyString.length - 7))
+    } else {
+      valType
+    }
+    val newBaseType = newValType.asInstanceOf[VBaseType]
+    IExp_con(newBaseType, e.const, e.expKind)
+  }
 
-  val logger = LoggerFactory.getLogger(this.getClass)
+  def getValType(idef: IDef): VValType = idef match {
+    case v: Variable => v.valType
+    case s: Signal => s.valType
+    case p: Port => p.valType
+    case vl: Vl => vl match {
+      case vl_v: Vl_v => vl_v.iVariable.valType
+      case vnl: Vnl => throw VIErrorMsg(s"${vnl}")
+    }
+    case spl: SPl => spl match {
+      case spl_s: SPl_s => spl_s.iSignal.valType
+      case spl_p: SPl_p => spl_p.iPort.valType
+      case spnl: SPnl => throw VIErrorMsg(s"${spnl}")
+    }
+  }
 
-  type RangeTy = (String, String, String)
+  // NOTE: we don't deal with "OTHERS" directly, but check the type mismatch and then change it
+  def getCrhsFromExp(lhs_def: IDef, rhsExp: IExp): Crhs = {
+    if (lhs_def.getExpKind == ExpVectorKind && rhsExp.expKind == ExpScalarKind) {
+      val exp: IExp = rhsExp match {
+        case exp_con: IExp_con => {
+          val valType = getValType(lhs_def)
+          refine_IExp_on(exp_con, valType, v2s = true)
+        }
+        case _ => rhsExp
+      }
+      exp.crhs_e_rhso
+    } else if ((lhs_def.getExpKind == ExpVectorKind && rhsExp.expKind == ExpVectorKind)
+      || (lhs_def.getExpKind == ExpScalarKind && rhsExp.expKind == ExpScalarKind)) {
+      val exp: IExp = rhsExp match {
+        case exp_con: IExp_con => {
+          val valType = getValType(lhs_def)
+          refine_IExp_on(exp_con, valType, v2s = false)
+        }
+        case _ => rhsExp
+      }
+      exp.crhs_e_rhse
+    } else throw VIErrorMsg(s"${rhsExp}")
+  }
 
   def getIdList(ctx: Identifier_listContext): List[String] = {
     val ids = for {
       id <- ctx.identifier()
     } yield id.getText.toLowerCase
     ids.toList
-  }
-
-  def fillInDefaultScalaVal(valType: String): IExp_con = valType match {
-    case "integer" => IExp_con(valType, IConstS("val_i", "0"))
-    case "real" => IExp_con(valType, IConstS("val_r", "0.0"))
-    case "character" => IExp_con(valType, IConstS("val_c", "(CHR ''0'')"))
-    case "boolean" => IExp_con(valType, IConstS("val_b", "True"))
-    case "std_ulogic" => IExp_con(valType, IConstS("val_c", "(CHR ''0'')"))
-    case "std_logic" => IExp_con(valType, IConstS("val_c", "(CHR ''0'')"))
-    case _ => defaultExpCon(s"scalar unknown ${valType}")
   }
 
   def selectedNameFromSubtypeInd(ctx: Subtype_indicationContext): VSelectedName = {
@@ -42,25 +76,8 @@ object V2IUtils {
     head
   }
 
-  def defaultTargetName(msg: String): String = {
-    logger.warn(s"defaultTargetName: ${msg}")
-    s"===${unknownString}==="
-  }
-
-  def defaultRange(msg: String): RangeTy = {
-    logger.warn(s"defaultRange: ${msg}")
-    (unknownString, unknownString, unknownString)
-  }
-
-  def defaultExpCon(msg: String): IExp_con = {
-    logger.warn(s"defaultExpCon: ${msg}")
-    throw VIErrorMsg(msg)
-  }
-
-  def VHDLize(vhdlType: String) = s"vhdl_${vhdlType}"
-
   // TODO
-  def def__v_clhs(idef: V_IDef, range: Option[Discrete_range], sn:VSelectedName): V_clhs = idef match {
+  def def__v_clhs(idef: V_IDef, range: Option[Discrete_range], sn: VSelectedName): V_clhs = idef match {
     case variable: Variable => {
       val v_lhs = range match {
         case None => Lhs_v(variable, sn)
@@ -73,7 +90,7 @@ object V2IUtils {
   }
 
   // TODO
-  def def__sp_clhs(idef: SP_IDef, range: Option[Discrete_range], sn:VSelectedName): SP_clhs = idef match {
+  def def__sp_clhs(idef: SP_IDef, range: Option[Discrete_range], sn: VSelectedName): SP_clhs = idef match {
     case signal: Signal => {
       val sp_s = SP_s(signal, sn)
       val sp_lhs = range match {

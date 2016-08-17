@@ -103,7 +103,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
       flattened <- elementDecl.flatten
     } yield flattened
     val typeDeclId = ctx.getParent.getParent.getParent.asInstanceOf[Type_declarationContext].identifier().getText
-    typeInfo +=(typeDeclId, items)
+    typeInfo +=(VCustomizedType(typeDeclId), items)
   }
 
   override def exitTerm(ctx: TermContext): Unit = {}

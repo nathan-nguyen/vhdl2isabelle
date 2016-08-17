@@ -113,15 +113,15 @@ final class DefInfo(defInfo: Option[DefInfo]) {
       p_map ++= di.p_map
     }
     case None => {
-      p_map += {
-        //    TODO currently rewrite "clk" to "p_clk" in vhd file
-        //    TODO ideally definition should be parsed from vhd file
-        //    TODO definition should not exist in isar file
-        val id = "p_clk"
-        val iVariable = IConstS("val_c", "CHR ''0''")
-        val exp_con = IExp_con("std_ulogic", iVariable)
-        id -> Port(id, "std_ulogic", exp_con, PortMode.withName("mode_in"), PortConn.connected)
-      }
+//      p_map += {
+//        //    TODO currently rewrite "clk" to "p_clk" in vhd file
+//        //    TODO ideally definition should be parsed from vhd file
+//        //    TODO definition should not exist in isar file
+//        val id = "p_clk"
+//        val iVariable = IConstS("val_c", "CHR ''0''")
+//        val exp_con = IExp_con(VScalarType("std_ulogic"), iVariable, ExpScalarKind)
+//        id -> Port(id, VScalarType("std_ulogic"), exp_con, PortMode.withName("mode_in"), PortConn.connected)
+//      }
     }
   }
 

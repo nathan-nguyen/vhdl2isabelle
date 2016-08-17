@@ -1,6 +1,5 @@
 package core
 
-import core.V2IUtils._
 import sg.edu.ntu.hchen.VHDLParser._
 
 import scala.collection.JavaConversions._
@@ -17,6 +16,7 @@ object VLabelColon {
 
 ///////////////////////////////////////////////////////////////////////
 
+import core.V2IUtils._
 
 case class VConstDecl(idList: List[String], subtypeInd: VSubtypeInd, vExp: Option[VExp])
 
@@ -95,7 +95,17 @@ sealed abstract class VTarget {
     case VTargetAggregate(aggregate) => throw VIErrorMsg(s"${toString}")
   }
 
-  def toI_SP(defInfo: DefInfo): SP_clhs = {
+  def lhs_V_IDef(defInfo: DefInfo): V_IDef = {
+    val (sn, _) = getInfo(defInfo)
+    defInfo.getVDef(sn)
+  }
+
+  def lhs_SP_IDef(defInfo: DefInfo): SP_IDef = {
+    val (sn, _) = getInfo(defInfo)
+    defInfo.getSPDef(sn)
+  }
+
+  def toI_SP_clhs(defInfo: DefInfo): SP_clhs = {
     val (sn, r) = getInfo(defInfo)
     val idef = defInfo.getSPDef(sn)
     def__sp_clhs(idef, r, sn)
@@ -172,15 +182,13 @@ object VWaveFormElem {
 }
 
 sealed abstract class VWaveForm {
-  def toI(defInfo: DefInfo): Crhs_e = this match {
-    case vWaveFormE@VWaveFormE(elems) => {
-      val iExp = vWaveFormE.getSpecialIExp(defInfo)
-      iExp.crhs_e()
-    }
-    case VWaveFormU => {
-      throw VIErrorMsg(s"${toString}")
-    }
+
+  def getSpecialVExp: VExp = this match {
+    case e:VWaveFormE => e.elems.head.exp
+    case VWaveFormU => throw VIErrorMsg(s"${VWaveFormU}")
   }
+
+  def getSpecialIExp(defInfo:DefInfo) :IExp = getSpecialVExp.toIExp(defInfo)
 }
 
 object VWaveForm {
@@ -197,10 +205,6 @@ object VWaveForm {
 
 case class VWaveFormE(elems: List[VWaveFormElem]) extends VWaveForm {
   require(elems.nonEmpty, "VWaveFormE")
-
-  def getSpecialVExp: VExp = elems.head.exp
-
-  def getSpecialIExp(defInfo: DefInfo): IExp = getSpecialVExp.toIExp(defInfo)
 }
 
 case object VWaveFormU extends VWaveForm
@@ -217,9 +221,13 @@ case class VCondWaveForms(whenWaveForm: VWaveForm, cond: Option[VExp], elseCond:
       case None => throw VIErrorMsg(s"${toString}")
     }
     val as_whenList = List(as_when1, as_when2)
-    val else_crhs = elseCond match {
+    val else_crhs:Crhs = elseCond match {
       case Some(VCondWaveForms(_, _, finalElseOpt)) => finalElseOpt match {
-        case Some(finalElse) => finalElse.whenWaveForm.toI(defInfo)
+        case Some(finalElse) => {
+          val exp = finalElse.whenWaveForm.getSpecialVExp
+          // TODO check whether consider "OTHERS"
+          exp.toIExp(defInfo).crhs_e_rhse
+        }
         case None => throw VIErrorMsg(s"${toString}")
       }
       case None => throw VIErrorMsg(s"${toString}")
@@ -237,7 +245,11 @@ object VCondWaveForms {
   }
 
   def genAsWhen(waveForm: VWaveForm, cond: Option[VExp])(defInfo: DefInfo): As_when = {
-    val when_crhs = waveForm.toI(defInfo)
+    val when_crhs:Crhs = {
+      val exp = waveForm.getSpecialVExp
+      // TODO check whether consider "OTHERS"
+      exp.toIExp(defInfo).crhs_e_rhse
+    }
     val when_cond = cond match {
       case Some(c) => c.toIExp(defInfo)
       case None => throw VIErrorMsg(s"${toString}")
@@ -276,7 +288,7 @@ object VSelectedSignalAssign {
 
 case class VCondSignalAssign(vTarget: VTarget, opts: VOpts, conditionalWaveforms: VCondWaveForms) {
   def toI(defInfo: DefInfo): (SP_clhs, List[As_when], Crhs) = {
-    val sp_chls = vTarget.toI_SP(defInfo)
+    val sp_chls = vTarget.toI_SP_clhs(defInfo)
     val (as_whenList, crhs) = conditionalWaveforms.toI(defInfo)
     (sp_chls, as_whenList, crhs)
   }
@@ -666,23 +678,23 @@ object VReportStat {
 case class VSignalAssignStat(labelColon: Option[String], target: VTarget, delay: Option[VDelay], waveForm: VWaveForm) extends VSeqStat {
   override def toI(defInfo: DefInfo): Seq_stmt_complex = {
     val id = labelColon.getOrElse(defaultId)
-    val s_clhs = target.toI_SP(defInfo)
+    val s_clhs = target.toI_SP_clhs(defInfo)
+    val exp = waveForm.getSpecialVExp
     val crhs: Crhs = s_clhs match {
       case _: Clhs_sp => {
-        waveForm.toI(defInfo)
+        val targetDef = target.lhs_SP_IDef(defInfo)
+        val rhsExp = exp.toIExp(defInfo)
+        getCrhsFromExp(targetDef, rhsExp)
       }
-      // TODO duplicated code
       case _: Clhs_spr => waveForm match {
         case waveFormE: VWaveFormE => {
-          val exp = waveFormE.getSpecialVExp
-          val literal = exp.getLiteral match {
-            case Some(l) => l
-            case None => VIErrorMsg(s"${exp}")
-          }
-          val identifier = literal.asInstanceOf[VLiteralEnumId].identifier
-          val rhs_def = defInfo.getDef(identifier)
+          val rhs_def = exp.rhs_IDef(defInfo)
           rhs_def match {
-            case _: Variable | _: Signal | _: Port => exp.toIExp(defInfo).crhs_e()
+            case _: Variable | _: Signal | _: Port => {
+              val targetDef = target.lhs_SP_IDef(defInfo)
+              val rhs = exp.toIExp(defInfo)
+              getCrhsFromExp(targetDef, rhs)
+            }
             case spl: SPl => Crhs_r(Rl_spl(spl))
             case vl: Vl => Crhs_r(Rl_vl(vl))
           }
@@ -713,23 +725,26 @@ case class VVarAssignStat(labelColon: Option[String], target: VTarget, exp: VExp
     // rhs may still have inconsistencies from vhdl to isar
     // currently suppose lhs, rhs must be consistent as to [Scalar, Record]
     val crhs: Crhs = v_clhs match {
-      case _: Clhs_v => exp.toIExp(defInfo).crhs_e()
+      case _: Clhs_v => {
+        val targetDef = target.lhs_V_IDef(defInfo)
+        val rhsExp = exp.toIExp(defInfo)
+        getCrhsFromExp(targetDef, rhsExp)
+      }
       case _: Clhs_vr => {
-        val literal = exp.getLiteral match {
-          case Some(l) => l
-          case None => throw VIErrorMsg(s"${exp}")
-        }
-        val identifier = literal.asInstanceOf[VLiteralEnumId].identifier
-        val rhs_def = defInfo.getDef(identifier)
+        // TODO rhs must be a IDef?
+        val rhs_def = exp.rhs_IDef(defInfo)
         rhs_def match {
-          case _: Variable | _: Signal | _: Port => exp.toIExp(defInfo).crhs_e()
+          case _: Variable | _: Signal | _: Port => {
+            val targetDef = target.lhs_V_IDef(defInfo)
+            val e = exp.toIExp(defInfo)
+            getCrhsFromExp(targetDef, e)
+          }
           case spl: SPl => Crhs_r(Rl_spl(spl))
           case vl: Vl => Crhs_r(Rl_vl(vl))
         }
       }
     }
     Ssc_va(id, v_clhs, crhs)
-
   }
 }
 
@@ -1006,7 +1021,7 @@ case class VProcStat(labelColon: Option[String],
     // guess
     val id = labelColon.orElse(identifier).getOrElse(defaultId)
     val iSensitiveList = sensitivitylist.map(_.toI(defInfo))
-//    logger.info(s"${iSensitiveList}")
+    //    logger.info(s"${iSensitiveList}")
     // don't care about procDeclPart
     // procStatPart => seq_stmt_complexList
     val seq_stmt_complexList: List[Seq_stmt_complex] = procStatPart.toI(defInfo)
@@ -1024,7 +1039,7 @@ object VProcStat {
     } else if (posponds.isEmpty) {
       (false, false)
     } else if (posponds.length == 1) {
-    // FIXME not sure
+      // TODO not sure, however may be insignificant
       (true, false)
     } else throw VIError
     val sensitivilist = Option(ctx.sensitivity_list()).map(VSensitiveList(_))

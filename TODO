@@ -1,8 +1,5 @@
 - list-list
-- OTHERS
-- abbrev
-- character, std_logic, std_ulogic; natural, integer
-- exp_tl, exp_trl
+- exp_tl, exp_trl & vector
 - remove function (preprocessing)
 - serialize
 

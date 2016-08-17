@@ -1,15 +1,13 @@
 package core
 
-import core.V2IUtils.VHDLize
-
 /**
   * it's only used for idef generation
   */
-final case class MetaData(itemId: String, valType: String, initVal: IExp)
+final case class MetaData(itemId: String, valType: VValType, initVal: IExp)
 
 /////////////////////////////////////////////////////////////////////////////////
 
-case class Variable(id: String, valType: String, iExp: IExp) extends V_IDef {
+case class Variable(id: String, valType: VBaseType, iExp: IExp) extends V_IDef {
   override def toString = s"""(''${id}'', ${VHDLize(valType)}, ${iExp})"""
 
   override def as_definition: String = {
@@ -20,6 +18,12 @@ case class Variable(id: String, valType: String, iExp: IExp) extends V_IDef {
   override def as_list: String = s"[${id}]"
 
   override def getId = id
+
+  override def getExpKind = valType match {
+    case st: VScalarType => ExpScalarKind
+    case vt: VVectorType => ExpVectorKind
+  }
+
 }
 
 sealed trait V_IDef extends IDef
@@ -49,6 +53,11 @@ sealed trait Vl extends V_IDef {
   override def getId = this match {
     case Vl_v(v) => v.id
     case Vnl(id, vlList) => id
+  }
+
+  def getExpKind: ExpKind = this match {
+    case Vl_v(v) => v.getExpKind
+    case Vnl(id, vlList) => ExpUnknownKind
   }
 
   /**
@@ -84,12 +93,12 @@ case class Vnl(id: String, vlList: List[Vl]) extends Vl
 object Vnl {
   //  FIXME: this is TOO specific!
   // TODO: currently valType is the EXACTLY type from VHDL without prefix!!!
-  def apply(id: String, dataList: List[MetaData])(implicit s: DummyImplicit): Vnl = {
+  def gen(id: String, dataList: List[MetaData])(implicit s: DummyImplicit): Vnl = {
     val vlList = for {
       data <- dataList
     } yield {
       val itemId = s"${id}_${data.itemId}"
-      Vl_v(Variable(itemId, data.valType, data.initVal))
+      Vl_v(Variable(itemId, data.valType.asInstanceOf[VBaseType], data.initVal))
     }
     Vnl(id, vlList)
   }
@@ -106,6 +115,8 @@ sealed trait IDef {
 
   // only the "final" classes have the id
   def getId: IdTy
+
+  def getExpKind: ExpKind
 }
 
 // only a trait
@@ -136,10 +147,16 @@ sealed abstract class SPl extends SP_IDef {
     case SPnl(id, _) => s"(splist_of_spl ${id})"
   }
 
-  def getId = this match {
+  override def getId = this match {
     case SPl_s(s) => s.getId
     case SPl_p(p) => p.getId
     case SPnl(id, splList) => id
+  }
+
+  override def getExpKind = this match {
+    case SPl_s(s) => s.getExpKind
+    case SPl_p(p) => p.getExpKind
+    case SPnl(id, splList) => ExpUnknownKind
   }
 
   /**
@@ -168,27 +185,27 @@ sealed abstract class SPl extends SP_IDef {
 
 case class SPl_s(iSignal: Signal) extends SPl
 
-case class SPl_p(iPortDef: Port) extends SPl
+case class SPl_p(iPort: Port) extends SPl
 
 case class SPnl(id: String, splList: List[SPl]) extends SPl
 
 object SPnl {
-  def apply(id: String, dataList: List[MetaData], signalKind: SignalKind.Ty): SPnl = {
+  def genFromS(id: String, dataList: List[MetaData], signalKind: SignalKind.Ty): SPnl = {
     val splList = for {
       data <- dataList
     } yield {
       val itemId = s"${id}_${data.itemId}"
-      SPl_s(Signal(itemId, data.valType, data.initVal, signalKind))
+      SPl_s(Signal(itemId, data.valType.asInstanceOf[VBaseType], data.initVal, signalKind))
     }
     SPnl(id, splList)
   }
 
-  def apply(id: String, dataList: List[MetaData], mode: PortMode.Ty, conn: PortConn.Ty): SPnl = {
+  def genFromP(id: String, dataList: List[MetaData], mode: PortMode.Ty, conn: PortConn.Ty): SPnl = {
     val splList = for {
       data <- dataList
     } yield {
       val itemId = s"${id}_${data.itemId}"
-      SPl_p(Port(itemId, data.valType, data.initVal, mode, conn))
+      SPl_p(Port(itemId, data.valType.asInstanceOf[VBaseType], data.initVal, mode, conn))
     }
     SPnl(id, splList)
   }
@@ -201,7 +218,7 @@ object SignalKind extends Enumeration {
   val register, bus = Value
 }
 
-case class Signal(id: String, valType: String, iExp: IExp, signalKind: SignalKind.Ty) extends SP_IDef {
+case class Signal(id: String, valType: VBaseType, iExp: IExp, signalKind: SignalKind.Ty) extends SP_IDef {
   override def toString = s"""(''${id}'', ${VHDLize(valType)}, ${signalKind}, ${iExp})"""
 
   override def as_definition: String = {
@@ -212,6 +229,12 @@ case class Signal(id: String, valType: String, iExp: IExp, signalKind: SignalKin
   override def as_list: String = s"[(sp_s ${id})]"
 
   override def getId = id
+
+  override def getExpKind = valType match {
+    case st: VScalarType => ExpScalarKind
+    case vt: VVectorType => ExpVectorKind
+  }
+
 }
 
 object PortMode extends Enumeration {
@@ -227,12 +250,17 @@ object PortConn extends Enumeration {
   val connected, unconnected = Value
 }
 
-case class Port(id: String, valType: String, iExp: IExp, mode: PortMode.Ty, conn: PortConn.Ty) extends SP_IDef {
+case class Port(id: String, valType: VBaseType, iExp: IExp, mode: PortMode.Ty, conn: PortConn.Ty) extends SP_IDef {
   override def toString = s"(''${id}'', ${VHDLize(valType)}, ${mode}, ${conn}, ${iExp})"
 
   override def as_definition: String = {
     s"""definition ${id}:: \"port\" where
         | \"${id} ≡ ${toString}\"""".stripMargin
+  }
+
+  override def getExpKind = valType match {
+    case st: VScalarType => ExpScalarKind
+    case vt: VVectorType => ExpVectorKind
   }
 
   override def as_list: String = s"[(sp_p ${id})]"

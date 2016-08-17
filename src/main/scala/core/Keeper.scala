@@ -1,13 +1,10 @@
 package core
 
-import org.slf4j.LoggerFactory
-import core.V2IUtils._
-
 import scala.collection.mutable
 
-abstract class Keeper(vInfo:Option[VInfo]) {
+abstract class Keeper(vInfo: Option[VInfo]) {
 
-  var entity:IEntity = _
+  var entity: IEntity = _
 
   val conc_stmt_complexes = mutable.ArrayBuffer.empty[Conc_stmt_complex]
 
@@ -17,62 +14,73 @@ abstract class Keeper(vInfo:Option[VInfo]) {
 
   val definedEntities = mutable.ArrayBuffer.empty[String]
 
-  val logger = LoggerFactory.getLogger(this.getClass)
-
   def genIVariable(id: String, expOption: Option[VExp], sti: VSubtypeInd): Unit = {
-    val valType = sti.getSimpleName
-    if (typeInfo.isListType(valType)) {
-      val initVals = typeInfo.getListInitVals(valType, expOption)(defInfo)
-      val vnl = Vnl(id, initVals)
-      defInfo +=(id, vnl)
-    } else {
-      val initVal = if (typeInfo.isVectorType(valType)) {
-        // TODO perhaps not guess!!!
-        sti.getRange match {
-          case Some(r) => typeInfo._guessVectorInitVal(valType, r)
-          case None => typeInfo._guessVectorInitVal(valType, defaultRange(s"ConstDecl vector ${sti}"))
+    val valType = VValType(sti.getSimpleName)
+    valType match {
+      case bt: VBaseType => {
+        val initVal = bt match {
+          case st: VScalarType => st.getInitVal(expOption)(defInfo)
+          case vt: VVectorType => sti.getRange match {
+            case Some(r) => {
+              vt.getInitVal(r, expOption)
+            }
+            case None => {
+              vt.guessInitVal(defaultRange(s"ConstDecl vector ${sti}"))
+            }
+          }
         }
-      } else {
-        typeInfo.getScalarInitVal(valType, expOption)(defInfo)
+        val variable = Variable(id, bt, initVal)
+        defInfo +=(id, variable)
       }
-      val variable = Variable(id, valType, initVal)
-      defInfo +=(id, variable)
+      case ct@VCustomizedType(s) => {
+        val initVals = ct.getInitVals(typeInfo.typeDeclTbl, expOption)(defInfo)
+        val vnl = Vnl.gen(id, initVals)
+        defInfo +=(id, vnl)
+      }
     }
   }
 
   def genIPort(id: String, expOption: Option[VExp], sti: VSubtypeInd, mode: PortMode.Ty, conn: PortConn.Ty): Unit = {
-    val valType = sti.getSimpleName
-    if (typeInfo.isListType(valType)) {
-      val initVals = typeInfo.getListInitVals(valType, expOption)(defInfo)
-      val spnl = SPnl(id, initVals, mode, conn)
-      defInfo +=(id, spnl)
-    } else {
-      val initVal = if (typeInfo.isVectorType(valType)) {
-        val range = sti.getRange.getOrElse(defaultRange(s"Port_list vector ${typeInfo}"))
-        typeInfo._guessVectorInitVal(valType, range)
-      } else {
-        typeInfo.getScalarInitVal(valType, expOption)(defInfo)
+    val valType = VValType(sti.getSimpleName)
+    valType match {
+      case bt: VBaseType => {
+        val initVal = bt match {
+          case st: VScalarType => st.getInitVal(expOption)(defInfo)
+          case vt: VVectorType => {
+            val range = sti.getRange.getOrElse(defaultRange(s"Port_list vector ${typeInfo}"))
+            vt.guessInitVal(range)
+          }
+        }
+        val port = Port(id, bt, initVal, mode, conn)
+        defInfo +=(id, port)
       }
-      val port = Port(id, valType, initVal, mode, conn)
-      defInfo +=(id, port)
+      case ct: VCustomizedType => {
+        val initVals = ct.getInitVals(typeInfo.typeDeclTbl, expOption)(defInfo)
+        val spnl = SPnl.genFromP(id, initVals, mode, conn)
+        defInfo +=(id, spnl)
+      }
     }
   }
 
   def genISignal(id: String, sti: VSubtypeInd, signalKind: SignalKind.Ty): Unit = {
-    val valType = sti.getSimpleName
-    if (typeInfo.isListType(valType)) {
-      val initVals = typeInfo._guessListInitVals(valType)
-      val spnl = SPnl(id, initVals, signalKind)
-      defInfo +=(id, spnl)
-    } else {
-      val initVal = if (typeInfo.isVectorType(valType)) {
-        val range = sti.getRange.getOrElse(defaultRange(s"signalDecl vector ${sti}"))
-        typeInfo._guessVectorInitVal(valType, range)
-      } else {
-        fillInDefaultScalaVal(valType)
+    val valType = VValType(sti.getSimpleName)
+    valType match {
+      case bt: VBaseType => {
+        val initVal = bt match {
+          case st: VScalarType => st.guessInitVal
+          case vt: VVectorType => {
+            val range = sti.getRange.getOrElse(defaultRange(s"signalDecl vector ${sti}"))
+            vt.guessInitVal(range)
+          }
+        }
+        val signal = Signal(id, bt, initVal, signalKind)
+        defInfo +=(id, signal)
       }
-      val signal = Signal(id, valType, initVal, signalKind)
-      defInfo +=(id, signal)
+      case ct: VCustomizedType => {
+        val initVals = ct.guessInitVals(typeInfo.typeDeclTbl)
+        val spnl = SPnl.genFromS(id, initVals, signalKind)
+        defInfo +=(id, spnl)
+      }
     }
   }
 
