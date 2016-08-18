@@ -43,6 +43,12 @@ object VBaseType {
 
 case class VScalarType(s: String) extends VBaseType {
 
+  def vectorize: VVectorType = {
+    require(s.startsWith("std_"))
+    //    require(s == "std_logic" || s == "std_ulogic")
+    VVectorType(s + vectorFlag)
+  }
+
   def guessInitVal: IExp_con = {
     val iconstS = s match {
       case "integer" => IConstS("val_i", "0")
@@ -66,11 +72,11 @@ case class VScalarType(s: String) extends VBaseType {
       case "std_logic" => IConstS("val_c", s"(CHR '${v}')")
       // NOT in guess
       case "natural" => IConstS("val_i", v)
+      case `defaultCharType` => IConstS("val_c", s"(CHR '${v}')")
       case _ => handler(s"scalar unknown ${toString} (${v})")
     }
     IExp_con(this, iconstS, ExpScalarKind)
   }
-
 
   def getInitVal(expOption: Option[VExp])(defInfo: DefInfo): IExp = expOption match {
     case Some(exp) => {
@@ -91,30 +97,33 @@ case class VScalarType(s: String) extends VBaseType {
 }
 
 case class VVectorType(s: String) extends VBaseType {
+  require(s.endsWith(vectorFlag))
 
-  // FIXME
-  def getInitVal(r: VRangeTy, expOption: Option[VExp]): IExp_con = {
+  def scalarize: VScalarType = VScalarType(s.substring(0, s.length - vectorFlag.length))
+
+  def getInitVal(r: VRangeV, expOption: Option[VExp]): IExp_con = {
     expOption match {
       case Some(vExp) => {
-        logger.info(s"${vExp}")
         val literalS = vExp.getLiteralS
-        literalS.num2Exp(VScalarType("character"), r)
+        val scalarType = scalarize
+        literalS.num2Exp(scalarType, r)
       }
       case None => guessInitVal(r)
     }
   }
 
   // this has something to do with TO/DOWNTO but not about "character"/"std_logic"/"std_ulogic"
-  def guessInitVal(r: VRangeTy, numericVal: String = "'0'"): IExp_con = {
-    val genCmd = s.substring(0, s.length - "_vector".length) + "_vec_gen"
-    val valListType = if (r.rangeD == RangeD.to) "val_list" else if (r.rangeD == RangeD.downto) "val_rlist" else unknownString
-    val initValue = if (List("val_lsit", "val_rlist").contains(valListType)) {
-      val iVarChar = IConstS("val_c", s"(CHR '${numericVal}')")
-      IConstS(valListType, s"(${genCmd} ${Math.abs(r.l.toInt - r.r.toInt) + 1} ${iVarChar})")
-    } else {
-      IConstS(valListType, unknownString)
+  def guessInitVal(range: VRangeV, rawVal: Char = '0'): IExp_con = {
+    val length = Math.abs(range.l.toInt - range.r.toInt) + 1
+    range.rangeD match {
+      case RangeD.`to` => {
+        IExp_con(this, IConstL_gen(this, length, rawVal), ExpVectorKindT)
+      }
+      case RangeD.`downto` => {
+        IExp_con(this, IConstRL_gen(this, length, rawVal), ExpVectorKindDT)
+      }
+      case RangeD.`unkown` => handler(s"${range}")
     }
-    IExp_con(this, initValue, ExpVectorKind)
   }
 }
 
@@ -131,7 +140,7 @@ case class VCustomizedType(s: String) extends VValType {
           val initVal = bt match {
             case st: VScalarType => st.guessInitVal
             case vt: VVectorType => {
-              val range = sti.getRange.getOrElse(defaultRange(s"guessListInit vector ${sti}"))
+              val range = sti.getRange.getOrElse(defaultRangeV(s"guessListInit vector ${sti}"))
               vt.guessInitVal(range)
             }
           }
@@ -170,11 +179,13 @@ case class VCustomizedType(s: String) extends VValType {
                       case Some(itemAggregate) => {
                         val (fieldName, innerExp) = itemAggregate.getFirstMap
                         if (fieldName == "others") {
-                          val range = sti.getRange.getOrElse(defaultRange(s"getListInit vector ${sti}"))
+                          val range = sti.getRange.getOrElse(defaultRangeV(s"getListInit vector ${sti}"))
                           val numericVal = innerExp.getPrimary
                           numericVal match {
                             case Some(p) => {
-                              vt.guessInitVal(range, p.asVal)
+                              val rawVal = p.asVal
+                              require(rawVal.length == 3 && rawVal.head == '\'' && rawVal.last == '\'')
+                              vt.guessInitVal(range, rawVal(1))
                             }
                             case None => handler(s"${numericVal}")
                           }

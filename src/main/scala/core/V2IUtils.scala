@@ -4,60 +4,101 @@ import sg.edu.ntu.hchen.VHDLParser.{Identifier_listContext, Subtype_indicationCo
 
 import scala.collection.JavaConversions._
 import scala.language.implicitConversions
+import scala.util.{Failure, Success, Try}
 
 case class VInfo(typeInfo: TypeInfo, defInfo: DefInfo)
 
 object V2IUtils {
 
-  def refine_IExp_on(e: IExp_con, valType: VValType, v2s: Boolean): IExp_con = {
-    val newValType = if (v2s) {
-      val tyString = valType.s
-      require(tyString.endsWith("_vector"))
-      VValType(tyString.substring(0, tyString.length - 7))
-    } else {
-      valType
+  /**
+    * change valType to correct one (character/std_logic/std_ulogic)
+    */
+  def refine__valType(idef: IDef, tobeRefined: IExp): IExp = {
+    tobeRefined match {
+      case ec: IExp_con => idef.getExpKind match {
+        case ExpScalarKind => IExp_con(idef.getVType, ec.const, idef.getExpKind)
+        case vk: ExpVectorKind => {
+          require(tobeRefined.expKind.isV, s"${tobeRefined.expKind}:\t${tobeRefined}")
+          vk match {
+            case ExpVectorKindT => ec.const match {
+              case s: IConstS => handler(s"scalar??? ${ec}")
+              case l: IConstL => IExp_con(idef.getVType, ec.const, idef.getExpKind)
+              case rl: IConstRL => {
+                val valType = idef.getVType.asInstanceOf[VVectorType]
+                rl match {
+                  case IConstRL_raw(_, iConstList) => {
+                    IExp_con(valType, IConstL_raw(valType, iConstList), idef.getExpKind)
+                  }
+                  case IConstRL_gen(_, length, rawVal) => {
+                    IExp_con(valType, IConstL_gen(valType, length, rawVal), idef.getExpKind)
+                  }
+                }
+              }
+            }
+            case ExpVectorKindDT => ec.const match {
+              case s: IConstS => handler(s"scalar??? ${ec}")
+              case l: IConstL => {
+                val valType = idef.getVType.asInstanceOf[VVectorType]
+                l match {
+                  case IConstL_raw(_, iConstList) => {
+                    IExp_con(idef.getVType, IConstRL_raw(valType, iConstList), idef.getExpKind)
+                  }
+                  case IConstL_gen(_, length, rawVal) => {
+                    IExp_con(idef.getVType, IConstRL_gen(valType, length, rawVal), idef.getExpKind)
+                  }
+                }
+              }
+              case rl: IConstRL => IExp_con(idef.getVType, rl, idef.getExpKind)
+            }
+          }
+        }
+        case ExpUnknownKind => handler(s"${ec}")
+      }
+      case _ => tobeRefined
     }
-    val newBaseType = newValType.asInstanceOf[VBaseType]
-    IExp_con(newBaseType, e.const, e.expKind)
   }
 
-  def getValType(idef: IDef): VValType = idef match {
-    case v: Variable => v.valType
-    case s: Signal => s.valType
-    case p: Port => p.valType
-    case vl: Vl => vl match {
-      case vl_v: Vl_v => vl_v.iVariable.valType
-      case vnl: Vnl => throw VIErrorMsg(s"${vnl}")
-    }
-    case spl: SPl => spl match {
-      case spl_s: SPl_s => spl_s.iSignal.valType
-      case spl_p: SPl_p => spl_p.iPort.valType
-      case spnl: SPnl => throw VIErrorMsg(s"${spnl}")
+  def refine__valType(trusted: IExp, tobeRefined: IExp): IExp = {
+    val idef = Try(trusted.getIDef)
+    idef match {
+      case Success(idefV) => {
+        refine__valType(idefV, tobeRefined)
+      }
+      case Failure(e) => {
+        logger.warn(s"trusted? ${trusted}")
+        tobeRefined
+      }
     }
   }
 
   // NOTE: we don't deal with "OTHERS" directly, but check the type mismatch and then change it
-  def getCrhsFromExp(lhs_def: IDef, rhsExp: IExp): Crhs = {
-    if (lhs_def.getExpKind == ExpVectorKind && rhsExp.expKind == ExpScalarKind) {
+  def exp__Crhs(lhs_def: IDef, rhsExp: IExp): Crhs = {
+    // this itself does little, only to change the valType
+    // "valType" is reliable, however may change to "scalarized"
+    def refine__sv_inner(e: IExp_con, valType: VBaseType): IExp_con = {
+      val newValType = valType.asInstanceOf[VVectorType].scalarize
+      IExp_con(newValType, e.const, e.expKind)
+    }
+
+    if (lhs_def.getExpKind.isV && rhsExp.expKind == ExpScalarKind) {
       val exp: IExp = rhsExp match {
         case exp_con: IExp_con => {
-          val valType = getValType(lhs_def)
-          refine_IExp_on(exp_con, valType, v2s = true)
+          val valType = lhs_def.getVType
+          refine__sv_inner(exp_con, valType)
         }
         case _ => rhsExp
       }
       exp.crhs_e_rhso
-    } else if ((lhs_def.getExpKind == ExpVectorKind && rhsExp.expKind == ExpVectorKind)
+    } else if ((lhs_def.getExpKind.isV && rhsExp.expKind.isV)
       || (lhs_def.getExpKind == ExpScalarKind && rhsExp.expKind == ExpScalarKind)) {
       val exp: IExp = rhsExp match {
         case exp_con: IExp_con => {
-          val valType = getValType(lhs_def)
-          refine_IExp_on(exp_con, valType, v2s = false)
+          refine__valType(lhs_def, rhsExp)
         }
         case _ => rhsExp
       }
       exp.crhs_e_rhse
-    } else throw VIErrorMsg(s"${rhsExp}")
+    } else handler(s"${rhsExp}")
   }
 
   def getIdList(ctx: Identifier_listContext): List[String] = {
@@ -86,7 +127,7 @@ object V2IUtils {
       Clhs_v(v_lhs)
     }
     case vl: Vl => Clhs_vr(vl)
-    case _ => throw VIErrorMsg(s"${idef}")
+    case _ => handler(s"${idef}")
   }
 
   // TODO
@@ -108,7 +149,7 @@ object V2IUtils {
       Clhs_sp(sp_lhs)
     }
     case spl: SPl => Clhs_spr(spl)
-    case _ => throw VIErrorMsg(s"${idef}")
+    case _ => handler(s"${idef}")
   }
 
 }

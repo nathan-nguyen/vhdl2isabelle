@@ -25,7 +25,7 @@ abstract class Keeper(vInfo: Option[VInfo]) {
               vt.getInitVal(r, expOption)
             }
             case None => {
-              vt.guessInitVal(defaultRange(s"ConstDecl vector ${sti}"))
+              vt.guessInitVal(defaultRangeV(s"ConstDecl vector ${sti}"))
             }
           }
         }
@@ -46,9 +46,13 @@ abstract class Keeper(vInfo: Option[VInfo]) {
       case bt: VBaseType => {
         val initVal = bt match {
           case st: VScalarType => st.getInitVal(expOption)(defInfo)
-          case vt: VVectorType => {
-            val range = sti.getRange.getOrElse(defaultRange(s"Port_list vector ${typeInfo}"))
-            vt.guessInitVal(range)
+          case vt: VVectorType => sti.getRange match {
+            case Some(r) => {
+              vt.getInitVal(r, expOption)
+            }
+            case None => {
+              vt.guessInitVal(defaultRangeV(s"genIPort ${sti}"))
+            }
           }
         }
         val port = Port(id, bt, initVal, mode, conn)
@@ -69,7 +73,7 @@ abstract class Keeper(vInfo: Option[VInfo]) {
         val initVal = bt match {
           case st: VScalarType => st.guessInitVal
           case vt: VVectorType => {
-            val range = sti.getRange.getOrElse(defaultRange(s"signalDecl vector ${sti}"))
+            val range = sti.getRange.getOrElse(defaultRangeV(s"signalDecl vector ${sti}"))
             vt.guessInitVal(range)
           }
         }

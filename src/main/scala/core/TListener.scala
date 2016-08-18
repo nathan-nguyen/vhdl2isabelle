@@ -569,7 +569,6 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
       val iEnv = IEnv(defInfo)
       entity = IEntity(definedEntities.head, iEnv, IResFn(), conc_stmt_complexes.toList)
     } else {
-//      logger.info(s"${typeInfo.typeDeclTbl.mkString("[", ",\n\n", "]")}")
     }
   }
 

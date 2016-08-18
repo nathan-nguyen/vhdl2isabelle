@@ -2,24 +2,65 @@ package core
 
 ////////////////////////////////////////////////////////////////////////////
 
-sealed abstract class IConst
+sealed abstract class IConst {
 
-case class IConstS(isarType: String, initVal: String) extends IConst {
-  override def toString = s"(${isarType} ${initVal})"
+  def genInitVal(valType: VVectorType, length: Int, rawVal: Char = '0'): String = {
+    val s = valType.s
+    val numericVal = s"'${rawVal}'"
+    val genCmd = s.substring(0, s.length - vectorFlag.length) + "_vec_gen"
+    val iVarChar = IConstS("val_c", s"(CHR '${numericVal}')")
+    s"(${genCmd} ${length} ${iVarChar})"
+  }
+
+  override def toString = this match {
+    case IConstS(isarType, initVal) => s"(${isarType} ${initVal})"
+    case l: IConstL => l match {
+      case IConstL_raw(valType, iConstList) => s"(val_list ${iConstList.ISAR_r})"
+      case g@IConstL_gen(valType, length, rawVal) => s"(val_list ${genInitVal(valType, length, rawVal)})"
+    }
+    case l: IConstRL => l match {
+      case IConstRL_raw(valType, iConstList) => s"(val_rlist ${iConstList.ISAR_r})"
+      case g@IConstRL_gen(valType, length, rawVal) => s"(val_rlist ${genInitVal(valType, length, rawVal)})"
+    }
+  }
 }
 
-case class IConstL(iConstList: List[IConst]) extends IConst
+case class IConstS(isarType: String, initVal: String) extends IConst
 
-case class IConstRL(iConstList: List[IConst]) extends IConst
+sealed abstract class IConstL extends IConst {
+  val valType: VVectorType
+}
+
+case class IConstL_raw(valType: VVectorType, iConstList: List[IConst]) extends IConstL
+
+case class IConstL_gen(valType: VVectorType, length: Int, rawVal: Char) extends IConstL
+
+abstract class IConstRL extends IConst {
+  val valType: VVectorType
+}
+
+case class IConstRL_raw(valType: VVectorType, iConstList: List[IConst]) extends IConstRL
+
+case class IConstRL_gen(valType: VVectorType, length: Int, rawVal: Char) extends IConstRL
+
 
 ////////////////////////////////////////////////////////////////////////////
 
-sealed trait ExpKind
+sealed trait ExpKind {
+  def isV = this match {
+    case v: ExpVectorKind => true
+    case _ => false
+  }
+}
 
 case object ExpScalarKind extends ExpKind
 
 // FIXME should distinguish TO and DOWNTO
-case object ExpVectorKind extends ExpKind
+abstract class ExpVectorKind extends ExpKind
+
+case object ExpVectorKindT extends ExpVectorKind
+
+case object ExpVectorKindDT extends ExpVectorKind
 
 case object ExpUnknownKind extends ExpKind
 
@@ -28,12 +69,19 @@ case object ExpUnknownKind extends ExpKind
 sealed abstract class IExp {
   val expKind: ExpKind
 
+  def getVType: VBaseType = getIDef.getVType
+
+  def getIDef: IDef = this match {
+    case vl_rhs: IExp_vl_rhs => vl_rhs.v
+    case spl_rhs: IExp_spl_rhs => spl_rhs.sp
+    case v: IExp_var => v.variable
+    case s: IExp_sig => s.signal
+    case p: IExp_prt => p.port
+    case _ => ???
+  }
+
   override def toString = this match {
-    case IExp_con(baseType, const, _) => const match {
-      case IConstS(isarType, initVal) => s"""(exp_con (${VHDLize(baseType)}, (${isarType} ${initVal})))"""
-      case IConstL(iConstList) => s"""(exp_con (${VHDLize(baseType)}, (val_list ${iConstList.ISAR_r})))"""
-      case IConstRL(iConstList) => s"""(exp_con (${VHDLize(baseType)}, (val_rlist ${iConstList.ISAR_r})))"""
-    }
+    case IExp_con(baseType, const, _) => s"""(exp_con (${VHDLize(baseType)}, ${const}))"""
     case IExp_var(variable, _) => s"""(exp_var ${variable.getId})"""
     case IExp_sig(signal, _) => s"""(exp_sig ${signal.getId})"""
     case IExp_prt(port, _) => s"""(exp_prt ${port.getId})"""
@@ -76,13 +124,14 @@ case class IUexp(op: VUop.Ty, e: IExp) extends IExp {
 
 // logic
 case class IBexpl(e1: IExp, op: VLogicOp.Ty, e2: IExp) extends IExp {
-  require(e1.expKind == e2.expKind, s"${e1.expKind} ${e1}\n${e2.expKind} ${e2}")
+  require(e1.expKind == e2.expKind)
   val expKind: ExpKind = e1.expKind
 }
 
 // relation
 case class IBexpr(e1: IExp, op: VRelationOp.Ty, e2: IExp) extends IExp {
-  require(e1.expKind == e2.expKind)
+  require(e1.expKind == e2.expKind, s"\n${e1}, ${e1.expKind}\n${e2}, ${e2.expKind}")
+//  if (e1.expKind != e2.expKind) handleExpKindMismatch(e1, e2, s"${toString}")
   val expKind: ExpKind = ExpScalarKind
 }
 
@@ -102,33 +151,34 @@ case class IBexpfa(e1: IExp, op: VFactorOp.Ty, e2: IExp) extends IBexpa {
 
 // term arighmetic
 case class IBexpta(e1: IExp, op: VTermOp.Ty, e2: IExp) extends IBexpa {
-  require(e1.expKind == e2.expKind)
+  require(e1.expKind == e2.expKind, s"\n${e1}, ${e1.expKind}, \n${e2}, ${e2.expKind}")
+//  if (e1.expKind != e2.expKind) handleExpKindMismatch(e1, e2, s"${toString}")
   val expKind: ExpKind = e1.expKind
 }
 
 case class IExp_nth(e: IExp, nthExp: IExp) extends IExp {
-  require(e.expKind == ExpVectorKind && nthExp.expKind == ExpScalarKind)
+  require(e.expKind.isV && nthExp.expKind == ExpScalarKind)
   val expKind: ExpKind = ExpScalarKind
 }
 
 case class IExp_sl(e: IExp, e1: IExp, e2: IExp) extends IExp {
-  require(e.expKind == ExpVectorKind && e1.expKind == ExpScalarKind && e2.expKind == ExpScalarKind)
-  val expKind: ExpKind = ExpVectorKind
+  // FIXME: not sure whether "DT" or "T": (1) rely on "e" (2) order of "e1", "e2"
+  require(e.expKind.isV && e1.expKind == ExpScalarKind && e2.expKind == ExpScalarKind)
+  val expKind: ExpKind = e.expKind
 }
 
 case class IExp_tl(e: IExp) extends IExp {
   require(e.expKind == ExpScalarKind)
-  val expKind: ExpKind = ExpVectorKind
+  val expKind: ExpKind = ExpVectorKindT
 }
 
-// TODO not used
 case class IExp_trl(e: IExp) extends IExp {
   require(e.expKind == ExpScalarKind)
-  val expKind: ExpKind = ExpVectorKind
+  val expKind: ExpKind = ExpVectorKindDT
 }
 
 // fake IExp to convert vl/spl to IExp
 
 case class IExp_vl_rhs(v: V_IDef, sn: VSelectedName, expKind: ExpKind) extends IExp
 
-case class IExp_spl_rhs(v: SP_IDef, sn: VSelectedName, expKind: ExpKind) extends IExp
+case class IExp_spl_rhs(sp: SP_IDef, sn: VSelectedName, expKind: ExpKind) extends IExp

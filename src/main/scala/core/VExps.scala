@@ -36,12 +36,12 @@ sealed abstract class VLiteral {
               case ivariable: Variable => IExp_var(ivariable, expKind)
               case signal: Signal => IExp_sig(signal, expKind)
               case port: Port => IExp_prt(port, expKind)
-              case _ => throw VIErrorMsg(s"${idef}, ${s}")
+              case _ => handler(s"${idef}, ${s}")
             }
           }
         }
         // TODO will be refined later if is a scalar type; for other cases???
-        case VLiteralEnumChar(s) => VScalarType("character").getInitValFromLiteral(s)
+        case VLiteralEnumChar(s) => VScalarType(defaultCharType).getInitValFromLiteral(s)
       }
       case VLiteralBitS(s) => handler(s)
       case vLiteralS: VLiteralS => vLiteralS.num2Exp
@@ -49,7 +49,7 @@ sealed abstract class VLiteral {
     }
   }
 
-  def asRange(defInfo: DefInfo): IExp_con = this match {
+  def asRangeExp(defInfo: DefInfo): IExp_con = this match {
     case ln: VLiteralNumAbs => ln match {
       case VLiteralNumInt(s) => VScalarType("natural").getInitValFromLiteral(s)
       case VLiteralNumReal(s) => handler(s"real as range? ${}")
@@ -58,9 +58,9 @@ sealed abstract class VLiteral {
     case _ => handler(s"what as range? ${toString}")
   }
 
-  def to_IDiscreteRange(defInfo: DefInfo): VHDL_dis_to = {
-    val e = asRange(defInfo)
-    VHDL_dis_to(e, e)
+  def to_IDiscreteRange(defInfo: DefInfo): Discrete_range = {
+    val e = asRangeExp(defInfo)
+    VHDL_dis_downto(e, e)
   }
 
   def asVal: String = this match {
@@ -94,19 +94,28 @@ case object VLiteralNull extends VLiteral
 case class VLiteralBitS(s: String) extends VLiteral
 
 case class VLiteralS(s: String) extends VLiteral {
-  def num2Exp(valType: VBaseType, rangeTy: VRangeTy): IExp_con = {
+  def num2Exp(valType: VScalarType, rangeTy: VRangeV): IExp_con = {
     val ss = s.substring(1, s.length - 1)
     require(ss.forall(_.isDigit), s"${s} not all digits")
     val iConstList = ss.toList.map(c => IConstS("val_c", s"(CHR ''${c}'')"))
+    val vt = valType.vectorize
     if (rangeTy.rangeD == RangeD.to) {
-      IExp_con(valType, IConstL(iConstList), ExpVectorKind)
+      if (ss.forall(_ == ss(0))) {
+        IExp_con(vt, IConstL_gen(vt, ss.length, ss(0)), ExpVectorKindT)
+      } else {
+        IExp_con(vt, IConstL_raw(vt, iConstList), ExpVectorKindT)
+      }
     } else if (rangeTy.rangeD == RangeD.downto) {
-      IExp_con(valType, IConstRL(iConstList), ExpVectorKind)
+      if (ss.forall(_ == ss(0))) {
+        IExp_con(vt, IConstRL_gen(vt, ss.length, ss(0)), ExpVectorKindDT)
+      } else {
+        IExp_con(vt, IConstRL_raw(vt, iConstList), ExpVectorKindDT)
+      }
     } else throw VIError
   }
 
-  // ONLY a hack!
-  def num2Exp: IExp_con = num2Exp(VScalarType("character"), VRangeTy(unknownString, RangeD.to, unknownString))
+  // FIXME this is quite wrong, but seems that we have to infer it late
+  def num2Exp: IExp_con = num2Exp(VScalarType(defaultCharType), VRangeV(unknownString, RangeD.to, unknownString))
 
 }
 
@@ -496,7 +505,6 @@ abstract class VPrimary {
     case VPrimaryQExp(vQExp) => handler(s"${toString}")
     case VPrimaryExpLR(vExp) => vExp.toIExp(defInfo)
     case VPrimaryAllocator(allocator) => handler(s"${toString}")
-    // FIXME incorrect, haven't considered OTHERS case
     case VPrimaryAggregate(aggregate) => {
       aggregate.getFirstMap._2.toIExp(defInfo)
     }
@@ -581,7 +589,7 @@ sealed abstract class VName {
 
   def getSimpleName: String = getSimpleNameOpt match {
     case Some(s) => s
-    case None => throw VIErrorMsg(s"${toString}")
+    case None => handler(s"${toString}")
   }
 
   def toI_rhs(defInfo: DefInfo): IExp
@@ -710,7 +718,7 @@ case class VNameFnCallOrIndexPart(assocListOpt: Option[VAssocList]) {
         case VActualDesignatorO => ???
       }
     }
-    case None => throw VIErrorMsg(s"${toString}")
+    case None => handler(s"${toString}")
   }
 
   def toI_rhs(defInfo: DefInfo): IExp = {
@@ -732,12 +740,10 @@ case class VNameSlicePart(r1: VExplicitRange, r2: Option[VExplicitRange]) {
   }
 
   // TODO r2
-  def toI_rhs(defInfo: DefInfo): (IExp, IExp) = {
-    if (r1.d == "downto") {
-      (r1.r.toIExp(defInfo), r1.l.toIExp(defInfo))
-    } else if (r1.d == "to") {
-      (r1.l.toIExp(defInfo), r1.r.toIExp(defInfo))
-    } else throw VIError
+  def toI_rhs(defInfo: DefInfo): (IExp, IExp) = r1.d match {
+    case RangeD.`to` => (r1.r.toIExp(defInfo), r1.l.toIExp(defInfo))
+    case RangeD.`downto` => (r1.l.toIExp(defInfo), r1.r.toIExp(defInfo))
+    case RangeD.`unkown` => throw VIError
   }
 }
 
@@ -840,7 +846,7 @@ sealed trait VAliasIndication
 case class VSubtypeInd(selectedName: VSelectedName,
                        constraint: Option[VConstraint],
                        tolerance: Option[VToleranceAspect]) extends VAliasIndication {
-  def getRange: Option[VRangeTy] = constraint.map(_.getRange)
+  def getRange: Option[VRangeV] = constraint.map(_.getRange)
 
   def getSimpleName = selectedName.getSimpleNameOpt.getOrElse(s"ERROR: ${toString}")
 }
@@ -868,9 +874,9 @@ case class VSubnatureIndication(name: String,
                                 exprs: Option[(VExp, VExp)]) extends VAliasIndication
 
 sealed trait VRange {
-  def getRange: VRangeTy = this match {
+  def getRV: VRangeV = this match {
     case VRangeE(explicitRange) => explicitRange.getRange
-    case VRangeN(name: String) => defaultRange(s"VRangeN: ${this}")
+    case VRangeN(name: String) => defaultRangeV(s"VRangeN: ${this}")
   }
 }
 
@@ -894,11 +900,11 @@ case class VRangeN(name: String) extends VRange
 ////////////////////////////////////////////////////////////
 
 sealed trait VDiscreteRange {
-  def getRange: VRangeTy = this match {
-    case VDiscreteRangeR(range) => range.getRange
+  def getRange: VRangeV = this match {
+    case VDiscreteRangeR(range) => range.getRV
     case VDiscreteRangeSub(subtypeInd) => subtypeInd.getRange match {
       case Some(range) => range
-      case None => defaultRange(s"VDiscreteRangeSub ${subtypeInd}")
+      case None => defaultRangeV(s"VDiscreteRangeSub ${subtypeInd}")
     }
   }
 }
@@ -923,13 +929,13 @@ case class VDiscreteRangeSub(subtypeInd: VSubtypeInd) extends VDiscreteRange
 
 
 sealed trait VConstraint {
-  def getRange: VRangeTy = this match {
-    case VRangeConstraint(range) => range.getRange
+  def getRange: VRangeV = this match {
+    case VRangeConstraint(range) => range.getRV
     case VIndexConstraint(discreteRanges) => {
       val (h, t) = (discreteRanges.head, discreteRanges.tail)
       t match {
         case Nil => h.getRange
-        case _ => defaultRange(s"VConstraint ${discreteRanges}")
+        case _ => defaultRangeV(s"VConstraint ${discreteRanges}")
       }
     }
   }
@@ -966,15 +972,14 @@ object VIndexConstraint {
   }
 }
 
-case class VExplicitRange(l: VSimpleExp, d: String, r: VSimpleExp) {
-  def getRange: VRangeTy = VRangeTy(l.asVal, RangeD.withName(d.toUpperCase), r.asVal)
+case class VExplicitRange(l: VSimpleExp, d: RangeD.Ty, r: VSimpleExp) {
+  def getRange: VRangeV = VRangeV(l.asVal, d, r.asVal)
 
-  def toI(defInfo: DefInfo): Discrete_range = {
-    if (d == "downto") {
-      VHDL_dis_downto(l.toIExp(defInfo), r.toIExp(defInfo))
-    } else if (d == "to") {
+  def toI(defInfo: DefInfo): Discrete_range = d match {
+    case RangeD.`to` =>
       VHDL_dis_to(l.toIExp(defInfo), r.toIExp(defInfo))
-    } else throw VIErrorMsg(s"${toString}")
+    case RangeD.`downto` => VHDL_dis_downto(l.toIExp(defInfo), r.toIExp(defInfo))
+    case RangeD.`unkown` => handler(s"${toString}")
   }
 }
 
@@ -983,7 +988,7 @@ object VExplicitRange {
     val simplExprList = for {
       simplExpr <- ctx.simple_expression()
     } yield VSimpleExp(simplExpr)
-    val direction = ctx.direction().getText.toLowerCase
+    val direction = RangeD.withName(ctx.direction().getText.toUpperCase)
     require(simplExprList.length == 2, "explicitRange")
     VExplicitRange(simplExprList.head, direction, simplExprList.last)
   }
@@ -1138,23 +1143,35 @@ object VFactorOp extends Enumeration with VAOp {
 ////////////////////////////////////////////////////////////
 
 case class VSimpleExp(termSign: Option[String], term: VTerm, ops: List[VTermOp.Ty], others: List[VTerm]) {
+
+  def refine__tl_trl(tKind: ExpKind, srcIExp: IExp): IExp = {
+    require(tKind.isV && srcIExp.expKind == ExpScalarKind)
+    tKind match {
+      case ExpVectorKindT => IExp_tl(srcIExp)
+      case ExpVectorKindDT => IExp_trl(srcIExp)
+      case _ => srcIExp
+    }
+  }
+
   def toIExp(defInfo: DefInfo): IExp = {
     val firstExp: IExp = termSign match {
-      case Some("-") => IUexp(VUop.neg, term.toIExp(defInfo))
       case Some("+") => IUexp(VUop.pos, term.toIExp(defInfo))
+      case Some("-") => IUexp(VUop.neg, term.toIExp(defInfo))
       case _ => term.toIExp(defInfo)
     }
+    // FIXME this is perhaps still WRONG since VHDL may allow "vt := st1 [+] st2"
     ops.zip(others).foldLeft(firstExp) {
       case (acc, (op, curTerm)) => {
         val cur = curTerm.toIExp(defInfo)
-        if (acc.expKind == ExpVectorKind && cur.expKind == ExpScalarKind) {
-          val refinedCur = IExp_tl(cur)
+        if (acc.expKind.isV && cur.expKind == ExpScalarKind) {
+          val refinedCur = refine__tl_trl(acc.expKind, cur)
           IBexpta(acc, op, refinedCur)
-        } else if (acc.expKind == ExpScalarKind && cur.expKind == ExpVectorKind) {
-          val refinedAcc = IExp_tl(acc)
+        } else if (acc.expKind == ExpScalarKind && cur.expKind.isV) {
+          val refinedAcc = refine__tl_trl(cur.expKind, acc)
           IBexpta(refinedAcc, op, cur)
         } else {
-          IBexpta(acc, op, cur)
+          val refined = refine__valType(acc, cur)
+          IBexpta(acc, op, refined)
         }
       }
     }
@@ -1278,8 +1295,14 @@ object VShiftExp {
 }
 
 case class VRelation(vShiftExpr: VShiftExp, op: Option[VRelationOp.Ty], other: Option[VShiftExp]) {
+  // FIXME type refinement should be made here (perhaps ALL other toIExp)
+  // TODO however we are not sure which should be trusted!!
   def toIExp(defInfo: DefInfo): IExp = (op, other) match {
-    case (Some(opV), Some(otherV)) => IBexpr(vShiftExpr.toIExp(defInfo), opV, otherV.toIExp(defInfo))
+    case (Some(opV), Some(otherV)) => {
+      val (lhs, rhs) = (vShiftExpr.toIExp(defInfo), otherV.toIExp(defInfo))
+      val refinedRhs = refine__valType(lhs, rhs)
+      IBexpr(lhs, opV, refinedRhs)
+    }
     case _ => vShiftExpr.toIExp(defInfo)
   }
 }
@@ -1338,7 +1361,7 @@ case class VExp(relation: VRelation, ops: List[VLogicOp.Ty], others: List[VRelat
   def rhs_IDef(defInfo: DefInfo): IDef = {
     val literal = getLiteral match {
       case Some(l) => l
-      case None => throw VIErrorMsg(s"${toString}")
+      case None => handler(s"${toString}")
     }
     val identifier = try {
       literal.asInstanceOf[VLiteralEnumId].identifier

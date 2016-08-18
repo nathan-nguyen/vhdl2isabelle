@@ -99,6 +99,6 @@ class VITran(inFile: String, vInfo: Option[VInfo]) {
       case None => throw new IllegalArgumentException(s"${target} not supported")
     }
     s"""export_code ${entityName} simulation init_state sim_arch trans_vhdl_desc_complex in ${target}
-        |module_name ${moduleName} file \"${outFileName}\"""".stripMargin
+        |module_name ${moduleName} file \"${outFileName}${ext}\"""".stripMargin
   }
 }

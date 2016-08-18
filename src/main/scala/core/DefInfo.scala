@@ -1,12 +1,8 @@
 package core
 
-import org.slf4j.LoggerFactory
-
 import scala.collection.mutable
 
 final class DefInfo(defInfo: Option[DefInfo]) {
-
-  val logger = LoggerFactory.getLogger(getClass)
 
   /**
     * two strategies can be applied for table lookup:
@@ -47,21 +43,21 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     * NOTE: isar representation of "top level scalar" and "inside scalar" should be different!
     */
 
-  def getDef(n: String): IDef = getDefOpt(List(n)).getOrElse(throw VIErrorMsg(s"${n}"))
+  def getDef(n: String): IDef = getDefOpt(List(n)).getOrElse(handler(s"${n}"))
 
   def getDef(sn: VSelectedName): IDef = {
     val nList = sn.suffixList.scanLeft(sn.id)((acc, cur) => s"${acc}_${cur.s}")
-    getDefOpt(nList).getOrElse(throw VIErrorMsg(s"${sn}"))
+    getDefOpt(nList).getOrElse(handler(s"${sn}"))
   }
 
   def getSPDef(sn: VSelectedName): SP_IDef = {
     val nList = sn.suffixList.scanLeft(sn.id)((acc, cur) => s"${acc}_${cur.s}")
-    getSPDefOpt(nList).getOrElse(throw VIErrorMsg(s"${sn}"))
+    getSPDefOpt(nList).getOrElse(handler(s"${sn}"))
   }
 
   def getVDef(sn: VSelectedName): V_IDef = {
     val nList = sn.suffixList.scanLeft(sn.id)((acc, cur) => s"${acc}_${cur.s}")
-    getVDefOpt(nList).getOrElse(throw VIErrorMsg(s"${sn}"))
+    getVDefOpt(nList).getOrElse(handler(s"${sn}"))
   }
 
   def getSPDefOpt(nList: List[String]): Option[SP_IDef] = {
@@ -73,7 +69,7 @@ final class DefInfo(defInfo: Option[DefInfo]) {
       }
       case (s@Some(ss), None) => s
       case (None, p@Some(sp)) => p
-      case (_, _) => throw VIErrorMsg(s"${nList}")
+      case (_, _) => handler(s"${nList}")
     }
   }
 
@@ -112,17 +108,7 @@ final class DefInfo(defInfo: Option[DefInfo]) {
       s_map ++= di.s_map
       p_map ++= di.p_map
     }
-    case None => {
-//      p_map += {
-//        //    TODO currently rewrite "clk" to "p_clk" in vhd file
-//        //    TODO ideally definition should be parsed from vhd file
-//        //    TODO definition should not exist in isar file
-//        val id = "p_clk"
-//        val iVariable = IConstS("val_c", "CHR ''0''")
-//        val exp_con = IExp_con(VScalarType("std_ulogic"), iVariable, ExpScalarKind)
-//        id -> Port(id, VScalarType("std_ulogic"), exp_con, PortMode.withName("mode_in"), PortConn.connected)
-//      }
-    }
+    case None =>
   }
 
   def +=(id: String, d: Variable): Unit = {
@@ -154,15 +140,9 @@ final class DefInfo(defInfo: Option[DefInfo]) {
   }
 
   def dumpTables() = {
-    logger.info(s"${
-      v_map.mkString("\n")
-    }")
-    logger.info(s"${
-      s_map.mkString("\n")
-    }")
-    logger.info(s"${
-      p_map.mkString("\n")
-    }")
+    logger.info(s"${v_map.mkString("\n")}")
+    logger.info(s"${s_map.mkString("\n")}")
+    logger.info(s"${p_map.mkString("\n")}")
   }
 
   override def toString = {

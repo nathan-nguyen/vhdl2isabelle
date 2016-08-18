@@ -1,7 +1,10 @@
 - list-list
-- exp_tl, exp_trl & vector
+- exp_tl, exp_trl
 - remove function (preprocessing)
 - serialize
+- sometimes we are not sure who has the correct "ExpKind" (for ExpVectorKind) or "ValType"
+  this should be modified in "toIExp" functions of the relevant "V" classes OR the higher level statements
+- can we prove that as long as "IExp" is a variable like, it is always ValType??? perhaps adding a "trust" field
 
 --------------------
 sbt ~run seems to have bugs on package renaming

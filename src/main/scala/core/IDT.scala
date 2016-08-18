@@ -19,10 +19,7 @@ case class Variable(id: String, valType: VBaseType, iExp: IExp) extends V_IDef {
 
   override def getId = id
 
-  override def getExpKind = valType match {
-    case st: VScalarType => ExpScalarKind
-    case vt: VVectorType => ExpVectorKind
-  }
+  override def getExpKind = iExp.expKind
 
 }
 
@@ -32,7 +29,7 @@ sealed trait Vl extends V_IDef {
 
   override def toString = this match {
     case Vl_v(iVariable) => s"(vl_v ${iVariable})"
-    case Vnl(id, vlList) => s"(vnl ('''', ${vlList.mkString("[\n ", ",\n ", "\n]")}))"
+    case Vnl(id, vlList) => s"(vnl ('''', ${vlList.ISAR}))"
   }
 
   def as_list: String = this match {
@@ -55,10 +52,11 @@ sealed trait Vl extends V_IDef {
     case Vnl(id, vlList) => id
   }
 
-  def getExpKind: ExpKind = this match {
+  override def getExpKind: ExpKind = this match {
     case Vl_v(v) => v.getExpKind
     case Vnl(id, vlList) => ExpUnknownKind
   }
+
 
   /**
     * it may return a "variable" or a "vl" (which is vnl-generated)
@@ -91,8 +89,8 @@ case class Vl_v(iVariable: Variable) extends Vl
 case class Vnl(id: String, vlList: List[Vl]) extends Vl
 
 object Vnl {
-  //  FIXME: this is TOO specific!
-  // TODO: currently valType is the EXACTLY type from VHDL without prefix!!!
+  //  FIXME: this gen is TOO specific!
+  // NOTE: currently valType is the EXACTLY type from VHDL without prefix!!!
   def gen(id: String, dataList: List[MetaData])(implicit s: DummyImplicit): Vnl = {
     val vlList = for {
       data <- dataList
@@ -116,6 +114,21 @@ sealed trait IDef {
   // only the "final" classes have the id
   def getId: IdTy
 
+  def getVType: VBaseType = this match {
+    case v: Variable => v.valType
+    case s: Signal => s.valType
+    case p: Port => p.valType
+    case vl: Vl => vl match {
+      case vl_v: Vl_v => vl_v.iVariable.valType
+      case vnl: Vnl => handler(s"${vnl}")
+    }
+    case spl: SPl => spl match {
+      case spl_s: SPl_s => spl_s.iSignal.valType
+      case spl_p: SPl_p => spl_p.iPort.valType
+      case spnl: SPnl => handler(s"${spnl}")
+    }
+  }
+
   def getExpKind: ExpKind
 }
 
@@ -127,10 +140,10 @@ sealed abstract class SPl extends SP_IDef {
   override def toString = this match {
     case SPl_s(s) => s"(spl_s ${s})"
     case SPl_p(p) => s"(spl_p ${p})"
-    case SPnl(id, splList) => s"(spnl ('''', ${splList.mkString("[\n ", ",\n ", "\n]")}))"
+    case SPnl(id, splList) => s"(spnl ('''', ${splList.ISAR}))"
   }
 
-  def as_definition: String = this match {
+  override def as_definition: String = this match {
     // this case should never be called
     case SPl_s(s) => s.as_definition
     // this case should never be called
@@ -141,15 +154,15 @@ sealed abstract class SPl extends SP_IDef {
     }
   }
 
-  def as_list = this match {
+  override def as_list = this match {
     case SPl_s(s) => s.id
     case SPl_p(p) => p.id
     case SPnl(id, _) => s"(splist_of_spl ${id})"
   }
 
   override def getId = this match {
-    case SPl_s(s) => s.getId
-    case SPl_p(p) => p.getId
+    case SPl_s(s) => s.id
+    case SPl_p(p) => p.id
     case SPnl(id, splList) => id
   }
 
@@ -230,10 +243,7 @@ case class Signal(id: String, valType: VBaseType, iExp: IExp, signalKind: Signal
 
   override def getId = id
 
-  override def getExpKind = valType match {
-    case st: VScalarType => ExpScalarKind
-    case vt: VVectorType => ExpVectorKind
-  }
+  override def getExpKind = iExp.expKind
 
 }
 
@@ -258,14 +268,12 @@ case class Port(id: String, valType: VBaseType, iExp: IExp, mode: PortMode.Ty, c
         | \"${id} ≡ ${toString}\"""".stripMargin
   }
 
-  override def getExpKind = valType match {
-    case st: VScalarType => ExpScalarKind
-    case vt: VVectorType => ExpVectorKind
-  }
+  override def getExpKind = iExp.expKind
 
   override def as_list: String = s"[(sp_p ${id})]"
 
   override def getId = id
+
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -281,7 +289,7 @@ sealed abstract class SigPrt {
       case _ => s"(sp_p ${sn.isar_sp})"
     }
     // shouldn't be called
-    case SP_spl(spl) => throw VIErrorMsg(s"${spl}")
+    case SP_spl(spl) => handler(s"${spl}")
   }
 }
 

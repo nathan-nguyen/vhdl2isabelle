@@ -2,9 +2,9 @@ import org.slf4j.LoggerFactory
 
 package object core {
 
-  def VHDLize(vhdlType: VBaseType) = s"vhdl_${vhdlType.s}"
-
   val logger = LoggerFactory.getLogger(getClass)
+
+  def VHDLize(vhdlType: VBaseType) = s"vhdl_${vhdlType.s}"
 
   object VIError extends Throwable
 
@@ -15,8 +15,13 @@ package object core {
   type IdTy = String
   type DefIdPair = (Option[IDef], IdTy)
 
-  def defaultId = ""
+  val defaultId = ""
+
   val unknownString = "???"
+
+  val vectorFlag = "_vector"
+  //  val defaultCharType = "std_xxxxxx"
+  val defaultCharType = "std_logic"
 
   def handler(msg: String) = throw VIErrorMsg(msg)
 
@@ -27,11 +32,15 @@ package object core {
     val unkown = Value("XXX")
   }
 
-  case class VRangeTy(l: String, rangeD: RangeD.Ty, r: String)
+  case class VRangeV(l: String, rangeD: RangeD.Ty, r: String)
 
-  def defaultRange(msg: String): VRangeTy = {
+  def defaultRangeV(msg: String): VRangeV = {
     logger.warn(s"defaultRange: ${msg}")
-    VRangeTy(unknownString, RangeD.unkown, unknownString)
+    VRangeV(unknownString, RangeD.unkown, unknownString)
+  }
+
+  def handleExpKindMismatch(e1: IExp, e2: IExp, msg: String) = {
+    logger.error(s"""expKindMismatch: ${msg}\n${e1.expKind}\t"${e1}"\n${e2.expKind}\t"${e2}"""")
   }
 
   // TODO define a list repr function

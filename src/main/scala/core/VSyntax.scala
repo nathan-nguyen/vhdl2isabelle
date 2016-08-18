@@ -92,7 +92,7 @@ sealed abstract class VTarget {
         p.toI_lhs(defInfo)
       }
     }
-    case VTargetAggregate(aggregate) => throw VIErrorMsg(s"${toString}")
+    case VTargetAggregate(aggregate) => handler(s"${toString}")
   }
 
   def lhs_V_IDef(defInfo: DefInfo): V_IDef = {
@@ -184,11 +184,11 @@ object VWaveFormElem {
 sealed abstract class VWaveForm {
 
   def getSpecialVExp: VExp = this match {
-    case e:VWaveFormE => e.elems.head.exp
-    case VWaveFormU => throw VIErrorMsg(s"${VWaveFormU}")
+    case e: VWaveFormE => e.elems.head.exp
+    case VWaveFormU => handler(s"${VWaveFormU}")
   }
 
-  def getSpecialIExp(defInfo:DefInfo) :IExp = getSpecialVExp.toIExp(defInfo)
+  def getSpecialIExp(defInfo: DefInfo): IExp = getSpecialVExp.toIExp(defInfo)
 }
 
 object VWaveForm {
@@ -211,26 +211,28 @@ case object VWaveFormU extends VWaveForm
 
 case class VCondWaveForms(whenWaveForm: VWaveForm, cond: Option[VExp], elseCond: Option[VCondWaveForms]) {
   // NOTE: isar definition has many limitations, but may be enough
-  def toI(defInfo: DefInfo): (List[As_when], Crhs) = {
+  def toI(defInfo: DefInfo)(lhs_idef:IDef): (List[As_when], Crhs) = {
     // whenWaveForm => as_whenList.head.crhs, cond => as_whenList.head.IExp
     // elseCond build the as_whenList(1) (last one)
     import VCondWaveForms.genAsWhen
     val as_when1 = genAsWhen(whenWaveForm, cond)(defInfo)
     val as_when2 = elseCond match {
       case Some(waveForms) => genAsWhen(waveForms.whenWaveForm, waveForms.cond)(defInfo)
-      case None => throw VIErrorMsg(s"${toString}")
+      case None => handler(s"${toString}")
     }
     val as_whenList = List(as_when1, as_when2)
-    val else_crhs:Crhs = elseCond match {
+    val else_crhs: Crhs = elseCond match {
       case Some(VCondWaveForms(_, _, finalElseOpt)) => finalElseOpt match {
         case Some(finalElse) => {
           val exp = finalElse.whenWaveForm.getSpecialVExp
           // TODO check whether consider "OTHERS"
-          exp.toIExp(defInfo).crhs_e_rhse
+          val iExp = exp.toIExp(defInfo)
+          val refined = refine__valType(lhs_idef, iExp)
+          refined.crhs_e_rhse
         }
-        case None => throw VIErrorMsg(s"${toString}")
+        case None => handler(s"${toString}")
       }
-      case None => throw VIErrorMsg(s"${toString}")
+      case None => handler(s"${toString}")
     }
     (as_whenList, else_crhs)
   }
@@ -245,14 +247,14 @@ object VCondWaveForms {
   }
 
   def genAsWhen(waveForm: VWaveForm, cond: Option[VExp])(defInfo: DefInfo): As_when = {
-    val when_crhs:Crhs = {
+    val when_crhs: Crhs = {
       val exp = waveForm.getSpecialVExp
       // TODO check whether consider "OTHERS"
       exp.toIExp(defInfo).crhs_e_rhse
     }
     val when_cond = cond match {
       case Some(c) => c.toIExp(defInfo)
-      case None => throw VIErrorMsg(s"${toString}")
+      case None => handler(s"${toString}")
     }
     As_when(when_crhs, when_cond)
   }
@@ -289,7 +291,8 @@ object VSelectedSignalAssign {
 case class VCondSignalAssign(vTarget: VTarget, opts: VOpts, conditionalWaveforms: VCondWaveForms) {
   def toI(defInfo: DefInfo): (SP_clhs, List[As_when], Crhs) = {
     val sp_chls = vTarget.toI_SP_clhs(defInfo)
-    val (as_whenList, crhs) = conditionalWaveforms.toI(defInfo)
+    val lhs_idef = vTarget.lhs_SP_IDef(defInfo)
+    val (as_whenList, crhs) = conditionalWaveforms.toI(defInfo)(lhs_idef)
     (sp_chls, as_whenList, crhs)
   }
 }
@@ -684,7 +687,7 @@ case class VSignalAssignStat(labelColon: Option[String], target: VTarget, delay:
       case _: Clhs_sp => {
         val targetDef = target.lhs_SP_IDef(defInfo)
         val rhsExp = exp.toIExp(defInfo)
-        getCrhsFromExp(targetDef, rhsExp)
+        exp__Crhs(targetDef, rhsExp)
       }
       case _: Clhs_spr => waveForm match {
         case waveFormE: VWaveFormE => {
@@ -693,13 +696,13 @@ case class VSignalAssignStat(labelColon: Option[String], target: VTarget, delay:
             case _: Variable | _: Signal | _: Port => {
               val targetDef = target.lhs_SP_IDef(defInfo)
               val rhs = exp.toIExp(defInfo)
-              getCrhsFromExp(targetDef, rhs)
+              exp__Crhs(targetDef, rhs)
             }
             case spl: SPl => Crhs_r(Rl_spl(spl))
             case vl: Vl => Crhs_r(Rl_vl(vl))
           }
         }
-        case VWaveFormU => throw VIErrorMsg(s"${toString}")
+        case VWaveFormU => handler(s"${toString}")
       }
     }
     Ssc_sa(id, s_clhs, crhs)
@@ -728,7 +731,7 @@ case class VVarAssignStat(labelColon: Option[String], target: VTarget, exp: VExp
       case _: Clhs_v => {
         val targetDef = target.lhs_V_IDef(defInfo)
         val rhsExp = exp.toIExp(defInfo)
-        getCrhsFromExp(targetDef, rhsExp)
+        exp__Crhs(targetDef, rhsExp)
       }
       case _: Clhs_vr => {
         // TODO rhs must be a IDef?
@@ -737,7 +740,7 @@ case class VVarAssignStat(labelColon: Option[String], target: VTarget, exp: VExp
           case _: Variable | _: Signal | _: Port => {
             val targetDef = target.lhs_V_IDef(defInfo)
             val e = exp.toIExp(defInfo)
-            getCrhsFromExp(targetDef, e)
+            exp__Crhs(targetDef, e)
           }
           case spl: SPl => Crhs_r(Rl_spl(spl))
           case vl: Vl => Crhs_r(Rl_vl(vl))
@@ -852,7 +855,12 @@ case class VCaseStat(labelColon: Option[String],
           (caseStatAltList.map(_.toI(defInfo)), List.empty)
         }
       }
-    Ssc_case(id, cond, when_complexList, defaultList)
+    val refined: List[Ssc_when] = when_complexList.map { w =>
+      val expList = w.choices.expList.map(e => refine__valType(cond, e))
+      val choices = w.choices.copy(expList = expList)
+      w.copy(choices = choices)
+    }
+    Ssc_case(id, cond, refined, defaultList)
   }
 }
 
