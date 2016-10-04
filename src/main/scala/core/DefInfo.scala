@@ -104,8 +104,11 @@ final class DefInfo(defInfo: Option[DefInfo]) {
 
   defInfo match {
     case Some(di) => {
+      v_raw ++= di.v_raw
       v_map ++= di.v_map
+      s_raw ++= di.s_raw
       s_map ++= di.s_map
+      p_raw ++= di.p_raw
       p_map ++= di.p_map
     }
     case None =>
