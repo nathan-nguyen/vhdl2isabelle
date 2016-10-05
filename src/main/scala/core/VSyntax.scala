@@ -4,7 +4,7 @@ import sg.edu.ntu.hchen.VHDLParser._
 
 import scala.collection.JavaConversions._
 
-///////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VLabelColon(id: String)
 
@@ -14,7 +14,7 @@ object VLabelColon {
   }
 }
 
-///////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 import core.V2IUtils._
 
@@ -30,7 +30,7 @@ object VConstDecl {
 }
 
 
-///////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VSignalDecl(idList: List[String], subtypeInd: VSubtypeInd,
                        signalKind: Option[String], exp: Option[VExp])
@@ -45,7 +45,7 @@ object VSignalDecl {
   }
 }
 
-///////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VInterfaceSignalDecl(idList: List[String], subtypeInd: VSubtypeInd, vExp: Option[VExp])
 
@@ -82,7 +82,7 @@ object VInterfacePortDecl {
   }
 }
 
-///////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class VTarget {
   def getInfo(defInfo: DefInfo): (VSelectedName, Option[Discrete_range]) = this match {
@@ -135,7 +135,7 @@ case class VTargetN(name: VName) extends VTarget
 
 case class VTargetAggregate(aggregate: VAggregate) extends VTarget
 
-//////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class VDelay
 
@@ -166,7 +166,7 @@ object VOpts {
   }
 }
 
-//////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 /**
   * 2nd exp is "after", not useful?
   */
@@ -261,7 +261,7 @@ object VCondWaveForms {
 
 }
 
-//////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VSelectedWaveForm(waveForm: VWaveForm, choices: VChoices,
                              waveFormOpt: Option[VWaveForm], choicesOpt: Option[VChoices])
@@ -286,7 +286,7 @@ object VSelectedSignalAssign {
   }
 }
 
-//////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VCondSignalAssign(vTarget: VTarget, opts: VOpts, conditionalWaveforms: VCondWaveForms) {
   def toI(defInfo: DefInfo): (SP_clhs, List[As_when], Crhs) = {
@@ -306,7 +306,7 @@ object VCondSignalAssign {
   }
 }
 
-//////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class VConcSignalAssignStat {
   def toI(defInfo: DefInfo): Csc_ca
@@ -343,7 +343,7 @@ case class VConcSignalAssignStatS(labelColon: Option[String],
 }
 
 
-///////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 case class VVarDecl(shared: Boolean, idList: List[String],
                     subtypeInd: VSubtypeInd, vExp: Option[VExp])
 
@@ -357,7 +357,7 @@ object VVarDecl {
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VSubProgDecl(vSubProgSpec: VSubProgSpec)
 
@@ -368,7 +368,7 @@ object VSubProgDecl {
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class VSubProgSpec
 
@@ -380,7 +380,7 @@ case class VProcSpec() extends VSubProgSpec
 
 case class VFuncSpec() extends VSubProgSpec
 
-////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VSubProgBody()
 
@@ -390,7 +390,7 @@ object VSubProgBody {
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VTypeDecl(id: String, vTypeDef: Option[VTypeDef])
 
@@ -402,7 +402,7 @@ object VTypeDecl {
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VFileDecl()
 
@@ -412,7 +412,7 @@ object VFileDecl {
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VAliasDecl()
 
@@ -422,7 +422,8 @@ object VAliasDecl {
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
+
 case class VAttrDecl()
 
 object VAttrDecl {
@@ -431,7 +432,8 @@ object VAttrDecl {
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
+
 case class VAttrSpec()
 
 object VAttrSpec {
@@ -440,21 +442,23 @@ object VAttrSpec {
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
+
 case class VUseClause()
 
 object VUseClause {
   def apply(ctx: Use_clauseContext): VUseClause = ???
 }
 
-////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
+
 case class VGrpTempDecl()
 
 object VGrpTempDecl {
   def apply(ctx: Group_template_declarationContext): VGrpTempDecl = ???
 }
 
-////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VGrpDecl()
 
@@ -462,7 +466,8 @@ object VGrpDecl {
   def apply(ctx: Group_declarationContext): VGrpDecl = ???
 }
 
-////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
+
 sealed abstract class VProcDeclItem
 
 object VProcDeclItem {
@@ -535,7 +540,7 @@ case class VProcDeclGTD(grpTemplDecl: VGrpTempDecl) extends VProcDeclItem
 
 case class VProcDeclGD(grpDecl: VGrpDecl) extends VProcDeclItem
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class VSeqStat {
   def toI(defInfo: DefInfo): Seq_stmt_complex
@@ -587,7 +592,7 @@ object VSeqStat {
   }
 }
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VSensitiveList(nameList: List[VName]) {
   // from list, checked from table
@@ -722,7 +727,6 @@ object VSignalAssignStat {
 case class VVarAssignStat(labelColon: Option[String], target: VTarget, exp: VExp) extends VSeqStat {
   override def toI(defInfo: DefInfo): Seq_stmt_complex = {
     val id = labelColon.getOrElse(defaultId)
-    //////////////////////////////////////
     val v_clhs = target.toI_V_Clhs(defInfo)
     // TODO
     // rhs may still have inconsistencies from vhdl to isar
@@ -818,7 +822,8 @@ object VIfStat {
 
 }
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
+
 case class VCaseStatAlt(choices: VChoices, seqOfStats: VSeqOfStats) {
   def toI(defInfo: DefInfo): Ssc_when = {
     val exps = choices.choiceList.map(_.getSimplExp.toIExp(defInfo))
@@ -843,7 +848,7 @@ case class VCaseStat(labelColon: Option[String],
   override def toI(defInfo: DefInfo): Seq_stmt_complex = {
     val id = labelColon.orElse(vId).getOrElse(defaultId)
     val cond = exp.toIExp(defInfo)
-    /// TODO may need to ensure default case only deal with one "choice"
+    // TODO: may need to ensure default case only deal with one "choice"
     val lastCase = caseStatAltList.last
     val (when_complexList: List[Ssc_when], defaultList: List[Seq_stmt_complex]) =
       lastCase.choices.choiceList.head match {
@@ -875,7 +880,7 @@ object VCaseStat {
   }
 }
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class VIterScheme
 
@@ -898,7 +903,7 @@ object VLoopStat {
   }
 }
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VNextStat(labelColon: Option[String], id: Option[String], cond: Option[VExp]) extends VSeqStat {
   override def toI(defInfo: DefInfo): Seq_stmt_complex = ???
@@ -935,7 +940,7 @@ case class VNullStat(labelColon: Option[String]) extends VSeqStat {
   override def toI(defInfo: DefInfo): Seq_stmt_complex = ???
 }
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VBreakSelectorClause(name: VName)
 
@@ -981,7 +986,8 @@ object VBreakStat {
   }
 }
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
+
 case class VProcCallStat(labelColon: Option[String], procCall: VProcCall) extends VSeqStat {
   override def toI(defInfo: DefInfo): Seq_stmt_complex = ???
 }
@@ -994,7 +1000,8 @@ object VProcCallStat {
   }
 }
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
+
 case class VProcStatPart(seqStatList: List[VSeqStat]) {
   def toI(defInfo: DefInfo): List[Seq_stmt_complex] = {
     seqStatList.map(_.toI(defInfo))
@@ -1059,7 +1066,7 @@ object VProcStat {
   }
 }
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class VFormalPart
 
@@ -1146,7 +1153,7 @@ object VProcCall {
   }
 }
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class VGenScheme {
   def toI(defInfo: DefInfo): Gen_type = this match {
@@ -1186,7 +1193,8 @@ case class VGenSchemeFor(paramSpec: VParamSpec) extends VGenScheme
 
 case class VGenSchemeIf(cond: VExp) extends VGenScheme
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
+
 case class VComponentDecl()
 
 object VComponentDecl {
@@ -1251,7 +1259,7 @@ object VTermDecl {
   }
 }
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed trait VBlockDeclItem {
 }
@@ -1382,7 +1390,7 @@ object VSubtypeDecl {
   }
 }
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VGenericList(vInterfaceConstDeclList: List[VInterfaceConstDecl]) {
   require(vInterfaceConstDeclList.nonEmpty)
@@ -1504,7 +1512,7 @@ object VBlockStat {
 }
 
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VCompInsStat()
 
@@ -1522,7 +1530,7 @@ object VSimuStat {
   }
 }
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VConcProcCallStat(labelColon: Option[String],
                              procCall: VProcCall)
@@ -1570,7 +1578,7 @@ object VConcBreakStat {
   }
 }
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class VArchStat {
   def toI(defInfo: DefInfo): Conc_stmt_complex = this match {
@@ -1636,7 +1644,8 @@ case class VArchStatCBS(vConcBreakStat: VConcBreakStat) extends VArchStat
 
 case class VArchStatSS(vSimuStat: VSimuStat) extends VArchStat
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
+
 case class VGenStat(labelColon: Option[String],
                     genScheme: VGenScheme,
                     blockDeclItemList: List[VBlockDeclItem],

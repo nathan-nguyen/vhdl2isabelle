@@ -5,16 +5,22 @@ import scala.language.implicitConversions
 case class IEnv_sp(signalList: List[Signal], portList: List[Port], spnlList: List[SPnl]) {
 
   override def toString: String = {
-    s"""${signalList.map(_.as_list).mkString("@")}
-       |@${portList.map(_.as_list).mkString("@")}
-       |@${spnlList.map(_.as_list).mkString("@")}""".stripMargin
+    val signalListNotEmpty  = signalList.map(_.as_list).size  > 0
+    val portListNotEmpty    = portList.map(_.as_list).size    > 0
+    val spnlListNotEmpty    = spnlList.map(_.as_list).size    > 0
+    val firstSeparator     = if (signalListNotEmpty && (portListNotEmpty || spnlListNotEmpty)) "@" else ""
+    val secondSeparator    = if ((signalListNotEmpty || spnlListNotEmpty) && spnlListNotEmpty) "@" else ""
+    s"""${signalList.map(_.as_list).mkString("@")}${firstSeparator}
+        ${portList.map(_.as_list).mkString("@")}${secondSeparator}
+        ${spnlList.map(_.as_list).mkString("@")}""".stripMargin
   }
 }
 
 case class IEnv_v(variableList: List[Variable], vnlList: List[Vnl]) {
   override def toString: String = {
-    s"""${variableList.map(_.as_list).mkString("@")}
-       |@${vnlList.map(_.as_list) mkString ("@")}""".stripMargin
+    val separatorString = if (variableList.map(_.as_list).size > 0 && vnlList.map(_.as_list).size > 0) "@" else ""
+    s"""${variableList.map(_.as_list).mkString("@")}${separatorString}
+        ${vnlList.map(_.as_list) mkString ("@")}""".stripMargin
   }
 }
 
@@ -45,10 +51,7 @@ case class IResFn() {
   override def toString = "λx.(None)"
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class SP_clhs {
   override def toString = this match {
@@ -61,11 +64,11 @@ case class Clhs_sp(sp_clhs: SP_lhs) extends SP_clhs
 
 case class Clhs_spr(spl: SPl) extends SP_clhs
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class Sensitivity_list()
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class Discrete_range {
   override def toString = this match {
@@ -78,7 +81,7 @@ case class VHDL_dis_to(l: IExp, r: IExp) extends Discrete_range
 
 case class VHDL_dis_downto(l: IExp, r: IExp) extends Discrete_range
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class SP_lhs {
   // since "Nil" case is wrapped inside "SigPrt", it cannot be directly used with "sn.isar_sp"
@@ -98,7 +101,7 @@ case class Lhs_s(sigPrt: SigPrt, sn: VSelectedName) extends SP_lhs
 
 case class Lhs_sa(sigPrt: SigPrt, discreteRange: Discrete_range, sn: VSelectedName) extends SP_lhs
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class V_lhs {
   override def toString = this match {
@@ -117,7 +120,7 @@ case class Lhs_v(variable: Variable, sn: VSelectedName) extends V_lhs
 
 case class Lhs_va(variable: Variable, discreteRange: Discrete_range, sn: VSelectedName) extends V_lhs
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class Asmt_rhs {
   override def toString = this match {
@@ -130,7 +133,7 @@ case class Rhs_e(exp: IExp) extends Asmt_rhs
 
 case class Rhs_o(exp: IExp) extends Asmt_rhs
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class Seq_stmt {
   override def toString = this match {
@@ -158,7 +161,7 @@ case class Sst_e(id: String, cond: IExp) extends Seq_stmt
 
 case object Sst_nl extends Seq_stmt
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class Rhsl {
   override def toString = this match {
@@ -187,7 +190,7 @@ case class Rl_vl(vl: Vl) extends Rhsl
 
 //case class Rnl(rhslList: List[Rhsl]) extends Rhsl
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 sealed abstract class Crhs {
   override def toString = this match {
     case Crhs_e(asmt_rhs) => s"(crhs_e ${asmt_rhs})"
@@ -200,7 +203,7 @@ case class Crhs_e(asmt_rhs: Asmt_rhs) extends Crhs
 
 case class Crhs_r(rhsl: Rhsl) extends Crhs
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 sealed abstract class V_clhs {
   override def toString = this match {
     case Clhs_v(v_lhs) => s"(clhs_v ${v_lhs})"
@@ -212,7 +215,7 @@ case class Clhs_v(v_lhs: V_lhs) extends V_clhs
 
 case class Clhs_vr(vl: Vl) extends V_clhs
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class IChoices(expList: List[IExp])
 
@@ -268,7 +271,7 @@ case class Ssc_e(id: IdTy, tId: IdTy, cond: IExp) extends Seq_stmt_complex
 
 case object Ssc_nl extends Seq_stmt_complex
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class Gen_type {
   override def toString = this match {
@@ -282,7 +285,7 @@ case class For_gen(exp: IExp, discrete_range: Discrete_range) extends Gen_type
 
 case class If_gen(exp: IExp) extends Gen_type
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class As_when(crhs: Crhs, cond: IExp) {
   override def toString = s"(${crhs} WHEN ${cond} ELSE)"
@@ -316,7 +319,7 @@ case class Csc_ca(id: IdTy, sp_clhs: SP_clhs, casmt_rhsList: List[As_when], crhs
 case class Csc_gen(id: IdTy, gen_type: Gen_type,
                    conc_stmt_complexList: List[Conc_stmt_complex]) extends Conc_stmt_complex
 
-//////////////////////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 // it is an IDef however not treated so
 case class IEntity(id: String, env: IEnv, resFn: IResFn, conc_stmt_complexList: List[Conc_stmt_complex]) {

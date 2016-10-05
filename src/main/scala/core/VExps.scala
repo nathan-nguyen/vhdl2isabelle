@@ -119,7 +119,7 @@ case class VLiteralS(s: String) extends VLiteral {
 
 }
 
-//////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 sealed abstract class VLiteralEnum(s: String) extends VLiteral
 
 object VLiteralEnum {
@@ -138,7 +138,7 @@ case class VLiteralEnumId(identifier: String) extends VLiteralEnum(identifier)
 
 case class VLiteralEnumChar(s: String) extends VLiteralEnum(s)
 
-///////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class VLiteralNum extends VLiteral {
   val s: String
@@ -190,7 +190,7 @@ object VLiteralNumPhy {
   }
 }
 
-//////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VBaseUnitDecl(id: String)
 

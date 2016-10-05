@@ -5,7 +5,7 @@ package core
   */
 final case class MetaData(itemId: String, valType: VValType, initVal: IExp)
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class Variable(id: String, valType: VBaseType, iExp: IExp) extends V_IDef {
   override def toString = s"""(''${id}'', ${VHDLize(valType)}, ${iExp})"""
@@ -38,9 +38,9 @@ sealed trait Vl extends V_IDef {
   }
 
   def as_definition: String = this match {
-    /// "variable", this case should never be called
+    // "variable", this case should never be called
     case Vl_v(v) => v.as_definition
-    /// becomes "vl"
+    // becomes "vl"
     case Vnl(id, _) => {
       s"""definition ${id}:: \"vl\" where
           |\"${id} ≡ ${toString}\"""".stripMargin
@@ -102,9 +102,7 @@ object Vnl {
   }
 }
 
-/////////////////////////////////////////////////////////////////////////////////
-
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed trait IDef {
   def as_definition: String
@@ -224,7 +222,7 @@ object SPnl {
   }
 }
 
-//////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 object SignalKind extends Enumeration {
   type Ty = Value
@@ -276,7 +274,7 @@ case class Port(id: String, valType: VBaseType, iExp: IExp, mode: PortMode.Ty, c
 
 }
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class SigPrt {
   override def toString = this match {
@@ -302,4 +300,4 @@ case class SP_p(iPort: Port, sn: VSelectedName) extends SigPrt
 // FAKE sp_of_spl
 case class SP_spl(spl: SPl) extends SigPrt
 
-/////////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//

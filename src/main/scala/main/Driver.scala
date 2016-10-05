@@ -17,7 +17,7 @@ object Driver {
   }
 
   def main(args: Array[String]) {
-    val inFile = getInFile("simple.vhd")
+    val inFile = getInFile("sample.vhd")
     val transfer = new VITran(inFile, Some(preInfo))
     transfer.dump(getOutDir)
   }

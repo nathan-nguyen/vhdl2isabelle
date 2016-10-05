@@ -23,7 +23,7 @@ class VITran(inFile: String, vInfo: Option[VInfo]) {
       val pos = fileName.lastIndexOf(".")
       if (pos > 0) fileName.substring(0, pos) else fileName
     }
-    s"VVV_${vhdlName}"
+    s"VHDL2Isabelle_${vhdlName}"
   }
 
   val parser = {

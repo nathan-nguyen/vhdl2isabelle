@@ -1,6 +1,6 @@
 package core
 
-////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class IConst {
 
@@ -44,7 +44,7 @@ case class IConstRL_raw(valType: VVectorType, iConstList: List[IConst]) extends 
 case class IConstRL_gen(valType: VVectorType, length: Int, rawVal: Char) extends IConstRL
 
 
-////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed trait ExpKind {
   def isV = this match {
@@ -64,7 +64,7 @@ case object ExpVectorKindDT extends ExpVectorKind
 
 case object ExpUnknownKind extends ExpKind
 
-////////////////////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed abstract class IExp {
   val expKind: ExpKind
@@ -143,13 +143,13 @@ case class IBexps(e1: IExp, op: VShiftOp.Ty, e2: IExp) extends IExp {
 
 sealed abstract class IBexpa extends IExp
 
-// factor arighmetic
+// factor arithmetic
 case class IBexpfa(e1: IExp, op: VFactorOp.Ty, e2: IExp) extends IBexpa {
   require(e1.expKind == e2.expKind)
   val expKind: ExpKind = e1.expKind
 }
 
-// term arighmetic
+// term arithmetic
 case class IBexpta(e1: IExp, op: VTermOp.Ty, e2: IExp) extends IBexpa {
   require(e1.expKind == e2.expKind, s"\n${e1}, ${e1.expKind}, \n${e2}, ${e2.expKind}")
 //  if (e1.expKind != e2.expKind) handleExpKindMismatch(e1, e2, s"${toString}")

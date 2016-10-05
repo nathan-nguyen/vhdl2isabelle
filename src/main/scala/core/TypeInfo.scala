@@ -2,12 +2,10 @@ package core
 
 import scala.collection.mutable
 
-///////////////////////////////////////////////////////////////
 /**
   * it's about the type information for variables defined in isar,
   * which has nothing to do with entity generation
   */
-///////////////////////////////////////////////////////////////
 
 /**
   * 3 kinds of types <---
@@ -112,7 +110,7 @@ case class VVectorType(s: String) extends VBaseType {
     }
   }
 
-  // this has something to do with TO/DOWNTO but not about "character"/"std_logic"/"std_ulogic"
+  // This has something to do with TO/DOWNTO but not about "character"/"std_logic"/"std_ulogic"
   def guessInitVal(range: VRangeV, rawVal: Char = '0'): IExp_con = {
     val length = Math.abs(range.l.toInt - range.r.toInt) + 1
     range.rangeD match {
