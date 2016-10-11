@@ -63,11 +63,17 @@ sealed abstract class VLiteral {
     VHDL_dis_downto(e, e)
   }
 
+  //
   def asVal: String = this match {
     case VLiteralNumInt(s) => s
     case VLiteralNumReal(s) => s
     case VLiteralNumBase(s) => s
-    case VLiteralEnumId(s) => s
+    case VLiteralEnumId(s) => {
+      ConstantValueMapping.integer_constant_mapping.get(s) match{
+        case Some(value) => value
+        case None => s
+      }
+    }
     case VLiteralEnumChar(s) => s
     case _ => unknownString
   }
@@ -210,7 +216,7 @@ object VSecondaryUnitDecl {
   }
 }
 
-//////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 sealed trait VTypeDef
 
 object VTypeDef {
@@ -372,7 +378,7 @@ object VRecordTypeDef {
   }
 }
 
-//////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 abstract class VChoice {
   def getSimplExp: VSimpleExp = this match {
@@ -416,7 +422,7 @@ object VChoices {
   }
 }
 
-////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VElemAssoc(choices: Option[VChoices], expr: VExp)
 
@@ -564,13 +570,13 @@ case class VPrimaryAggregate(aggregate: VAggregate) extends VPrimary
 
 case class VPrimaryName(name: VName) extends VPrimary
 
-// just a hack
+// [HC] Just a hack
 case class VSuffix(s: String) {
   override def toString = s"${s}"
 }
 
 
-// perhaps needing separation
+// [HC] Perhaps needing separation
 sealed abstract class VName {
 
   def getSimpleNameOpt: Option[String] = this match {
@@ -837,9 +843,7 @@ object VNameParts {
   }
 }
 
-///////////////////////////////////////////////////////////////
-
-////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed trait VAliasIndication
 
@@ -897,7 +901,7 @@ case class VRangeE(explicitRange: VExplicitRange) extends VRange
 case class VRangeN(name: String) extends VRange
 
 
-////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed trait VDiscreteRange {
   def getRange: VRangeV = this match {
@@ -925,7 +929,7 @@ case class VDiscreteRangeR(range: VRange) extends VDiscreteRange
 
 case class VDiscreteRangeSub(subtypeInd: VSubtypeInd) extends VDiscreteRange
 
-////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 
 sealed trait VConstraint {
@@ -995,7 +999,7 @@ object VExplicitRange {
 }
 
 
-////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 abstract class VFactor {
   def toIExp(defInfo: DefInfo): IExp = this match {
@@ -1093,7 +1097,8 @@ object VTerm {
   }
 }
 
-///////////////////////////////////////////////////
+//********************************************************************************************************************//
+
 object VUop extends Enumeration {
   type Ty = Value
   val abs = Value("[abs]")
@@ -1102,7 +1107,7 @@ object VUop extends Enumeration {
   val pos = Value("[+:]")
 }
 
-///////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 sealed trait VAOp
 
@@ -1140,7 +1145,7 @@ object VFactorOp extends Enumeration with VAOp {
   }
 }
 
-////////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 case class VSimpleExp(termSign: Option[String], term: VTerm, ops: List[VTermOp.Ty], others: List[VTerm]) {
 
@@ -1187,8 +1192,8 @@ case class VSimpleExp(termSign: Option[String], term: VTerm, ops: List[VTermOp.T
       ops.zip(others).foldLeft((sign + term.asVal).toInt)((acc, cur) => {
         val f = cur._2.asVal.toInt
         cur._1 match {
-          case `plus` => acc * f
-          case `minus` => acc / f
+          case `plus` => acc + f
+          case `minus` => acc - f
           case `ampersand` => throw VIError
         }
       }).toString
@@ -1211,7 +1216,8 @@ object VSimpleExp {
   }
 }
 
-///////////////////////////////////////////////////////////
+//********************************************************************************************************************//
+
 object VShiftOp extends Enumeration {
   type Ty = Value
   val sll = Value("[sll]")
@@ -1232,7 +1238,7 @@ object VShiftOp extends Enumeration {
   }
 }
 
-///////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 object VLogicOp extends Enumeration {
   type Ty = Value
@@ -1254,7 +1260,7 @@ object VLogicOp extends Enumeration {
   }
 }
 
-///////////////////////////////////////////////////////////
+//********************************************************************************************************************//
 
 object VRelationOp extends Enumeration {
   type Ty = Value
@@ -1357,7 +1363,7 @@ case class VExp(relation: VRelation, ops: List[VLogicOp.Ty], others: List[VRelat
     case None => throw VIError
   }
 
-  // for rhs (exp)
+  // For rhs (exp)
   def rhs_IDef(defInfo: DefInfo): IDef = {
     val literal = getLiteral match {
       case Some(l) => l

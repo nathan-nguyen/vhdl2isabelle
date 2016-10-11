@@ -1,0 +1,29 @@
+Fixed:
+
+(V2I-000) Constant in pre.vhd are not included when parsing main vhd file
+Example in pre.vhd:
+constant IDBITS : integer := 32;
+IDBITS is defined in pre.vhd but cannot be used in main vhd file
+
+(V2I-001) Separators between signalList, portList, variableList, vnlList declaration are not display correctly when one of these list is empty
+
+(V2I-002) Cannot declare record with element that has range is defined by a constant
+Example:
+constant IDBITS : integer := 32;
+type icache_out_type is record
+  diagdata         : std_logic_vector(IDBITS-1 downto 0);  -- diagnostic data
+end record;
+
+(V2I-003) Operator not correct
+Example:
+constant IDBITS : integer := 32;
+type icache_out_type is record
+  diagdata         : std_logic_vector(IDBITS-1 downto 0);  -- diagnostic data
+end record;
+To Isabelle -> 32
+type icache_out_type is record
+  diagdata         : std_logic_vector(IDBITS+1 downto 0);  -- diagnostic data
+end record;
+To Isabelle -> 34
+
+Not Fixed:

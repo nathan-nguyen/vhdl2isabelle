@@ -51,12 +51,7 @@ entity iu3 is
     --tbi   : out tracebuf_in_type;
     --tbo_2p : in  tracebuf_2p_out_type;
     --tbi_2p : out tracebuf_2p_in_type;
-    sclk   : in  std_ulogic;
-
-
-
-
-    idbits_out : out integer
+    sclk   : in  std_ulogic
     );
 
 
@@ -64,37 +59,6 @@ entity iu3 is
 end;
 
 architecture rtl of iu3 is
-  type div_regtype is record
-    x      : std_logic_vector(64 downto 0);
-    --x      : std_logic_vector(IDBITS downto 0);
-    state  : std_logic_vector(2 downto 0);
-    zero   : std_logic;
-    zero2  : std_logic;
-    qcorr  : std_logic;
-    zcorr  : std_logic;
-    qzero  : std_logic;
-    qmsb   : std_logic;
-    ovf    : std_logic;
-    neg    : std_logic;
-    cnt    : std_logic_vector(4 downto 0);
-  end record;
-
-  constant RRES : div_regtype := (
-    x      => (others => '0'),
-    state  => (others => '0'),
-    zero   => '0',
-    zero2  => '0',
-    qcorr  => '0',
-    zcorr  => '0',
-    qzero  => '0',
-    qmsb   => '0',
-    ovf    => '0',
-    neg    => '0',
-    cnt    => (others => '0'));
 
 begin
-  stimulus : process
-    begin
-      idbits_out <= IDBITS - 1;
-    end process stimulus;
-end rtl;
+end;

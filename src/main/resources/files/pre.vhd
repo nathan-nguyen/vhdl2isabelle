@@ -36,7 +36,7 @@ type icache_in_type is record
      hold             : std_ulogic;
      flush            : std_ulogic;                             -- flush in progress
      diagrdy          : std_ulogic;                             -- diagnostic access ready
-     --diagdata         : std_logic_vector(IDBITS-1 downto 0);  -- diagnostic data
+     diagdata         : std_logic_vector(IDBITS+1 downto 0);    -- diagnostic data
      mds              : std_ulogic;                             -- memory data strobe
      cfg              : std_logic_vector(31 downto 0);
      idle             : std_ulogic;                             -- idle mode

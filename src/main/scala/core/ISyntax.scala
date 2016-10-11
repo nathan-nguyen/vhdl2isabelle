@@ -103,15 +103,15 @@ sealed abstract class IExp {
 
   def crhs_e_rhso: Crhs_e = Crhs_e(Rhs_o(this))
 
-  // implemented outside
+  // Implemented outside
   def crhs_r(defInfo: DefInfo): Crhs_r = ???
 
 }
 
 case class IExp_con(baseType: VBaseType, const: IConst, expKind: ExpKind) extends IExp
 
-// for storing identifiers
-// different from isar, it must be a defined "variable"
+// For storing identifiers
+// Different from Isabelle, it must be a defined "variable"
 case class IExp_var(variable: Variable, expKind: ExpKind) extends IExp
 
 case class IExp_sig(signal: Signal, expKind: ExpKind) extends IExp
@@ -122,20 +122,20 @@ case class IUexp(op: VUop.Ty, e: IExp) extends IExp {
   val expKind: ExpKind = e.expKind
 }
 
-// logic
+// Logic
 case class IBexpl(e1: IExp, op: VLogicOp.Ty, e2: IExp) extends IExp {
   require(e1.expKind == e2.expKind)
   val expKind: ExpKind = e1.expKind
 }
 
-// relation
+// Relation
 case class IBexpr(e1: IExp, op: VRelationOp.Ty, e2: IExp) extends IExp {
   require(e1.expKind == e2.expKind, s"\n${e1}, ${e1.expKind}\n${e2}, ${e2.expKind}")
-//  if (e1.expKind != e2.expKind) handleExpKindMismatch(e1, e2, s"${toString}")
+  // if (e1.expKind != e2.expKind) handleExpKindMismatch(e1, e2, s"${toString}")
   val expKind: ExpKind = ExpScalarKind
 }
 
-// shift
+// Shift
 case class IBexps(e1: IExp, op: VShiftOp.Ty, e2: IExp) extends IExp {
   require(e1.expKind == e2.expKind)
   val expKind: ExpKind = e1.expKind
@@ -143,16 +143,16 @@ case class IBexps(e1: IExp, op: VShiftOp.Ty, e2: IExp) extends IExp {
 
 sealed abstract class IBexpa extends IExp
 
-// factor arithmetic
+// Factor arithmetic
 case class IBexpfa(e1: IExp, op: VFactorOp.Ty, e2: IExp) extends IBexpa {
   require(e1.expKind == e2.expKind)
   val expKind: ExpKind = e1.expKind
 }
 
-// term arithmetic
+// Term arithmetic
 case class IBexpta(e1: IExp, op: VTermOp.Ty, e2: IExp) extends IBexpa {
   require(e1.expKind == e2.expKind, s"\n${e1}, ${e1.expKind}, \n${e2}, ${e2.expKind}")
-//  if (e1.expKind != e2.expKind) handleExpKindMismatch(e1, e2, s"${toString}")
+  // if (e1.expKind != e2.expKind) handleExpKindMismatch(e1, e2, s"${toString}")
   val expKind: ExpKind = e1.expKind
 }
 
@@ -177,7 +177,7 @@ case class IExp_trl(e: IExp) extends IExp {
   val expKind: ExpKind = ExpVectorKindDT
 }
 
-// fake IExp to convert vl/spl to IExp
+// Fake IExp to convert vl/spl to IExp
 
 case class IExp_vl_rhs(v: V_IDef, sn: VSelectedName, expKind: ExpKind) extends IExp
 

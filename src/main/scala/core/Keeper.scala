@@ -19,7 +19,10 @@ abstract class Keeper(vInfo: Option[VInfo]) {
     valType match {
       case bt: VBaseType => {
         val initVal = bt match {
-          case st: VScalarType => st.getInitVal(expOption)(defInfo)
+          case st: VScalarType => {
+            val constantValueMapping = ConstantValueMapping.getIntegerConstant(id, st, expOption, defInfo)
+            st.getInitVal(expOption)(defInfo)
+          }
           case vt: VVectorType => sti.getRange match {
             case Some(r) => {
               vt.getInitVal(r, expOption)
