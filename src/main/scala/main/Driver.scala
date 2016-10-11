@@ -6,7 +6,7 @@ object Driver {
 
   val userHome = System.getProperty("user.home")
 
-  def getInFile(fileName: String) = s"${userHome}/VHDL2Isabelle/vhdl2isar/src/main/resources/files/${fileName}"
+  def getInFile(fileName: String) = s"${userHome}/VHDL2Isabelle/vhdl2isabelle/src/main/resources/files/${fileName}"
 
   def getOutDir = s"${userHome}/VHDL2Isabelle/VHDLModel/VHDLModel/"
 
