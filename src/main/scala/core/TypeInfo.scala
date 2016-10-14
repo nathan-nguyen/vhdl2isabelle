@@ -112,15 +112,31 @@ case class VVectorType(s: String) extends VBaseType {
 
   // This has something to do with TO/DOWNTO but not about "character"/"std_logic"/"std_ulogic"
   def guessInitVal(range: VRangeV, rawVal: Char = '0'): IExp_con = {
-    val length = Math.abs(range.l.toInt - range.r.toInt) + 1
-    range.rangeD match {
-      case RangeD.`to` => {
-        IExp_con(this, IConstL_gen(this, length, rawVal), ExpVectorKindT)
+    try {
+      range.rangeD match {
+        case RangeD.`to` => {
+          val length = range.r.toInt - range.l.toInt + 1;
+          IExp_con(this, IConstL_gen(this, length.toString, rawVal), ExpVectorKindT)
+        }
+        case RangeD.`downto` => {
+          val length = range.l.toInt - range.r.toInt + 1
+          IExp_con(this, IConstRL_gen(this, length.toString, rawVal), ExpVectorKindDT)
+        }
+        case RangeD.`unkown` => handler(s"${range}")
       }
-      case RangeD.`downto` => {
-        IExp_con(this, IConstRL_gen(this, length, rawVal), ExpVectorKindDT)
+    } catch {
+      case nfe : NumberFormatException => {
+        range.rangeD match {
+          case RangeD.`to` => {
+            IExp_con(this, IConstL_gen(this, s"(${range.r} - ${range.l} + 1)", rawVal), ExpVectorKindT)
+          }
+          case RangeD.`downto` => {
+            IExp_con(this, IConstRL_gen(this, s"(${range.l} - ${range.r} + 1)", rawVal), ExpVectorKindDT)
+          }
+          case RangeD.`unkown` => handler(s"${range}")
+        }
       }
-      case RangeD.`unkown` => handler(s"${range}")
+      case e : Exception => ???
     }
   }
 }

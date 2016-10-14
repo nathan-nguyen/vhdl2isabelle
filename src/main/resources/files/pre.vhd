@@ -11,10 +11,10 @@ type boolean is (false,true);
 -- IDBITS ; cword ; cdatatype ; icache_in_type ; icache_out_type
 -----------------------------------------------------------------------------
 
-  constant IDBITS : integer := 32;
+constant IDBITS : integer := 32;
 
-  --subtype cword is std_logic_vector(IDBITS-1 downto 0);
-  --type cdatatype is array (0 to 3) of cword;
+--subtype cword is std_logic_vector(IDBITS-1 downto 0);
+--type cdatatype is array (0 to 3) of cword;
 
 type icache_in_type is record
      rpc              : std_logic_vector(31 downto 0);  -- raw address (npc)

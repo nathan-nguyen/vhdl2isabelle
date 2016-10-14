@@ -10,7 +10,7 @@ import core._
 import sg.edu.ntu.hchen.{VHDLLexer, VHDLParser}
 import utils.PErrorListener
 
-class VITran(inFile: String, vInfo: Option[VInfo]) {
+class VITranslator(inFile: String, vInfo: Option[VInfo]) {
 
   val logger = LoggerFactory.getLogger(getClass)
 

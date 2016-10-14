@@ -4,7 +4,7 @@ package core
 
 sealed abstract class IConst {
 
-  def genInitVal(valType: VVectorType, length: Int, rawVal: Char = '0'): String = {
+  def generateInitialValue(valType: VVectorType, length: String, rawVal: Char = '0'): String = {
     val s = valType.s
     val numericVal = s"'${rawVal}'"
     val genCmd = s.substring(0, s.length - vectorFlag.length) + "_vec_gen"
@@ -16,11 +16,11 @@ sealed abstract class IConst {
     case IConstS(isarType, initVal) => s"(${isarType} ${initVal})"
     case l: IConstL => l match {
       case IConstL_raw(valType, iConstList) => s"(val_list ${iConstList.ISAR_r})"
-      case g@IConstL_gen(valType, length, rawVal) => s"(val_list ${genInitVal(valType, length, rawVal)})"
+      case g@IConstL_gen(valType, length, rawVal) => s"(val_list ${generateInitialValue(valType, length, rawVal)})"
     }
     case l: IConstRL => l match {
       case IConstRL_raw(valType, iConstList) => s"(val_rlist ${iConstList.ISAR_r})"
-      case g@IConstRL_gen(valType, length, rawVal) => s"(val_rlist ${genInitVal(valType, length, rawVal)})"
+      case g@IConstRL_gen(valType, length, rawVal) => s"(val_rlist ${generateInitialValue(valType, length, rawVal)})"
     }
   }
 }
@@ -33,7 +33,7 @@ sealed abstract class IConstL extends IConst {
 
 case class IConstL_raw(valType: VVectorType, iConstList: List[IConst]) extends IConstL
 
-case class IConstL_gen(valType: VVectorType, length: Int, rawVal: Char) extends IConstL
+case class IConstL_gen(valType: VVectorType, length: String, rawVal: Char) extends IConstL
 
 abstract class IConstRL extends IConst {
   val valType: VVectorType
@@ -41,7 +41,7 @@ abstract class IConstRL extends IConst {
 
 case class IConstRL_raw(valType: VVectorType, iConstList: List[IConst]) extends IConstRL
 
-case class IConstRL_gen(valType: VVectorType, length: Int, rawVal: Char) extends IConstRL
+case class IConstRL_gen(valType: VVectorType, length: String, rawVal: Char) extends IConstRL
 
 
 //********************************************************************************************************************//

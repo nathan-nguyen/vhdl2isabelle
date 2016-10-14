@@ -19,10 +19,7 @@ abstract class Keeper(vInfo: Option[VInfo]) {
     valType match {
       case bt: VBaseType => {
         val initVal = bt match {
-          case st: VScalarType => {
-            val constantValueMapping = ConstantValueMapping.getIntegerConstant(id, st, expOption, defInfo)
-            st.getInitVal(expOption)(defInfo)
-          }
+          case st: VScalarType => st.getInitVal(expOption)(defInfo)
           case vt: VVectorType => sti.getRange match {
             case Some(r) => {
               vt.getInitVal(r, expOption)
@@ -43,7 +40,7 @@ abstract class Keeper(vInfo: Option[VInfo]) {
     }
   }
 
-  def genIPort(id: String, expOption: Option[VExp], sti: VSubtypeInd, mode: PortMode.Ty, conn: PortConn.Ty): Unit = {
+  def generateIPort(id: String, expOption: Option[VExp], sti: VSubtypeInd, mode: PortMode.Ty, conn: PortConn.Ty): Unit = {
     val valType = VValType(sti.getSimpleName)
     valType match {
       case bt: VBaseType => {
@@ -54,7 +51,7 @@ abstract class Keeper(vInfo: Option[VInfo]) {
               vt.getInitVal(r, expOption)
             }
             case None => {
-              vt.guessInitVal(defaultRangeV(s"genIPort ${sti}"))
+              vt.guessInitVal(defaultRangeV(s"generateIPort ${sti}"))
             }
           }
         }

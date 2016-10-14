@@ -538,7 +538,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
       val mode = PortMode.withName(s"mode_${interfacePortDecl.mode}")
       val sti = interfacePortDecl.subtypeInd
       val expOption = interfacePortDecl.vExp
-      genIPort(id, expOption, sti, mode, PortConn.connected)
+      generateIPort(id, expOption, sti, mode, PortConn.connected)
     }
   }
 

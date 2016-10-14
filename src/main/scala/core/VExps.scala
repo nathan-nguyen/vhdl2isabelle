@@ -63,17 +63,12 @@ sealed abstract class VLiteral {
     VHDL_dis_downto(e, e)
   }
 
-  //
+  // [TN] Not sure this is a valid way to put get_init_val, should move to ISyntax
   def asVal: String = this match {
     case VLiteralNumInt(s) => s
     case VLiteralNumReal(s) => s
     case VLiteralNumBase(s) => s
-    case VLiteralEnumId(s) => {
-      ConstantValueMapping.integer_constant_mapping.get(s) match{
-        case Some(value) => value
-        case None => s
-      }
-    }
+    case VLiteralEnumId(s) => s"get_init_val ${s}"
     case VLiteralEnumChar(s) => s
     case _ => unknownString
   }
@@ -107,13 +102,13 @@ case class VLiteralS(s: String) extends VLiteral {
     val vt = valType.vectorize
     if (rangeTy.rangeD == RangeD.to) {
       if (ss.forall(_ == ss(0))) {
-        IExp_con(vt, IConstL_gen(vt, ss.length, ss(0)), ExpVectorKindT)
+        IExp_con(vt, IConstL_gen(vt, ss.length.toString, ss(0)), ExpVectorKindT)
       } else {
         IExp_con(vt, IConstL_raw(vt, iConstList), ExpVectorKindT)
       }
     } else if (rangeTy.rangeD == RangeD.downto) {
       if (ss.forall(_ == ss(0))) {
-        IExp_con(vt, IConstRL_gen(vt, ss.length, ss(0)), ExpVectorKindDT)
+        IExp_con(vt, IConstRL_gen(vt, ss.length.toString, ss(0)), ExpVectorKindDT)
       } else {
         IExp_con(vt, IConstRL_raw(vt, iConstList), ExpVectorKindDT)
       }
@@ -1070,7 +1065,7 @@ case class VTerm(factor: VFactor, ops: List[VFactorOp.Ty], others: List[VFactor]
     }
   }
 
-  //  FIXME rem is incorrect; generally, asVal SHOULDN'T be used
+  //  FIXME [HC] asVal should not be used
   def asVal: String = {
     import VFactorOp._
     try {
@@ -1080,11 +1075,22 @@ case class VTerm(factor: VFactor, ops: List[VFactorOp.Ty], others: List[VFactor]
           case `mul` => acc * f
           case `div` => acc / f
           case `mod` => acc % f
-          case `rem` => acc % f
+          case `rem` => ???
         }
       }).toString
     } catch {
-      case e: Exception => "???"
+      case nfe : NumberFormatException => {
+        ops.zip(others).foldLeft(factor.asVal)((acc, cur) => {
+          val f = cur._2.asVal
+          cur._1 match {
+            case `mul` => s"(${acc} * ${f})"
+            case `div` => ???
+            case `mod` => ???
+            case `rem` => ???
+          }
+        }).toString
+      }
+      case e: Exception => ???
     }
   }
 }
@@ -1198,6 +1204,17 @@ case class VSimpleExp(termSign: Option[String], term: VTerm, ops: List[VTermOp.T
         }
       }).toString
     } catch {
+      case nfe : NumberFormatException => {
+        // FIXME if sign is negative -> sign + term.asVal is syntax error in Isabelle
+        ops.zip(others).foldLeft((sign + term.asVal))((acc, cur) => {
+          val f = cur._2.asVal
+          cur._1 match {
+            case `plus` => s"(${acc} + ${f})"
+            case `minus` => s"(${acc} - ${f})"
+            case `ampersand` => throw VIError
+          }
+        }).toString
+      }
       case e: Throwable => s"???simpleExp"
     }
   }

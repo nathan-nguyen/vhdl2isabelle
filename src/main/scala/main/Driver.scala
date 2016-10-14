@@ -12,13 +12,13 @@ object Driver {
 
   def preInfo: VInfo = {
     val preFile = getInFile("pre.vhd")
-    val preTransfer = new VITran(preFile, None)
+    val preTransfer = new VITranslator(preFile, None)
     preTransfer.preInfo
   }
 
   def main(args: Array[String]) {
     val inFile = getInFile("sample.vhd")
-    val transfer = new VITran(inFile, Some(preInfo))
+    val transfer = new VITranslator(inFile, Some(preInfo))
     transfer.dump(getOutDir)
   }
 

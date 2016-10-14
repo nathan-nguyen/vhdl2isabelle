@@ -16,7 +16,7 @@ type icache_out_type is record
   diagdata         : std_logic_vector(IDBITS-1 downto 0);  -- diagnostic data
 end record;
 
-(V2I-003) Operator not correct
+(V2I-003) Operator not correct in record/element range declaration
 Example:
 constant IDBITS : integer := 32;
 type icache_out_type is record
@@ -28,6 +28,20 @@ type icache_out_type is record
 end record;
 To Isabelle -> 34
 
+(V2I-005) bug V2I-002 ; V2I-003 need to be modified to use get_init_val in Isabelle (No constant)
+
 /*********************************************************************************************************************/
 /***************************************************  NOT FIXED  *****************************************************/
 /*********************************************************************************************************************/
+
+(V2I-004) subtype declaration is not translated to Isabelle
+
+(V2I-006)
+
+(V2I-007)
+
+(V2I-008)
+
+(V2I-009)
+
+(V2I-010)
