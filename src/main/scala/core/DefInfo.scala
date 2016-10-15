@@ -94,8 +94,8 @@ final class DefInfo(defInfo: Option[DefInfo]) {
   def spnl_flatten(spnl: SPnl): (List[S_PTy], List[P_PTy]) = {
     def aux(sPnl: SPnl): List[(S_PTy, P_PTy)] = spnl.splList flatMap {
       case spnl: SPnl => aux(spnl)
-      case SPl_s(s) => List((s, null))
-      case SPl_p(p) => List((null, p))
+      case SPl_signal(s) => List((s, null))
+      case SPl_port(p) => List((null, p))
     }
     val (signalList, portList) = aux(spnl).unzip
     (signalList.filter(_ != null), portList.filter(_ != null))

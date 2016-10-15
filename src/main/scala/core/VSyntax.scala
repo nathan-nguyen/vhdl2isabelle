@@ -188,7 +188,7 @@ sealed abstract class VWaveForm {
     case VWaveFormU => handler(s"${VWaveFormU}")
   }
 
-  def getSpecialIExp(defInfo: DefInfo): IExp = getSpecialVExp.toIExp(defInfo)
+  def getSpecialIExp(defInfo: DefInfo): IsabelleExpression = getSpecialVExp.toIExp(defInfo)
 }
 
 object VWaveForm {
@@ -490,7 +490,7 @@ object VProcDeclItem {
     } else if (spBody != null) {
       VProcDeclItemSPB(VSubProgBody(spBody))
     } else if (typeDecl != null) {
-      VProcDeclItemSTD(VSubtypeDecl(subtypeDecl))
+      VProcDeclItemSTD(VSubtypeDeclaration(subtypeDecl))
     } else if (constDecl != null) {
       VProcDeclItemCD(VConstDecl(constDecl))
     } else if (varDecl != null) {
@@ -520,7 +520,7 @@ case class VProcDeclItemSPB(subProgBody: VSubProgBody) extends VProcDeclItem
 
 case class VProcDeclItemTD(typeDecl: VTypeDecl) extends VProcDeclItem
 
-case class VProcDeclItemSTD(subtypeDecl: VSubtypeDecl) extends VProcDeclItem
+case class VProcDeclItemSTD(subtypeDecl: VSubtypeDeclaration) extends VProcDeclItem
 
 case class VProcDeclItemCD(constDecl: VConstDecl) extends VProcDeclItem
 
@@ -1295,7 +1295,7 @@ object VBlockDeclItem {
     } else if (type_declaration != null) {
       VBlockDeclItemTD(VTypeDecl(type_declaration))
     } else if (subtype_declaration != null) {
-      VBlockDeclItemSTD(VSubtypeDecl(subtype_declaration))
+      VBlockDeclItemSTD(VSubtypeDeclaration(subtype_declaration))
     } else if (constant_declarationContext != null) {
       VBlockDeclItemCD(VConstDecl(constant_declarationContext))
     } else if (signal_declaration != null) {
@@ -1340,7 +1340,7 @@ case class VBlockDeclItemSPD(vSubProgDecl: VSubProgDecl) extends VBlockDeclItem
 
 case class VBlockDeclItemSPB(vSubProgBody: VSubProgBody) extends VBlockDeclItem
 
-case class VBlockDeclItemSTD(vSubtypeDecl: VSubtypeDecl) extends VBlockDeclItem
+case class VBlockDeclItemSTD(vSubtypeDecl: VSubtypeDeclaration) extends VBlockDeclItem
 
 case class VBlockDeclItemTD(vTypeDecl: VTypeDecl) extends VBlockDeclItem
 
@@ -1380,13 +1380,13 @@ case class VBlockDeclItemQD(vQuantityDecl: VQuantityDecl) extends VBlockDeclItem
 
 case class VBlockDeclItemTermD(VTermDecl: VTermDecl) extends VBlockDeclItem
 
-case class VSubtypeDecl(id: String, subtypeInd: VSubtypeInd)
+case class VSubtypeDeclaration(id: String, subtypeInd: VSubtypeInd)
 
-object VSubtypeDecl {
-  def apply(ctx: Subtype_declarationContext): VSubtypeDecl = {
+object VSubtypeDeclaration {
+  def apply(ctx: Subtype_declarationContext): VSubtypeDeclaration = {
     val id = ctx.identifier().getText
     val subtypeInd = VSubtypeInd(ctx.subtype_indication())
-    VSubtypeDecl(id, subtypeInd)
+    VSubtypeDeclaration(id, subtypeInd)
   }
 }
 

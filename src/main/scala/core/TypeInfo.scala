@@ -3,15 +3,15 @@ package core
 import scala.collection.mutable
 
 /**
-  * it's about the type information for variables defined in isar,
+  * it's about the type information for variables defined in isabelle,
   * which has nothing to do with entity generation
   */
 
 /**
   * 3 kinds of types <---
-  * - * scalar: integer, std_logic
-  * - * vector: std_ulogic_vector
-  * - + customized: div32_in_type
+  * - * scalar: integer, std_logic, std_ulogic
+  * - * vector: std_logic_vector, std_ulogic_vector
+  * - * customized:
   */
 sealed abstract class VValType {
   val s: String
@@ -47,7 +47,7 @@ case class VScalarType(s: String) extends VBaseType {
     VVectorType(s + vectorFlag)
   }
 
-  def guessInitVal: IExp_con = {
+  def guessInitVal: IExp_constant = {
     val iconstS = s match {
       case "integer" => IConstS("val_i", "0")
       case "real" => IConstS("val_r", "0.0")
@@ -57,10 +57,10 @@ case class VScalarType(s: String) extends VBaseType {
       case "std_logic" => IConstS("val_c", "(CHR ''0'')")
       case _ => handler(s"scalar unknown ${s}")
     }
-    IExp_con(this, iconstS, ExpScalarKind)
+    IExp_constant(this, iconstS, ExpScalarKind)
   }
 
-  def getInitValFromLiteral(v: String): IExp_con = {
+  def getInitValFromLiteral(v: String): IExp_constant = {
     val iconstS = s match {
       case "integer" => IConstS("val_i", v)
       case "real" => IConstS("val_r", v)
@@ -73,13 +73,13 @@ case class VScalarType(s: String) extends VBaseType {
       case `defaultCharType` => IConstS("val_c", s"(CHR '${v}')")
       case _ => handler(s"scalar unknown ${toString} (${v})")
     }
-    IExp_con(this, iconstS, ExpScalarKind)
+    IExp_constant(this, iconstS, ExpScalarKind)
   }
 
-  def getInitVal(expOption: Option[VExp])(defInfo: DefInfo): IExp = expOption match {
+  def getInitVal(expOption: Option[VExp])(defInfo: DefInfo): IsabelleExpression = expOption match {
     case Some(exp) => {
       val refined = exp.toIExp(defInfo) match {
-        case e: IExp_con => IExp_con(this, e.const, ExpScalarKind)
+        case e: IExp_constant => IExp_constant(this, e.const, ExpScalarKind)
         case o => o
       }
       val expRepr = refined.toString
@@ -99,7 +99,7 @@ case class VVectorType(s: String) extends VBaseType {
 
   def scalarize: VScalarType = VScalarType(s.substring(0, s.length - vectorFlag.length))
 
-  def getInitVal(r: VRangeV, expOption: Option[VExp]): IExp_con = {
+  def getInitVal(r: VRangeV, expOption: Option[VExp]): IExp_constant = {
     expOption match {
       case Some(vExp) => {
         val literalS = vExp.getLiteralS
@@ -111,16 +111,16 @@ case class VVectorType(s: String) extends VBaseType {
   }
 
   // This has something to do with TO/DOWNTO but not about "character"/"std_logic"/"std_ulogic"
-  def guessInitVal(range: VRangeV, rawVal: Char = '0'): IExp_con = {
+  def guessInitVal(range: VRangeV, rawVal: Char = '0'): IExp_constant = {
     try {
       range.rangeD match {
         case RangeD.`to` => {
           val length = range.r.toInt - range.l.toInt + 1;
-          IExp_con(this, IConstL_gen(this, length.toString, rawVal), ExpVectorKindT)
+          IExp_constant(this, IConstL_gen(this, length.toString, rawVal), ExpVectorKindTo)
         }
         case RangeD.`downto` => {
           val length = range.l.toInt - range.r.toInt + 1
-          IExp_con(this, IConstRL_gen(this, length.toString, rawVal), ExpVectorKindDT)
+          IExp_constant(this, IConstRL_gen(this, length.toString, rawVal), ExpVectorKindDownTo)
         }
         case RangeD.`unkown` => handler(s"${range}")
       }
@@ -128,10 +128,10 @@ case class VVectorType(s: String) extends VBaseType {
       case nfe : NumberFormatException => {
         range.rangeD match {
           case RangeD.`to` => {
-            IExp_con(this, IConstL_gen(this, s"(${range.r} - ${range.l} + 1)", rawVal), ExpVectorKindT)
+            IExp_constant(this, IConstL_gen(this, s"(${range.r} - ${range.l} + 1)", rawVal), ExpVectorKindTo)
           }
           case RangeD.`downto` => {
-            IExp_con(this, IConstRL_gen(this, s"(${range.l} - ${range.r} + 1)", rawVal), ExpVectorKindDT)
+            IExp_constant(this, IConstRL_gen(this, s"(${range.l} - ${range.r} + 1)", rawVal), ExpVectorKindDownTo)
           }
           case RangeD.`unkown` => handler(s"${range}")
         }
@@ -162,7 +162,7 @@ case class VCustomizedType(s: String) extends VValType {
         }
         case ct: VCustomizedType => {
           val initVals = ct.guessInitVals(typeDeclTbl)
-          //      TODO    IValue shoud have other forms
+          // TODO IValue shoud have other forms
           MetaData(itemId, valType, handler(s"list-list ${initVals}"))
         }
       }
@@ -183,7 +183,7 @@ case class VCustomizedType(s: String) extends VValType {
             } yield {
               val itemExp = aggregateIdExpMap(itemId)
               val itemValType = VValType(sti.getSimpleName)
-              val initVal: IExp = itemValType match {
+              val initVal: IsabelleExpression = itemValType match {
                 case bt: VBaseType => bt match {
                   case st: VScalarType => {
                     st.getInitVal(Option(itemExp))(defInfo)
@@ -213,6 +213,7 @@ case class VCustomizedType(s: String) extends VValType {
                   }
                 }
                 case ct: VCustomizedType => {
+                  val printVal = println("\n\nprintVal " + ct + "\n\n")
                   handler(s"list-list: ${itemValType}")
                 }
               }

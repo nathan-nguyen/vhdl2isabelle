@@ -39,18 +39,18 @@ package object core {
     VRangeV(unknownString, RangeD.unkown, unknownString)
   }
 
-  def handleExpKindMismatch(e1: IExp, e2: IExp, msg: String) = {
+  def handleExpKindMismatch(e1: IsabelleExpression, e2: IsabelleExpression, msg: String) = {
     logger.error(s"""expKindMismatch: ${msg}\n${e1.expKind}\t"${e1}"\n${e2.expKind}\t"${e2}"""")
   }
 
   // TODO define a list repr function
 
-  implicit class IsarList[A](l: List[A]) {
-    def ISAR: String = l.mkString("[", ",\n", "]")
+  implicit class IsabelleList[A](l: List[A]) {
+    def ISABELLE: String = l.mkString("[", ",\n", "]")
 
-    def ISAR_r: String = l.mkString("[", ",", "]")
+    def ISABELLE_r: String = l.mkString("[", ",", "]")
 
-    def ISAR_conc: String = l.mkString("[\n\t", ",\n\t", "\n]")
+    def ISABELLE_conc: String = l.mkString("[\n\t", ",\n\t", "\n]")
   }
 
 }

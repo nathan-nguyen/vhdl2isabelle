@@ -77,9 +77,9 @@ sealed abstract class Discrete_range {
   }
 }
 
-case class VHDL_dis_to(l: IExp, r: IExp) extends Discrete_range
+case class VHDL_dis_to(l: IsabelleExpression, r: IsabelleExpression) extends Discrete_range
 
-case class VHDL_dis_downto(l: IExp, r: IExp) extends Discrete_range
+case class VHDL_dis_downto(l: IsabelleExpression, r: IsabelleExpression) extends Discrete_range
 
 //********************************************************************************************************************//
 
@@ -129,9 +129,9 @@ sealed abstract class Asmt_rhs {
   }
 }
 
-case class Rhs_e(exp: IExp) extends Asmt_rhs
+case class Rhs_e(exp: IsabelleExpression) extends Asmt_rhs
 
-case class Rhs_o(exp: IExp) extends Asmt_rhs
+case class Rhs_o(exp: IsabelleExpression) extends Asmt_rhs
 
 //********************************************************************************************************************//
 
@@ -151,13 +151,13 @@ case class Sst_sa(id: String, sP_lhs: SP_lhs, asmt_rhs: Asmt_rhs) extends Seq_st
 
 case class Sst_va(id: String, v_lhs: V_lhs, asmt_rhs: Asmt_rhs) extends Seq_stmt
 
-case class Sst_if(id: String, cond: IExp, then_seq_stmtList: List[Seq_stmt], else_seq_stmtList: List[Seq_stmt]) extends Seq_stmt
+case class Sst_if(id: String, cond: IsabelleExpression, then_seq_stmtList: List[Seq_stmt], else_seq_stmtList: List[Seq_stmt]) extends Seq_stmt
 
-case class Sst_l(id: String, cond: IExp, body_seq_stmtList: List[Seq_stmt]) extends Seq_stmt
+case class Sst_l(id: String, cond: IsabelleExpression, body_seq_stmtList: List[Seq_stmt]) extends Seq_stmt
 
-case class Sst_n(id: String, cond: IExp) extends Seq_stmt
+case class Sst_n(id: String, cond: IsabelleExpression) extends Seq_stmt
 
-case class Sst_e(id: String, cond: IExp) extends Seq_stmt
+case class Sst_e(id: String, cond: IsabelleExpression) extends Seq_stmt
 
 case object Sst_nl extends Seq_stmt
 
@@ -217,14 +217,14 @@ case class Clhs_vr(vl: Vl) extends V_clhs
 
 //********************************************************************************************************************//
 
-case class IChoices(expList: List[IExp])
+case class IChoices(expList: List[IsabelleExpression])
 
 case class Ssc_when(choices: IChoices, Seq_stmt_complexList: List[Seq_stmt_complex]) {
-  override def toString = s"(WHEN ${choices.expList.ISAR} => ${Seq_stmt_complexList.ISAR})"
+  override def toString = s"(WHEN ${choices.expList.ISABELLE} => ${Seq_stmt_complexList.ISABELLE})"
 }
 
-case class Ssc_elif(cond: IExp, Seq_stmt_complexList: List[Seq_stmt_complex]) {
-  override def toString = s"(ELSIF ${cond} THEN ${Seq_stmt_complexList.ISAR})"
+case class Ssc_elif(cond: IsabelleExpression, Seq_stmt_complexList: List[Seq_stmt_complex]) {
+  override def toString = s"(ELSIF ${cond} THEN ${Seq_stmt_complexList.ISABELLE})"
 }
 
 sealed abstract class Seq_stmt_complex {
@@ -232,16 +232,16 @@ sealed abstract class Seq_stmt_complex {
     case Ssc_sa(id, sP_clhs, crhs) => s"(''${id}'': ${sP_clhs} <= ${crhs})"
     case Ssc_va(id, v_clhs, crhs) => s"(''${id}'': ${v_clhs} := ${crhs})"
     case Ssc_if(id, cond, if_seq_stmt_complexList, elif_complexList, else_complexList) => {
-      s"(''${id}'': IF ${cond} THEN ${if_seq_stmt_complexList.ISAR} ${elif_complexList.ISAR} ELSE ${else_complexList.ISAR} END IF)"
+      s"(''${id}'': IF ${cond} THEN ${if_seq_stmt_complexList.ISABELLE} ${elif_complexList.ISABELLE} ELSE ${else_complexList.ISABELLE} END IF)"
     }
     case Ssc_case(id, cond, when_complexList, defaultSeq_stmt_complexList) => {
-      s"(''${id}'': CASE ${cond} IS ${when_complexList.ISAR} WHEN OTHERS => ${defaultSeq_stmt_complexList.ISAR} END CASE)"
+      s"(''${id}'': CASE ${cond} IS ${when_complexList.ISABELLE} WHEN OTHERS => ${defaultSeq_stmt_complexList.ISABELLE} END CASE)"
     }
     case Ssc_while(id, cond, bodySeq_stmt_complexList) => {
-      s"(''${id}'': WHILE ${cond} LOOP ${bodySeq_stmt_complexList.ISAR} END LOOP)"
+      s"(''${id}'': WHILE ${cond} LOOP ${bodySeq_stmt_complexList.ISABELLE} END LOOP)"
     }
     case Ssc_for(id, cond, discrete_range, seq_stmt_complexList) => {
-      s"(''${id}'': FOR ${cond} IN ${discrete_range} LOOP ${seq_stmt_complexList.ISAR} END LOOP)"
+      s"(''${id}'': FOR ${cond} IN ${discrete_range} LOOP ${seq_stmt_complexList.ISABELLE} END LOOP)"
     }
     case Ssc_n(id, tId, cond) => s"(''${id}'': NEXT ${tId} WHEN ${cond})"
     case Ssc_e(id, tId, cond) => s"(''${id}'': EXIT ${tId} WHEN ${cond})"
@@ -253,21 +253,21 @@ case class Ssc_sa(id: IdTy, sP_clhs: SP_clhs, crhs: Crhs) extends Seq_stmt_compl
 
 case class Ssc_va(id: IdTy, v_clhs: V_clhs, crhs: Crhs) extends Seq_stmt_complex
 
-case class Ssc_if(id: IdTy, ifCond: IExp, if_seq_stmt_complexList: List[Seq_stmt_complex],
+case class Ssc_if(id: IdTy, ifCond: IsabelleExpression, if_seq_stmt_complexList: List[Seq_stmt_complex],
                   elif_complexList: List[Ssc_elif],
                   else_complexList: List[Seq_stmt_complex]) extends Seq_stmt_complex
 
-case class Ssc_case(id: IdTy, cond: IExp, when_complexList: List[Ssc_when],
+case class Ssc_case(id: IdTy, cond: IsabelleExpression, when_complexList: List[Ssc_when],
                     defaultSeq_stmt_complexList: List[Seq_stmt_complex]) extends Seq_stmt_complex
 
-case class Ssc_while(id: IdTy, cond: IExp, bodySeq_stmt_complexList: List[Seq_stmt_complex]) extends Seq_stmt_complex
+case class Ssc_while(id: IdTy, cond: IsabelleExpression, bodySeq_stmt_complexList: List[Seq_stmt_complex]) extends Seq_stmt_complex
 
-case class Ssc_for(id: IdTy, cond: IExp, discrete_range: Discrete_range,
+case class Ssc_for(id: IdTy, cond: IsabelleExpression, discrete_range: Discrete_range,
                    seq_stmt_complexList: List[Seq_stmt_complex]) extends Seq_stmt_complex
 
-case class Ssc_n(id: IdTy, tId: IdTy, cond: IExp) extends Seq_stmt_complex
+case class Ssc_n(id: IdTy, tId: IdTy, cond: IsabelleExpression) extends Seq_stmt_complex
 
-case class Ssc_e(id: IdTy, tId: IdTy, cond: IExp) extends Seq_stmt_complex
+case class Ssc_e(id: IdTy, tId: IdTy, cond: IsabelleExpression) extends Seq_stmt_complex
 
 case object Ssc_nl extends Seq_stmt_complex
 
@@ -281,13 +281,13 @@ sealed abstract class Gen_type {
 }
 
 // TODO test definition in isar
-case class For_gen(exp: IExp, discrete_range: Discrete_range) extends Gen_type
+case class For_gen(exp: IsabelleExpression, discrete_range: Discrete_range) extends Gen_type
 
-case class If_gen(exp: IExp) extends Gen_type
+case class If_gen(exp: IsabelleExpression) extends Gen_type
 
 //********************************************************************************************************************//
 
-case class As_when(crhs: Crhs, cond: IExp) {
+case class As_when(crhs: Crhs, cond: IsabelleExpression) {
   override def toString = s"(${crhs} WHEN ${cond} ELSE)"
 }
 
@@ -299,13 +299,13 @@ sealed abstract class Conc_stmt_complex {
   override def toString = this match {
     case Csc_ps(id, iSensitivilistOpt, seq_stmt_complexList) => {
       val iSensitivilistRepr = iSensitivilistOpt.map(_.toString).getOrElse("[]")
-      s"(''${id}'': PROCESS (${iSensitivilistRepr}) BEGIN \n${seq_stmt_complexList.ISAR_conc} \nEND PROCESS)"
+      s"(''${id}'': PROCESS (${iSensitivilistRepr}) BEGIN \n${seq_stmt_complexList.ISABELLE_conc} \nEND PROCESS)"
     }
     case Csc_ca(id, sp_clhs, casmt_rhsList, crhs) => {
-      s"(''${id}'': ${sp_clhs} <= <${casmt_rhsList.ISAR_conc}> ${crhs})"
+      s"(''${id}'': ${sp_clhs} <= <${casmt_rhsList.ISABELLE_conc}> ${crhs})"
     }
     case Csc_gen(id, gen_type, conc_stmt_complexList) => {
-      s"(''${id}'': ${gen_type} BEGIN \n${conc_stmt_complexList.ISAR_conc} \nEND GENERATE)"
+      s"(''${id}'': ${gen_type} BEGIN \n${conc_stmt_complexList.ISABELLE_conc} \nEND GENERATE)"
     }
   }
 }
@@ -328,7 +328,7 @@ case class IEntity(id: String, env: IEnv, resFn: IResFn, conc_stmt_complexList: 
         |"${id} ≡
         |  let env = ${env};
         |      resfn = ${resFn};
-        |      cst_list = ${conc_stmt_complexList.ISAR}
+        |      cst_list = ${conc_stmt_complexList.ISABELLE}
         |  in (env, resfn, cst_list)
         |"
      """.stripMargin

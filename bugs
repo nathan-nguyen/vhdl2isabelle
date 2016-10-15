@@ -36,9 +36,9 @@ To Isabelle -> 34
 
 (V2I-004) subtype declaration is not translated to Isabelle
 
-(V2I-006)
+(V2I-006) array_type_definition is not implemented
 
-(V2I-007)
+(V2I-007) base_literal is not able to parse (16#00000#)
 
 (V2I-008)
 

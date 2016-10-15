@@ -9,7 +9,7 @@ sealed abstract class VLiteral {
 
   val trueOrFalse = Set("true", "false")
 
-  def toIExp(defInfo: DefInfo): IExp = {
+  def toIExp(defInfo: DefInfo): IsabelleExpression = {
     //    logger.info(s"${toString}")
     this match {
       // numeric
@@ -33,9 +33,9 @@ sealed abstract class VLiteral {
             val expKind = idef.getExpKind
             idef match {
               // NOTE: this should always use IExp_var/IExp_sig/IExp_prt
-              case ivariable: Variable => IExp_var(ivariable, expKind)
-              case signal: Signal => IExp_sig(signal, expKind)
-              case port: Port => IExp_prt(port, expKind)
+              case ivariable: Variable => IExp_variable(ivariable, expKind)
+              case signal: Signal => IExp_signal(signal, expKind)
+              case port: Port => IExp_port(port, expKind)
               case _ => handler(s"${idef}, ${s}")
             }
           }
@@ -49,7 +49,7 @@ sealed abstract class VLiteral {
     }
   }
 
-  def asRangeExp(defInfo: DefInfo): IExp_con = this match {
+  def asRangeExp(defInfo: DefInfo): IExp_constant = this match {
     case ln: VLiteralNumAbs => ln match {
       case VLiteralNumInt(s) => VScalarType("natural").getInitValFromLiteral(s)
       case VLiteralNumReal(s) => handler(s"real as range? ${}")
@@ -95,28 +95,28 @@ case object VLiteralNull extends VLiteral
 case class VLiteralBitS(s: String) extends VLiteral
 
 case class VLiteralS(s: String) extends VLiteral {
-  def num2Exp(valType: VScalarType, rangeTy: VRangeV): IExp_con = {
+  def num2Exp(valType: VScalarType, rangeTy: VRangeV): IExp_constant = {
     val ss = s.substring(1, s.length - 1)
     require(ss.forall(_.isDigit), s"${s} not all digits")
     val iConstList = ss.toList.map(c => IConstS("val_c", s"(CHR ''${c}'')"))
     val vt = valType.vectorize
     if (rangeTy.rangeD == RangeD.to) {
       if (ss.forall(_ == ss(0))) {
-        IExp_con(vt, IConstL_gen(vt, ss.length.toString, ss(0)), ExpVectorKindT)
+        IExp_constant(vt, IConstL_gen(vt, ss.length.toString, ss(0)), ExpVectorKindTo)
       } else {
-        IExp_con(vt, IConstL_raw(vt, iConstList), ExpVectorKindT)
+        IExp_constant(vt, IConstL_raw(vt, iConstList), ExpVectorKindTo)
       }
     } else if (rangeTy.rangeD == RangeD.downto) {
       if (ss.forall(_ == ss(0))) {
-        IExp_con(vt, IConstRL_gen(vt, ss.length.toString, ss(0)), ExpVectorKindDT)
+        IExp_constant(vt, IConstRL_gen(vt, ss.length.toString, ss(0)), ExpVectorKindDownTo)
       } else {
-        IExp_con(vt, IConstRL_raw(vt, iConstList), ExpVectorKindDT)
+        IExp_constant(vt, IConstRL_raw(vt, iConstList), ExpVectorKindDownTo)
       }
     } else throw VIError
   }
 
   // FIXME this is quite wrong, but seems that we have to infer it late
-  def num2Exp: IExp_con = num2Exp(VScalarType(defaultCharType), VRangeV(unknownString, RangeD.to, unknownString))
+  def num2Exp: IExp_constant = num2Exp(VScalarType(defaultCharType), VRangeV(unknownString, RangeD.to, unknownString))
 
 }
 
@@ -501,7 +501,7 @@ object VAllocator {
 }
 
 abstract class VPrimary {
-  def toIExp(defInfo: DefInfo): IExp = this match {
+  def toIExp(defInfo: DefInfo): IsabelleExpression = this match {
     case VPrimaryLiteral(literal) => literal.toIExp(defInfo)
     case VPrimaryQExp(vQExp) => handler(s"${toString}")
     case VPrimaryExpLR(vExp) => vExp.toIExp(defInfo)
@@ -593,7 +593,7 @@ sealed abstract class VName {
     case None => handler(s"${toString}")
   }
 
-  def toI_rhs(defInfo: DefInfo): IExp
+  def toI_rhs(defInfo: DefInfo): IsabelleExpression
 
 }
 
@@ -621,23 +621,23 @@ case class VSelectedName(id: String, suffixList: List[VSuffix]) extends VName {
 
   def isar_sp = extracted("s.")
 
-  override def toI_rhs(defInfo: DefInfo): IExp = {
+  override def toI_rhs(defInfo: DefInfo): IsabelleExpression = {
     //    logger.info(s"${toString}")
     val idef = defInfo.getDef(this)
     val expKind = idef.getExpKind
     idef match {
       case vl: Vl => IExp_vl_rhs(vl, this, expKind)
       case v: Variable => suffixList match {
-        case Nil => IExp_var(v, expKind)
+        case Nil => IExp_variable(v, expKind)
         case _ => IExp_vl_rhs(v, this, expKind)
       }
       case spl: SPl => IExp_spl_rhs(spl, this, expKind)
       case s: Signal => suffixList match {
-        case Nil => IExp_sig(s, expKind)
+        case Nil => IExp_signal(s, expKind)
         case _ => IExp_spl_rhs(s, this, expKind)
       }
       case p: Port => suffixList match {
-        case Nil => IExp_prt(p, expKind)
+        case Nil => IExp_port(p, expKind)
         case _ => IExp_spl_rhs(p, this, expKind)
       }
     }
@@ -722,7 +722,7 @@ case class VNameFnCallOrIndexPart(assocListOpt: Option[VAssocList]) {
     case None => handler(s"${toString}")
   }
 
-  def toI_rhs(defInfo: DefInfo): IExp = {
+  def toI_rhs(defInfo: DefInfo): IsabelleExpression = {
     getExp.toIExp(defInfo)
   }
 }
@@ -741,7 +741,7 @@ case class VNameSlicePart(r1: VExplicitRange, r2: Option[VExplicitRange]) {
   }
 
   // TODO r2
-  def toI_rhs(defInfo: DefInfo): (IExp, IExp) = r1.d match {
+  def toI_rhs(defInfo: DefInfo): (IsabelleExpression, IsabelleExpression) = r1.d match {
     case RangeD.`to` => (r1.r.toIExp(defInfo), r1.l.toIExp(defInfo))
     case RangeD.`downto` => (r1.l.toIExp(defInfo), r1.r.toIExp(defInfo))
     case RangeD.`unkown` => throw VIError
@@ -771,7 +771,7 @@ sealed abstract class VNamePart {
     }
   }
 
-  def toI_rhs(defInfo: DefInfo): IExp = this match {
+  def toI_rhs(defInfo: DefInfo): IsabelleExpression = this match {
     case VNamePartAttr(selectedName, nameAttrPart) => ???
     case VNamePartFnI(selectedName, nameFnCallOrIndexPart) => {
       //      logger.info(s"${toString}")
@@ -825,7 +825,7 @@ case class VNameParts(namePartList: List[VNamePart]) extends VName {
   }
 
   // TODO only deal with ONE
-  override def toI_rhs(defInfo: DefInfo): IExp = {
+  override def toI_rhs(defInfo: DefInfo): IsabelleExpression = {
     namePartList.head.toI_rhs(defInfo)
   }
 }
@@ -997,15 +997,15 @@ object VExplicitRange {
 //********************************************************************************************************************//
 
 abstract class VFactor {
-  def toIExp(defInfo: DefInfo): IExp = this match {
+  def toIExp(defInfo: DefInfo): IsabelleExpression = this match {
     case VFFactor(primary, primaryOption) => {
       primaryOption match {
-        case Some(p) => IBexpfa(primary.toIExp(defInfo), VFactorOp.exp, p.toIExp(defInfo))
+        case Some(p) => IBinaryArithmeticPrimaryExpression(primary.toIExp(defInfo), VDoubleStarOperator.exp, p.toIExp(defInfo))
         case None => primary.toIExp(defInfo)
       }
     }
-    case VAbsFactor(primary) => IUexp(VUop.abs, primary.toIExp(defInfo))
-    case VNotFactor(primary) => IUexp(VUop.not, primary.toIExp(defInfo))
+    case VAbsFactor(primary) => IUnaryExpression(VUnaryOperator.abs, primary.toIExp(defInfo))
+    case VNotFactor(primary) => IUnaryExpression(VUnaryOperator.not, primary.toIExp(defInfo))
   }
 
   def computeE(v: String, n: String): String = {
@@ -1058,16 +1058,16 @@ case class VAbsFactor(primary: VPrimary) extends VFactor
 
 case class VNotFactor(primary: VPrimary) extends VFactor
 
-case class VTerm(factor: VFactor, ops: List[VFactorOp.Ty], others: List[VFactor]) {
-  def toIExp(defInfo: DefInfo): IExp = {
+case class VTerm(factor: VFactor, ops: List[VMultiplyingOperator.Ty], others: List[VFactor]) {
+  def toIExp(defInfo: DefInfo): IsabelleExpression = {
     ops.zip(others).foldLeft(factor.toIExp(defInfo)) {
-      case (accExp, (op, curFactor)) => IBexpfa(accExp, op, curFactor.toIExp(defInfo))
+      case (accExp, (op, curFactor)) => IBinaryArithmeticFactorExpression(accExp, op, curFactor.toIExp(defInfo))
     }
   }
 
   //  FIXME [HC] asVal should not be used
   def asVal: String = {
-    import VFactorOp._
+    import VMultiplyingOperator._
     try {
       ops.zip(others).foldLeft(factor.asVal.toInt)((acc, cur) => {
         val f = cur._2.asVal.toInt
@@ -1097,7 +1097,7 @@ case class VTerm(factor: VFactor, ops: List[VFactorOp.Ty], others: List[VFactor]
 
 object VTerm {
   def apply(ctx: TermContext): VTerm = {
-    val ops = ctx.multiplying_operator().map(VFactorOp(_)).toList
+    val ops = ctx.multiplying_operator().map(VMultiplyingOperator(_)).toList
     val factors = ctx.factor().map(VFactor(_)).toList
     VTerm(factors.head, ops, factors.tail)
   }
@@ -1105,7 +1105,7 @@ object VTerm {
 
 //********************************************************************************************************************//
 
-object VUop extends Enumeration {
+object VUnaryOperator extends Enumeration {
   type Ty = Value
   val abs = Value("[abs]")
   val not = Value("[not]")
@@ -1114,12 +1114,11 @@ object VUop extends Enumeration {
 }
 
 //********************************************************************************************************************//
+sealed trait VArithmeticOperator
 
-sealed trait VAOp
-
-object VTermOp extends Enumeration with VAOp {
-  type Ty = Value
+object VAddingOperator extends Enumeration with VArithmeticOperator {
   // TODO VHDL overloads this, should make it homomorphic
+  type Ty = Value
   val plus = Value("[+]")
   val minus = Value("[-]")
   val ampersand = Value("[&]")
@@ -1133,14 +1132,12 @@ object VTermOp extends Enumeration with VAOp {
 
 }
 
-object VFactorOp extends Enumeration with VAOp {
+object VMultiplyingOperator extends Enumeration with VArithmeticOperator {
   type Ty = Value
   val mul = Value("[*]")
   val div = Value("[/]")
   val mod = Value("[mod]")
   val rem = Value("[rem]")
-  //  DOUBLESTAR
-  val exp = Value("[**]")
 
   def apply(ctx: Multiplying_operatorContext): Ty = {
     if (ctx.MUL() != null) mul
@@ -1151,23 +1148,28 @@ object VFactorOp extends Enumeration with VAOp {
   }
 }
 
+object VDoubleStarOperator extends Enumeration with VArithmeticOperator {
+  type Ty = Value
+  val exp = Value("[**]")
+}
+
 //********************************************************************************************************************//
 
-case class VSimpleExp(termSign: Option[String], term: VTerm, ops: List[VTermOp.Ty], others: List[VTerm]) {
+case class VSimpleExp(termSign: Option[String], term: VTerm, ops: List[VAddingOperator.Ty], others: List[VTerm]) {
 
-  def refine__tl_trl(tKind: ExpKind, srcIExp: IExp): IExp = {
+  def refine__tl_trl(tKind: ExpKind, srcIExp: IsabelleExpression): IsabelleExpression = {
     require(tKind.isV && srcIExp.expKind == ExpScalarKind)
     tKind match {
-      case ExpVectorKindT => IExp_tl(srcIExp)
-      case ExpVectorKindDT => IExp_trl(srcIExp)
+      case ExpVectorKindTo => IExp_tl(srcIExp)
+      case ExpVectorKindDownTo => IExp_trl(srcIExp)
       case _ => srcIExp
     }
   }
 
-  def toIExp(defInfo: DefInfo): IExp = {
-    val firstExp: IExp = termSign match {
-      case Some("+") => IUexp(VUop.pos, term.toIExp(defInfo))
-      case Some("-") => IUexp(VUop.neg, term.toIExp(defInfo))
+  def toIExp(defInfo: DefInfo): IsabelleExpression = {
+    val firstExp: IsabelleExpression = termSign match {
+      case Some("+") => IUnaryExpression(VUnaryOperator.pos, term.toIExp(defInfo))
+      case Some("-") => IUnaryExpression(VUnaryOperator.neg, term.toIExp(defInfo))
       case _ => term.toIExp(defInfo)
     }
     // FIXME this is perhaps still WRONG since VHDL may allow "vt := st1 [+] st2"
@@ -1176,20 +1178,20 @@ case class VSimpleExp(termSign: Option[String], term: VTerm, ops: List[VTermOp.T
         val cur = curTerm.toIExp(defInfo)
         if (acc.expKind.isV && cur.expKind == ExpScalarKind) {
           val refinedCur = refine__tl_trl(acc.expKind, cur)
-          IBexpta(acc, op, refinedCur)
+          IBinaryArithmeticTermExpression(acc, op, refinedCur)
         } else if (acc.expKind == ExpScalarKind && cur.expKind.isV) {
           val refinedAcc = refine__tl_trl(cur.expKind, acc)
-          IBexpta(refinedAcc, op, cur)
+          IBinaryArithmeticTermExpression(refinedAcc, op, cur)
         } else {
           val refined = refine__valType(acc, cur)
-          IBexpta(acc, op, refined)
+          IBinaryArithmeticTermExpression(acc, op, refined)
         }
       }
     }
   }
 
   def asVal: String = {
-    import VTermOp._
+    import VAddingOperator._
     val sign = termSign match {
       case Some("-") => "-"
       case _ => ""
@@ -1223,7 +1225,7 @@ case class VSimpleExp(termSign: Option[String], term: VTerm, ops: List[VTermOp.T
 object VSimpleExp {
   def apply(ctx: Simple_expressionContext): VSimpleExp = {
     val terms = ctx.term().map(VTerm(_)).toList
-    val ops = ctx.adding_operator().map(VTermOp(_)).toList
+    val ops = ctx.adding_operator().map(VAddingOperator(_)).toList
     val symbol = {
       if (ctx.PLUS() != null) Some("+")
       else if (ctx.MINUS() != null) Some("-")
@@ -1300,8 +1302,8 @@ object VRelationOp extends Enumeration {
 }
 
 case class VShiftExp(vSimpleExp: VSimpleExp, op: Option[VShiftOp.Ty], other: Option[VSimpleExp]) {
-  def toIExp(defInfo: DefInfo): IExp = (op, other) match {
-    case (Some(opV), Some(simpleExpV)) => IBexps(vSimpleExp.toIExp(defInfo), opV, simpleExpV.toIExp(defInfo))
+  def toIExp(defInfo: DefInfo): IsabelleExpression = (op, other) match {
+    case (Some(opV), Some(simpleExpV)) => IBinaryShiftingExpression(vSimpleExp.toIExp(defInfo), opV, simpleExpV.toIExp(defInfo))
     case _ => vSimpleExp.toIExp(defInfo)
   }
 }
@@ -1320,11 +1322,11 @@ object VShiftExp {
 case class VRelation(vShiftExpr: VShiftExp, op: Option[VRelationOp.Ty], other: Option[VShiftExp]) {
   // FIXME type refinement should be made here (perhaps ALL other toIExp)
   // TODO however we are not sure which should be trusted!!
-  def toIExp(defInfo: DefInfo): IExp = (op, other) match {
+  def toIExp(defInfo: DefInfo): IsabelleExpression = (op, other) match {
     case (Some(opV), Some(otherV)) => {
       val (lhs, rhs) = (vShiftExpr.toIExp(defInfo), otherV.toIExp(defInfo))
       val refinedRhs = refine__valType(lhs, rhs)
-      IBexpr(lhs, opV, refinedRhs)
+      IBinaryRelationalExpression(lhs, opV, refinedRhs)
     }
     case _ => vShiftExpr.toIExp(defInfo)
   }
@@ -1342,9 +1344,9 @@ object VRelation {
 }
 
 case class VExp(relation: VRelation, ops: List[VLogicOp.Ty], others: List[VRelation]) {
-  def toIExp(defInfo: DefInfo): IExp = {
+  def toIExp(defInfo: DefInfo): IsabelleExpression = {
     ops.zip(others).foldLeft(relation.toIExp(defInfo)) {
-      case (acc, (op, curRelation)) => IBexpl(acc, op, curRelation.toIExp(defInfo))
+      case (acc, (op, curRelation)) => IBinaryLogicalExpression(acc, op, curRelation.toIExp(defInfo))
     }
   }
 

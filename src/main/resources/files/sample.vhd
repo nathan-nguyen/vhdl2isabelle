@@ -52,6 +52,8 @@ entity iu3 is
     --tbo_2p : in  tracebuf_2p_out_type;
     --tbi_2p : out tracebuf_2p_in_type;
     sclk   : in  std_ulogic
+
+    --listlist : in type2
     );
 
 

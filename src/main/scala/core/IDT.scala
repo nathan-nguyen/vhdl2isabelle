@@ -1,13 +1,13 @@
 package core
 
 /**
-  * it's only used for idef generation
+  * It's only used for idef generation
   */
-final case class MetaData(itemId: String, valType: VValType, initVal: IExp)
+final case class MetaData(itemId: String, valType: VValType, initVal: IsabelleExpression)
 
 //********************************************************************************************************************//
 
-case class Variable(id: String, valType: VBaseType, iExp: IExp) extends V_IDef {
+case class Variable(id: String, valType: VBaseType, iExp: IsabelleExpression) extends V_IDef {
   override def toString = s"""(''${id}'', ${VHDLize(valType)}, ${iExp})"""
 
   override def as_definition: String = {
@@ -29,7 +29,7 @@ sealed trait Vl extends V_IDef {
 
   override def toString = this match {
     case Vl_v(iVariable) => s"(vl_v ${iVariable})"
-    case Vnl(id, vlList) => s"(vnl ('''', ${vlList.ISAR}))"
+    case Vnl(id, vlList) => s"(vnl ('''', ${vlList.ISABELLE}))"
   }
 
   def as_list: String = this match {
@@ -89,7 +89,7 @@ case class Vl_v(iVariable: Variable) extends Vl
 case class Vnl(id: String, vlList: List[Vl]) extends Vl
 
 object Vnl {
-  //  FIXME: this gen is TOO specific!
+  // FIXME: this gen is TOO specific!
   // NOTE: currently valType is the EXACTLY type from VHDL without prefix!!!
   def gen(id: String, dataList: List[MetaData])(implicit s: DummyImplicit): Vnl = {
     val vlList = for {
@@ -121,8 +121,8 @@ sealed trait IDef {
       case vnl: Vnl => handler(s"${vnl}")
     }
     case spl: SPl => spl match {
-      case spl_s: SPl_s => spl_s.iSignal.valType
-      case spl_p: SPl_p => spl_p.iPort.valType
+      case spl_s: SPl_signal => spl_s.iSignal.valType
+      case spl_p: SPl_port => spl_p.iPort.valType
       case spnl: SPnl => handler(s"${spnl}")
     }
   }
@@ -136,16 +136,16 @@ sealed trait SP_IDef extends IDef
 sealed abstract class SPl extends SP_IDef {
 
   override def toString = this match {
-    case SPl_s(s) => s"(spl_s ${s})"
-    case SPl_p(p) => s"(spl_p ${p})"
-    case SPnl(id, splList) => s"(spnl ('''', ${splList.ISAR}))"
+    case SPl_signal(s) => s"(spl_s ${s})"
+    case SPl_port(p) => s"(spl_p ${p})"
+    case SPnl(id, splList) => s"(spnl ('''', ${splList.ISABELLE}))"
   }
 
   override def as_definition: String = this match {
-    // this case should never be called
-    case SPl_s(s) => s.as_definition
-    // this case should never be called
-    case SPl_p(p) => p.as_definition
+    // [HC] : This case should never be called
+    case SPl_signal(s) => s.as_definition
+    // [HC] : This case should never be called
+    case SPl_port(p) => p.as_definition
     case SPnl(id, splList) => {
       s"""definition ${id}:: \"spl\" where
           | \"${id} ≡ ${toString}\"""".stripMargin
@@ -153,20 +153,20 @@ sealed abstract class SPl extends SP_IDef {
   }
 
   override def as_list = this match {
-    case SPl_s(s) => s.id
-    case SPl_p(p) => p.id
+    case SPl_signal(s) => s.id
+    case SPl_port(p) => p.id
     case SPnl(id, _) => s"(splist_of_spl ${id})"
   }
 
   override def getId = this match {
-    case SPl_s(s) => s.id
-    case SPl_p(p) => p.id
+    case SPl_signal(s) => s.id
+    case SPl_port(p) => p.id
     case SPnl(id, splList) => id
   }
 
   override def getExpKind = this match {
-    case SPl_s(s) => s.getExpKind
-    case SPl_p(p) => p.getExpKind
+    case SPl_signal(s) => s.getExpKind
+    case SPl_port(p) => p.getExpKind
     case SPnl(id, splList) => ExpUnknownKind
   }
 
@@ -177,8 +177,8 @@ sealed abstract class SPl extends SP_IDef {
     def aux(l: List[String], cur: Option[SPl]): Option[SPl] = l match {
       case h :: t => cur match {
         case Some(spl) => spl match {
-          case _: SPl_s => Some(spl)
-          case _: SPl_p => Some(spl)
+          case _: SPl_signal => Some(spl)
+          case _: SPl_port => Some(spl)
           case spnl: SPnl => aux(t, spnl.splList.find(_.getId == h))
         }
         case None => None
@@ -186,17 +186,17 @@ sealed abstract class SPl extends SP_IDef {
       case Nil => cur
     }
     aux(nList, Some(this)) match {
-      case Some(SPl_s(spl_s)) => Some(spl_s)
-      case Some(SPl_p(spl_p)) => Some(spl_p)
+      case Some(SPl_signal(spl_s)) => Some(spl_s)
+      case Some(SPl_port(spl_p)) => Some(spl_p)
       case other => other
     }
   }
 
 }
 
-case class SPl_s(iSignal: Signal) extends SPl
+case class SPl_signal(iSignal: Signal) extends SPl
 
-case class SPl_p(iPort: Port) extends SPl
+case class SPl_port(iPort: Port) extends SPl
 
 case class SPnl(id: String, splList: List[SPl]) extends SPl
 
@@ -206,7 +206,7 @@ object SPnl {
       data <- dataList
     } yield {
       val itemId = s"${id}_${data.itemId}"
-      SPl_s(Signal(itemId, data.valType.asInstanceOf[VBaseType], data.initVal, signalKind))
+      SPl_signal(Signal(itemId, data.valType.asInstanceOf[VBaseType], data.initVal, signalKind))
     }
     SPnl(id, splList)
   }
@@ -216,7 +216,7 @@ object SPnl {
       data <- dataList
     } yield {
       val itemId = s"${id}_${data.itemId}"
-      SPl_p(Port(itemId, data.valType.asInstanceOf[VBaseType], data.initVal, mode, conn))
+      SPl_port(Port(itemId, data.valType.asInstanceOf[VBaseType], data.initVal, mode, conn))
     }
     SPnl(id, splList)
   }
@@ -229,7 +229,7 @@ object SignalKind extends Enumeration {
   val register, bus = Value
 }
 
-case class Signal(id: String, valType: VBaseType, iExp: IExp, signalKind: SignalKind.Ty) extends SP_IDef {
+case class Signal(id: String, valType: VBaseType, iExp: IsabelleExpression, signalKind: SignalKind.Ty) extends SP_IDef {
   override def toString = s"""(''${id}'', ${VHDLize(valType)}, ${signalKind}, ${iExp})"""
 
   override def as_definition: String = {
@@ -258,7 +258,7 @@ object PortConn extends Enumeration {
   val connected, unconnected = Value
 }
 
-case class Port(id: String, valType: VBaseType, iExp: IExp, mode: PortMode.Ty, conn: PortConn.Ty) extends SP_IDef {
+case class Port(id: String, valType: VBaseType, iExp: IsabelleExpression, mode: PortMode.Ty, conn: PortConn.Ty) extends SP_IDef {
   override def toString = s"(''${id}'', ${VHDLize(valType)}, ${mode}, ${conn}, ${iExp})"
 
   override def as_definition: String = {

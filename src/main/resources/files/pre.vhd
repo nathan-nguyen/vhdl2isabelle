@@ -44,6 +44,16 @@ type icache_in_type is record
      bpmiss           : std_ulogic;
      eocl             : std_ulogic;
   end record;
+
+  type type1 is record
+    r1 : std_logic_vector(31 downto 0);
+    r2 : std_logic_vector(0 to 10);
+  end record;
+
+  type type2 is record
+    r3 : type1;
+    r4 : std_logic_vector(10 downto 1);
+  end record;
 -----------------------------------------------------------------------------
 -- END
 -----------------------------------------------------------------------------

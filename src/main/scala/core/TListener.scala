@@ -95,7 +95,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def enterDirection(ctx: DirectionContext): Unit = {}
 
-  //  DEFINITION
+  //  [HC] Definition
   override def enterRecord_type_definition(ctx: Record_type_definitionContext): Unit = {
     val recordTypeDef = VRecordTypeDef(ctx)
     val items = for {
@@ -341,7 +341,12 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def exitConfiguration_declarative_item(ctx: Configuration_declarative_itemContext): Unit = {}
 
-  override def enterSubtype_declaration(ctx: Subtype_declarationContext): Unit = {}
+  override def enterSubtype_declaration(ctx: Subtype_declarationContext): Unit = {
+    val subtypeDeclaration = VSubtypeDeclaration(ctx)
+    val identifier = subtypeDeclaration.id
+    val subtypeIndication = subtypeDeclaration.subtypeInd
+//    typeInfo += (VCustomizedType(identifier), Seq(identifier -> subtypeIndication)) -> This is wrong, this only apply to record
+  }
 
   override def exitEntity_header(ctx: Entity_headerContext): Unit = {}
 
