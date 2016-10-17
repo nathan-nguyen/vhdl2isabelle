@@ -283,7 +283,7 @@ sealed abstract class Gen_type {
   }
 }
 
-// TODO test definition in isar
+// TODO test definition in isabelle
 case class For_gen(exp: IsabelleExpression, discrete_range: Discrete_range) extends Gen_type
 
 case class If_gen(exp: IsabelleExpression) extends Gen_type

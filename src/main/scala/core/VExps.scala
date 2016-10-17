@@ -16,13 +16,16 @@ sealed abstract class VLiteral {
     this match {
       // numeric
       // FIXME if s is numeric literal, it should be transfered to decimal firstly
-      case numL: VLiteralNum => numL match {
-        case numAbsL: VLiteralNumAbs => numAbsL match {
-          case VLiteralNumInt(s) => VScalarType("integer").getInitValFromLiteral(s)
-          case VLiteralNumReal(s) => VScalarType("real").getInitValFromLiteral(s)
-          case VLiteralNumBase(s) => handler(s)
+      case numL: VNumericLiteral => numL match {
+        case numAbsL: VAbstractLiteral => numAbsL match {
+          case VIntegerLiteral(s) => VScalarType("integer").getInitValFromLiteral(s)
+          case VRealLiteral(s) => VScalarType("real").getInitValFromLiteral(s)
+          case VBaseLiteral(s) => numAbsL.asInstanceOf[VBaseLiteral].getValue match {
+            case i : Int => VScalarType("integer").getInitValFromLiteral(i.toString)
+            //case r : Float/Double => VScalarType("real").getInitValFromLiteral(r.toString)
+          }
         }
-        case VLiteralNumPhy(s) => handler(s)
+        case VPhysicalLiteral(s) => handler(s)
       }
       // enumeral
       case enumL: VLiteralEnum => enumL match {
@@ -34,7 +37,7 @@ sealed abstract class VLiteral {
             val idef = defInfo.getDef(s)
             val expKind = idef.getExpKind
             idef match {
-              // NOTE: this should always use IExp_var/IExp_signal/IExp_port
+              // NOTE: this should always use IExp_variable/IExp_signal/IExp_port
               case ivariable: Variable => IExp_variable(ivariable, expKind)
               case signal: Signal => IExp_signal(signal, expKind)
               case port: Port => IExp_port(port, expKind)
@@ -52,10 +55,10 @@ sealed abstract class VLiteral {
   }
 
   def asRangeExp(defInfo: DefInfo): IExp_constant = this match {
-    case ln: VLiteralNumAbs => ln match {
-      case VLiteralNumInt(s) => VScalarType("natural").getInitValFromLiteral(s)
-      case VLiteralNumReal(s) => handler(s"real as range? ${}")
-      case VLiteralNumBase(s) => handler(s"base as range? ${s}")
+    case ln: VAbstractLiteral => ln match {
+      case VIntegerLiteral(s) => VScalarType("natural").getInitValFromLiteral(s)
+      case VRealLiteral(s) => handler(s"real as range? ${}")
+      case VBaseLiteral(s) => handler(s"base as range? ${s}")
     }
     case _ => handler(s"what as range? ${toString}")
   }
@@ -67,9 +70,9 @@ sealed abstract class VLiteral {
 
   // [TN] Not sure this is a valid way to put get_init_val, should move to ISyntax
   def asVal: String = this match {
-    case VLiteralNumInt(s) => s
-    case VLiteralNumReal(s) => s
-    case VLiteralNumBase(s) => s
+    case VIntegerLiteral(s) => s
+    case VRealLiteral(s) => s
+    case VBaseLiteral(s) => s
     case VLiteralEnumId(s) => s"get_init_val ${s}"
     case VLiteralEnumChar(s) => s
     case _ => unknownString
@@ -87,7 +90,7 @@ object VLiteral {
     } else if (ctx.enumeration_literal() != null) {
       VLiteralEnum(ctx.enumeration_literal())
     } else if (ctx.numeric_literal() != null) {
-      VLiteralNum(ctx.numeric_literal())
+      VNumericLiteral(ctx.numeric_literal())
     } else throw VIError
   }
 }
@@ -143,53 +146,64 @@ case class VLiteralEnumChar(s: String) extends VLiteralEnum(s)
 
 //********************************************************************************************************************//
 
-sealed abstract class VLiteralNum extends VLiteral {
+sealed abstract class VNumericLiteral extends VLiteral {
   val s: String
 }
 
-object VLiteralNum {
-  def apply(ctx: Numeric_literalContext): VLiteralNum = {
+object VNumericLiteral {
+  def apply(ctx: Numeric_literalContext): VNumericLiteral = {
     val abs = ctx.abstract_literal()
     val phy = ctx.physical_literal()
     if (abs != null) {
-      VLiteralNumAbs(abs)
+      VAbstractLiteral(abs)
     } else {
-      VLiteralNumPhy(phy.getText)
+      VPhysicalLiteral(phy.getText)
     }
   }
 }
 
-sealed abstract class VLiteralNumAbs extends VLiteralNum {
+sealed abstract class VAbstractLiteral extends VNumericLiteral {
   val s: String
 }
 
-object VLiteralNumAbs {
-  def apply(ctx: Abstract_literalContext): VLiteralNumAbs = {
+object VAbstractLiteral {
+  def apply(ctx: Abstract_literalContext): VAbstractLiteral = {
     val intL = ctx.INTEGER()
     val realL = ctx.REAL_LITERAL()
     val baseL = ctx.BASE_LITERAL()
     if (intL != null) {
-      VLiteralNumInt(ctx.getText)
+      VIntegerLiteral(ctx.getText)
     } else if (realL != null) {
-      VLiteralNumReal(ctx.getText)
+      VRealLiteral(ctx.getText)
     } else if (baseL != null) {
-      VLiteralNumBase(baseL.getText)
+      VBaseLiteral(baseL.getText)
     } else throw VIError
   }
 }
 
-case class VLiteralNumInt(s: String) extends VLiteralNumAbs
+case class VIntegerLiteral(s: String) extends VAbstractLiteral
 
-case class VLiteralNumReal(s: String) extends VLiteralNumAbs
+case class VRealLiteral(s: String) extends VAbstractLiteral
 
-case class VLiteralNumBase(s: String) extends VLiteralNumAbs
+// TODO: The value could be real number (Return double or float)
+case class VBaseLiteral(s: String) extends VAbstractLiteral {
+  def getValue = {
+    val values = s.split("#");
+    val radix = values(0).toInt
+    // val baseFractionalNumber = values(1)
+    // val exponent = values(2).toInt
+    if (radix < 2 || radix > 16) handler(s)
+    val baseInteger = values(1)
+    Integer.parseInt(baseInteger, radix)
+  }
+}
 
-case class VLiteralNumPhy(s: String) extends VLiteralNum
+case class VPhysicalLiteral(s: String) extends VNumericLiteral
 
-object VLiteralNumPhy {
-  def apply(ctx: Physical_literalContext): VLiteralNumPhy = {
+object VPhysicalLiteral {
+  def apply(ctx: Physical_literalContext): VPhysicalLiteral = {
     val s = ctx.identifier().getText
-    VLiteralNumPhy(s)
+    VPhysicalLiteral(s)
   }
 }
 
@@ -203,12 +217,12 @@ object VBaseUnitDecl {
   }
 }
 
-case class VSecondaryUnitDecl(id: String, phyLiteral: VLiteralNumPhy)
+case class VSecondaryUnitDecl(id: String, phyLiteral: VPhysicalLiteral)
 
 object VSecondaryUnitDecl {
   def apply(ctx: Secondary_unit_declarationContext): VSecondaryUnitDecl = {
     val id = ctx.identifier().getText
-    val phyLiteral = VLiteralNumPhy(ctx.physical_literal())
+    val phyLiteral = VPhysicalLiteral(ctx.physical_literal())
     VSecondaryUnitDecl(id, phyLiteral)
   }
 }

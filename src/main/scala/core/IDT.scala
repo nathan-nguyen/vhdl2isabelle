@@ -16,7 +16,7 @@ case class Variable(id: String, valType: VBaseType, iExp: IsabelleExpression) ex
 
   override def as_definition: String = {
     s"""definition ${id}:: \"variable\" where
-        | \"${id} ≡ ${toString}\"""".stripMargin
+        |\"${id} ≡ ${toString}\"""".stripMargin
   }
 
   override def as_list: String = s"[${id}]"

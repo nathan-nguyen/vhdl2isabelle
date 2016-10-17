@@ -17,7 +17,7 @@ entity iu3 is
     tbuf     : integer range 0 to 128 := 0;     -- trace buf size in kB (0 - no trace buffer)
     pwd      : integer range 0 to 2 := 0;       -- power-down
     svt      : integer range 0 to 1 := 0;       -- single-vector trapping
-    --rstaddr  : integer := 16#00000#;            -- reset vector MSB address
+    rstaddr  : integer := 16#00000#;            -- reset vector MSB address
     smp      : integer range 0 to 15 := 0;      -- support SMP systems
     fabtech  : integer range 0 to NTECH := 0;
     clk2x    : integer := 0;
