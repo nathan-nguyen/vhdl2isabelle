@@ -1,7 +1,8 @@
 package core
 
-//********************************************************************************************************************//
-
+/**
+  * Created by Hongxu Chen.
+  */
 sealed abstract class IConst {
 
   def generateInitialValue(valType: VVectorType, length: String, rawVal: Char = '0'): String = {
@@ -22,12 +23,13 @@ sealed abstract class IConst {
       case IConstRL_raw(valType, iConstList) => s"(val_rlist ${iConstList.ISABELLE_r})"
       case g@IConstRL_gen(valType, length, rawVal) => s"(val_rlist ${generateInitialValue(valType, length, rawVal)})"
     }
+    case c: IConstCustomized => handler(s"${c}")
   }
 }
 
 case class IConstS(isarType: String, initVal: String) extends IConst
 
-// IConstL -> to -> var_list
+// IConstL -> to -> "var_list"
 sealed abstract class IConstL extends IConst {
   val valType: VVectorType
 }
@@ -36,7 +38,7 @@ case class IConstL_raw(valType: VVectorType, iConstList: List[IConst]) extends I
 
 case class IConstL_gen(valType: VVectorType, length: String, rawVal: Char) extends IConstL
 
-// IConstRL -> downto -> var_rlist
+// IConstRL -> downto -> "var_rlist"
 abstract class IConstRL extends IConst {
   val valType: VVectorType
 }
@@ -44,6 +46,16 @@ abstract class IConstRL extends IConst {
 case class IConstRL_raw(valType: VVectorType, iConstList: List[IConst]) extends IConstRL
 
 case class IConstRL_gen(valType: VVectorType, length: String, rawVal: Char) extends IConstRL
+
+// Nested list
+abstract class IConstCustomized extends IConst {
+  val valType: VCustomizedType
+}
+
+// TODO: Add IConstCustomized_raw() for the case initial values exist.
+
+// Generate the initial value
+case class IConstCustomized_gen(valType: VCustomizedType) extends IConstCustomized
 
 //********************************************************************************************************************//
 
@@ -65,6 +77,8 @@ case object ExpVectorKindTo extends ExpVectorKind
 // Vector downto
 case object ExpVectorKindDownTo extends ExpVectorKind
 
+case object ExpCustomizedKind extends ExpKind
+
 case object ExpUnknownKind extends ExpKind
 
 //********************************************************************************************************************//
@@ -72,7 +86,7 @@ case object ExpUnknownKind extends ExpKind
 sealed abstract class IsabelleExpression {
   val expKind: ExpKind
 
-  def getVType: VBaseType = getIDef.getVType
+  def getVType: VValType = getIDef.getVType
 
   def getIDef: IDef = this match {
     case vl_rhs: IExp_vl_rhs => vl_rhs.v
@@ -85,6 +99,7 @@ sealed abstract class IsabelleExpression {
 
   override def toString = this match {
     case IExp_constant(baseType, const, _) => s"""(exp_con (${VHDLize(baseType)}, ${const}))"""
+    case IExp_customizedConstant(customizedType, const, _) => throw VIError
     case IExp_variable(variable, _) => s"""(exp_var ${variable.getId})"""
     case IExp_signal(signal, _) => s"""(exp_sig ${signal.getId})"""
     case IExp_port(port, _) => s"""(exp_prt ${port.getId})"""
@@ -103,8 +118,8 @@ sealed abstract class IsabelleExpression {
     case IExp_tl(e) => s"""(exp_tl ${e})"""
     case IExp_trl(e) => s"""(exp_trl ${e})"""
 
-    case IExp_vl_rhs(vl, selectedName, _) => s"""(exp_of_vl ${selectedName.isar_v})"""
-    case IExp_spl_rhs(spl, selectedName, _) => s"""(exp_of_spl ${selectedName.isar_sp})"""
+    case IExp_vl_rhs(vl, selectedName, _) => s"""(exp_of_vl ${selectedName.isa_v})"""
+    case IExp_spl_rhs(spl, selectedName, _) => s"""(exp_of_spl ${selectedName.isa_sp})"""
   }
 
   def crhs_e_rhse: Crhs_e = Crhs_e(Rhs_e(this))
@@ -117,6 +132,8 @@ sealed abstract class IsabelleExpression {
 }
 
 case class IExp_constant(baseType: VBaseType, const: IConst, expKind: ExpKind) extends IsabelleExpression
+
+case class IExp_customizedConstant(customizedType: VCustomizedType, const: IConst, expKind: ExpKind) extends IsabelleExpression
 
 // For storing identifiers
 // Different from Isabelle, it must be a defined "variable"

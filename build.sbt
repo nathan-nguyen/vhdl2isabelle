@@ -1,4 +1,4 @@
-name := "vhdl2isar"
+name := "vhdl2isabelle"
 
 version := "1.0"
 
@@ -13,7 +13,10 @@ libraryDependencies ++= Seq(
 
 unmanagedClasspath in(Compile, runMain) += baseDirectory.value / ""
 
+/**
+  * Created by Hongxu Chen.
+  */
 antlr4Settings
-antlr4PackageName in Antlr4 := Some("sg.edu.ntu.hchen")
+antlr4PackageName in Antlr4 := Some("sg.edu.ntu.vhdl2isabelle")
 antlr4GenListener in Antlr4 := true
 antlr4GenVisitor in Antlr4 := false

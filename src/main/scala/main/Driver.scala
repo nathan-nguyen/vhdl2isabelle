@@ -2,6 +2,9 @@ package main
 
 import core.VInfo
 
+/**
+  * Created by Hongxu Chen.
+  */
 object Driver {
 
   val userHome = System.getProperty("user.home")

@@ -2,11 +2,14 @@ package core
 
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.{ErrorNode, TerminalNode}
-import sg.edu.ntu.hchen.VHDLListener
-import sg.edu.ntu.hchen.VHDLParser._
+import sg.edu.ntu.vhdl2isabelle.VHDLListener
+import sg.edu.ntu.vhdl2isabelle.VHDLParser._
 
 import scala.collection.JavaConversions._
 
+/**
+  * Created by Hongxu Chen.
+  */
 class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def enterAbstract_literal(ctx: Abstract_literalContext): Unit = {}
 

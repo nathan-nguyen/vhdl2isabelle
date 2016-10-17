@@ -2,6 +2,9 @@ package core
 
 import scala.collection.mutable
 
+/**
+  * Created by Hongxu Chen.
+  */
 abstract class Keeper(vInfo: Option[VInfo]) {
 
   var entity: IEntity = _
@@ -55,12 +58,12 @@ abstract class Keeper(vInfo: Option[VInfo]) {
             }
           }
         }
-        val port = Port(id, bt, initVal, mode, conn)
+        val port = Port_BaseType(id, bt, initVal, mode, conn)
         defInfo +=(id, port)
       }
       case ct: VCustomizedType => {
         val initVals = ct.getInitVals(typeInfo.typeDeclTbl, expOption)(defInfo)
-        val spnl = SPnl.genFromP(id, initVals, mode, conn)
+        val spnl = Spnl_list.generateFromPort(id, initVals, mode, conn, typeInfo, defInfo)
         defInfo +=(id, spnl)
       }
     }
@@ -82,7 +85,7 @@ abstract class Keeper(vInfo: Option[VInfo]) {
       }
       case ct: VCustomizedType => {
         val initVals = ct.guessInitVals(typeInfo.typeDeclTbl)
-        val spnl = SPnl.genFromS(id, initVals, signalKind)
+        val spnl = Spnl_list.genFromSignal(id, initVals, signalKind)
         defInfo +=(id, spnl)
       }
     }

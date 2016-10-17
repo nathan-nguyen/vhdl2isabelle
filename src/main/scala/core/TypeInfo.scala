@@ -3,7 +3,11 @@ package core
 import scala.collection.mutable
 
 /**
-  * it's about the type information for variables defined in isabelle,
+  * Created by Hongxu Chen.
+  */
+
+/**
+  * It's about the type information for variables defined in isabelle,
   * which has nothing to do with entity generation
   */
 
@@ -160,11 +164,8 @@ case class VCustomizedType(s: String) extends VValType {
           }
           MetaData(itemId, bt, initVal)
         }
-        case ct: VCustomizedType => {
-          val initVals = ct.guessInitVals(typeDeclTbl)
-          // TODO IValue shoud have other forms
-          MetaData(itemId, valType, handler(s"list-list ${initVals}"))
-        }
+        case ct: VCustomizedType =>
+          MetaData(itemId, valType, IExp_customizedConstant(ct, IConstCustomized_gen(ct), ExpCustomizedKind))
       }
     }
     iVals.toList

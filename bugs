@@ -28,19 +28,19 @@ type icache_out_type is record
 end record;
 To Isabelle -> 34
 
-(V2I-005) bug V2I-002 ; V2I-003 need to be modified to use get_init_val in Isabelle (No constant)
+(V2I-005) Bug V2I-002 ; V2I-003 need to be modified to use get_init_val in Isabelle (No constant)
+
+(V2I-008) Nested list
 
 /*********************************************************************************************************************/
 /***************************************************  NOT FIXED  *****************************************************/
 /*********************************************************************************************************************/
 
-(V2I-004) subtype declaration is not translated to Isabelle
+(V2I-004) TODO : subtype declaration is not translated to Isabelle
 
-(V2I-006) array_type_definition is not implemented
+(V2I-006) TODO : array_type_definition is not implemented
 
-(V2I-007) base_literal is not able to parse (16#00000#)
-
-(V2I-008)
+(V2I-007) TODO : base_literal is not able to parse (16#00000#)
 
 (V2I-009)
 

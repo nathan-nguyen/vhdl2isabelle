@@ -1,5 +1,8 @@
 import org.slf4j.LoggerFactory
 
+/**
+  * Created by Hongxu Chen.
+  */
 package object core {
 
   val logger = LoggerFactory.getLogger(getClass)

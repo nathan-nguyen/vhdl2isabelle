@@ -1,28 +1,32 @@
 package core
 
-import sg.edu.ntu.hchen.VHDLParser.{Identifier_listContext, Subtype_indicationContext}
+import sg.edu.ntu.vhdl2isabelle.VHDLParser.{Identifier_listContext, Subtype_indicationContext}
 
 import scala.collection.JavaConversions._
 import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
 
+/**
+  * Created by Hongxu Chen.
+  */
 case class VInfo(typeInfo: TypeInfo, defInfo: DefInfo)
 
 object V2IUtils {
 
   /**
-    * change valType to correct one (character/std_logic/std_ulogic)
+    * Change valType to correct one (character/std_logic/std_ulogic)
     */
   def refine__valType(idef: IDef, tobeRefined: IsabelleExpression): IsabelleExpression = {
     tobeRefined match {
       case ec: IExp_constant => idef.getExpKind match {
-        case ExpScalarKind => IExp_constant(idef.getVType, ec.const, idef.getExpKind)
+        case ExpScalarKind => IExp_constant(idef.getVType.asInstanceOf[VBaseType], ec.const, idef.getExpKind)
         case vk: ExpVectorKind => {
           require(tobeRefined.expKind.isV, s"${tobeRefined.expKind}:\t${tobeRefined}")
           vk match {
             case ExpVectorKindTo => ec.const match {
-              case s: IConstS => handler(s"scalar??? ${ec}")
-              case l: IConstL => IExp_constant(idef.getVType, ec.const, idef.getExpKind)
+              case s: IConstS => handler(s"${s}")
+              case c: IConstCustomized => handler(s"${c}")
+              case l: IConstL => IExp_constant(idef.getVType.asInstanceOf[VBaseType], ec.const, idef.getExpKind)
               case rl: IConstRL => {
                 val valType = idef.getVType.asInstanceOf[VVectorType]
                 rl match {
@@ -36,22 +40,24 @@ object V2IUtils {
               }
             }
             case ExpVectorKindDownTo => ec.const match {
-              case s: IConstS => handler(s"scalar??? ${ec}")
+              case s: IConstS => handler(s"${s}")
+              case c: IConstCustomized => handler(s"${c}")
               case l: IConstL => {
                 val valType = idef.getVType.asInstanceOf[VVectorType]
                 l match {
                   case IConstL_raw(_, iConstList) => {
-                    IExp_constant(idef.getVType, IConstRL_raw(valType, iConstList), idef.getExpKind)
+                    IExp_constant(idef.getVType.asInstanceOf[VBaseType], IConstRL_raw(valType, iConstList), idef.getExpKind)
                   }
                   case IConstL_gen(_, length, rawVal) => {
-                    IExp_constant(idef.getVType, IConstRL_gen(valType, length, rawVal), idef.getExpKind)
+                    IExp_constant(idef.getVType.asInstanceOf[VBaseType], IConstRL_gen(valType, length, rawVal), idef.getExpKind)
                   }
                 }
               }
-              case rl: IConstRL => IExp_constant(idef.getVType, rl, idef.getExpKind)
+              case rl: IConstRL => IExp_constant(idef.getVType.asInstanceOf[VBaseType], rl, idef.getExpKind)
             }
           }
         }
+        case ExpCustomizedKind => handler (s"${ec}")
         case ExpUnknownKind => handler(s"${ec}")
       }
       case _ => tobeRefined
@@ -83,7 +89,7 @@ object V2IUtils {
     if (lhs_def.getExpKind.isV && rhsExp.expKind == ExpScalarKind) {
       val exp: IsabelleExpression = rhsExp match {
         case exp_con: IExp_constant => {
-          val valType = lhs_def.getVType
+          val valType = lhs_def.getVType.asInstanceOf[VBaseType]
           refine__sv_inner(exp_con, valType)
         }
         case _ => rhsExp

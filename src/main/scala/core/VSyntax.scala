@@ -1,11 +1,11 @@
 package core
 
-import sg.edu.ntu.hchen.VHDLParser._
-
+import sg.edu.ntu.vhdl2isabelle.VHDLParser._
 import scala.collection.JavaConversions._
 
-//********************************************************************************************************************//
-
+/**
+  * Created by Hongxu Chen.
+  */
 case class VLabelColon(id: String)
 
 object VLabelColon {

@@ -1,10 +1,12 @@
 package core
 
 import core.V2IUtils._
-import sg.edu.ntu.hchen.VHDLParser._
-
+import sg.edu.ntu.vhdl2isabelle.VHDLParser._
 import scala.collection.JavaConversions._
 
+/**
+  * Created by Hongxu Chen.
+  */
 sealed abstract class VLiteral {
 
   val trueOrFalse = Set("true", "false")
@@ -32,7 +34,7 @@ sealed abstract class VLiteral {
             val idef = defInfo.getDef(s)
             val expKind = idef.getExpKind
             idef match {
-              // NOTE: this should always use IExp_var/IExp_sig/IExp_prt
+              // NOTE: this should always use IExp_var/IExp_signal/IExp_port
               case ivariable: Variable => IExp_variable(ivariable, expKind)
               case signal: Signal => IExp_signal(signal, expKind)
               case port: Port => IExp_port(port, expKind)
@@ -617,9 +619,9 @@ case class VSelectedName(id: String, suffixList: List[VSuffix]) extends VName {
     nList.tail.foldLeft(nList.head)((acc, cur) => s"(${acc} ${extractor}''${cur}'')")
   }
 
-  def isar_v = extracted("v.")
+  def isa_v = extracted("v.")
 
-  def isar_sp = extracted("s.")
+  def isa_sp = extracted("s.")
 
   override def toI_rhs(defInfo: DefInfo): IsabelleExpression = {
     //    logger.info(s"${toString}")

@@ -2,7 +2,10 @@ package core
 
 import scala.language.implicitConversions
 
-case class IEnv_sp(signalList: List[Signal], portList: List[Port], spnlList: List[SPnl]) {
+/**
+  * Created by Hongxu Chen.
+  */
+case class IEnv_sp(signalList: List[Signal], portList: List[Port], spnlList: List[Spnl_list]) {
 
   override def toString: String = {
     val signalListNotEmpty  = signalList.map(_.as_list).size  > 0
@@ -88,11 +91,11 @@ sealed abstract class SP_lhs {
   override def toString = this match {
     case Lhs_s(sigPrt, sn) => sn.suffixList match {
       case Nil => s"(lhs_s ${sigPrt})"
-      case _ => s"(lhs_s (sp_of_spl ${sn.isar_sp}))"
+      case _ => s"(lhs_s (sp_of_spl ${sn.isa_sp}))"
     }
     case Lhs_sa(sigPrt, discreteRange, sn) => sn.suffixList match{
       case Nil => s"(lhs_sa ${sigPrt} ${discreteRange})"
-      case _ => s"(lhs_sa (sp_of_spl ${sn.isar_sp}) ${discreteRange})"
+      case _ => s"(lhs_sa (sp_of_spl ${sn.isa_sp}) ${discreteRange})"
     }
   }
 }
@@ -106,12 +109,12 @@ case class Lhs_sa(sigPrt: SigPrt, discreteRange: Discrete_range, sn: VSelectedNa
 sealed abstract class V_lhs {
   override def toString = this match {
     case Lhs_v(v, sn) => sn.suffixList match {
-      case Nil => s"(lhs_v ${sn.isar_v})"
-      case _ => s"(lhs_v (var_of_vl ${sn.isar_v}))"
+      case Nil => s"(lhs_v ${sn.isa_v})"
+      case _ => s"(lhs_v (var_of_vl ${sn.isa_v}))"
     }
     case Lhs_va(v, discreteRange, sn) => sn.suffixList match {
-      case Nil => s"(lhs_va ${sn.isar_v} ${discreteRange})"
-      case _ => s"(lhs_va (var_of_vl ${sn.isar_v}) ${discreteRange})"
+      case Nil => s"(lhs_va ${sn.isa_v} ${discreteRange})"
+      case _ => s"(lhs_va (var_of_vl ${sn.isa_v}) ${discreteRange})"
     }
   }
 }

@@ -7,9 +7,12 @@ import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{ANTLRFileStream, CommonTokenStream, Lexer, Token}
 import org.slf4j.LoggerFactory
 import core._
-import sg.edu.ntu.hchen.{VHDLLexer, VHDLParser}
+import sg.edu.ntu.vhdl2isabelle.{VHDLLexer, VHDLParser}
 import utils.PErrorListener
 
+/**
+  * Created by Hongxu Chen.
+  */
 class VITranslator(inFile: String, vInfo: Option[VInfo]) {
 
   val logger = LoggerFactory.getLogger(getClass)
