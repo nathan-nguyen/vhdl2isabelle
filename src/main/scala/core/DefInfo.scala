@@ -99,7 +99,6 @@ final class DefInfo(defInfo: Option[DefInfo]) {
       case SPl_signal(s) => List((s, null))
       case SPl_port(p) => List((null, p))
       case spnl_list: Spnl_list => aux(spnl_list)
-      case spnl_nested_list: Spnl_nestedList => handler(s"${spnl_nested_list}")
     }
     val (signalList, portList) = aux(spnl).unzip
     (signalList.filter(_ != null), portList.filter(_ != null))

@@ -39,7 +39,7 @@ case class IConstL_raw(valType: VVectorType, iConstList: List[IConst]) extends I
 case class IConstL_gen(valType: VVectorType, length: String, rawVal: Char) extends IConstL
 
 // IConstRL -> downto -> "var_rlist"
-abstract class IConstRL extends IConst {
+sealed abstract class IConstRL extends IConst {
   val valType: VVectorType
 }
 
@@ -47,14 +47,13 @@ case class IConstRL_raw(valType: VVectorType, iConstList: List[IConst]) extends 
 
 case class IConstRL_gen(valType: VVectorType, length: String, rawVal: Char) extends IConstRL
 
-// Nested list
-abstract class IConstRecord extends IConst {
+sealed abstract class IConstRecord extends IConst {
   val valType: VRecordType
 }
 
 // TODO: Add IConstRecord_raw() for the case initial values exist.
 
-// Generate the initial value
+// This is used for nested record - Generate the initial value
 case class IConstRecord_gen(valType: VRecordType) extends IConstRecord
 
 //********************************************************************************************************************//

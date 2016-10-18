@@ -126,7 +126,6 @@ sealed trait IDef {
       case spl_s: SPl_signal => spl_s.iSignal.valType
       case spl_p: SPl_port => spl_p.iPort.valType
       case spnl_list: Spnl_list => handler(s"${spnl_list}")
-      case spnl_nested_list : Spnl_nestedList => handler(s"${spnl_nested_list}")
     }
   }
 
@@ -144,8 +143,10 @@ sealed abstract class SPl extends SP_IDef {
       case pbt : Port_BaseType => s"(spl_p ${p})"
       case pct : Port_RecordType => s"(spnl ${p})"
     }
-    case Spnl_list(id, splList) => s"(spnl ('''', ${splList.ISABELLE}))"
-    case Spnl_nestedList(id, splList) => s"${splList.ISABELLE}"
+    case spnl_list@Spnl_list(id, splList) => {
+      if (spnl_list.nestedList) s"${splList.ISABELLE}"
+      else s"(spnl ('''', ${splList.ISABELLE}))"
+    }
   }
 
   override def as_definition: String = this match {
@@ -157,28 +158,24 @@ sealed abstract class SPl extends SP_IDef {
       s"""definition ${id}:: \"spl\" where
           |\"${id} ≡ ${toString}\"""".stripMargin
     }
-    case Spnl_nestedList(id, splList) => throw VIError
   }
 
   override def as_list = this match {
     case SPl_signal(s) => s.id
     case SPl_port(p) => p.id
     case Spnl_list(id, _) => s"(splist_of_spl ${id})"
-    case Spnl_nestedList(id, _) => throw VIError
   }
 
   override def getId = this match {
     case SPl_signal(s) => s.id
     case SPl_port(p) => p.id
     case Spnl_list(id, splList) => id
-    case Spnl_nestedList(id, spList) => throw VIError
   }
 
   override def getExpKind = this match {
     case SPl_signal(s) => s.getExpKind
     case SPl_port(p) => p.getExpKind
     case Spnl_list(id, splList) => ExpUnknownKind
-    case Spnl_nestedList(id, splList) => throw VIError
   }
 
   /**
@@ -210,8 +207,10 @@ case class SPl_signal(iSignal: Signal) extends SPl
 
 case class SPl_port(iPort: Port) extends SPl
 
-case class Spnl_list(id: String, splList: List[SPl]) extends SPl
-
+case class Spnl_list(id: String, splList: List[SPl]) extends SPl {
+  var nestedList : Boolean = false
+}
+// TODO: [HC] Rewrite to make it more general
 object Spnl_list {
   def genFromSignal(id: String, dataList: List[MetaData], signalKind: SignalKind.Ty): Spnl_list = {
     val splList = for {
@@ -235,25 +234,6 @@ object Spnl_list {
       }
     }
     Spnl_list(id, splList)
-  }
-
-}
-
-case class Spnl_nestedList(id: String, splList: List[SPl]) extends SPl
-
-object Spnl_nestedList {
-  def generateFromPort(id: String, dataList: List[MetaData], mode: PortMode.Ty, conn: PortConn.Ty, typeDeclarationMap : TypeDeclarationMap): Spnl_nestedList = {
-    val splList = for {
-      data <- dataList
-    } yield {
-      val itemId = s"${id}_${data.itemId}"
-      data.valType match {
-        case baseType : VBaseType => SPl_port(Port_BaseType(itemId, baseType, data.initVal, mode, conn))
-        case recordType : VRecordType => SPl_port(Port_RecordType(itemId, recordType, data.initVal, mode, conn, typeDeclarationMap))
-        case _ => handler(s"${data.valType}")
-      }
-    }
-    Spnl_nestedList(id, splList)
   }
 
 }
@@ -318,7 +298,8 @@ case class Port_BaseType(id: String, valType: VBaseType, iExp: IsabelleExpressio
 case class Port_RecordType(id: String, valType: VRecordType, iExp: IsabelleExpression, mode: PortMode.Ty, conn: PortConn.Ty, typeDeclarationMap : TypeDeclarationMap) extends Port {
   override def toString = {
     val initVals = valType.guessInitVals(typeDeclarationMap)
-    val SpnlNestedList = Spnl_nestedList.generateFromPort(id, initVals, mode, conn, typeDeclarationMap)
+    val SpnlNestedList = Spnl_list.generateFromPort(id, initVals, mode, conn, typeDeclarationMap)
+    SpnlNestedList.nestedList = true
     s"(''${id}'', ${SpnlNestedList})"
   }
 }
