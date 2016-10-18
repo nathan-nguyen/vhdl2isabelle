@@ -17,24 +17,25 @@ import scala.collection.mutable
   * - * vector: std_logic_vector, std_ulogic_vector
   * - * customized:
   */
-sealed abstract class VValType {
+sealed abstract class VTypeDefinition {
   val s: String
 }
 
-object VValType {
-  def apply(s: String): VValType = {
+object VTypeDefinition {
+  def apply(s: String): VTypeDefinition = {
     if (VBaseType.scalars(s)) {
       VScalarType(s)
     } else if (VBaseType.vectors(s)) {
       VVectorType(s)
-    } else {
-      // must be defined before; however should be checked outside
-      VCustomizedType(s)
-    }
+    } else if (VCustomizedType.recordTypes(s)) {
+      VRecordType(s)
+    } else if (VCustomizedType.subTypes(s)){
+      VSubtype(s)
+    } else handler(s)
   }
 }
 
-abstract class VBaseType extends VValType {
+abstract class VBaseType extends VTypeDefinition {
   val s: String
 }
 
@@ -145,14 +146,22 @@ case class VVectorType(s: String) extends VBaseType {
   }
 }
 
-case class VCustomizedType(s: String) extends VValType {
+// CustomizedType does not exist in VHDL Parser
+sealed abstract class VCustomizedType extends VTypeDefinition
 
-  def guessInitVals(typeDeclTbl: TDTy): List[MetaData] = {
-    val recordInfo = typeDeclTbl(this)
+object VCustomizedType {
+  var subTypes = Set("");
+  var recordTypes = Set("");
+}
+
+case class VRecordType(s: String) extends VCustomizedType {
+
+  def guessInitVals(typeDeclarationMap: TypeDeclarationMap): List[MetaData] = {
+    val recordInfo = typeDeclarationMap(this)
     val iVals = for {
       (itemId, sti) <- recordInfo
     } yield {
-      val valType = VValType(sti.getSimpleName)
+      val valType = VTypeDefinition(sti.getSimpleName)
       valType match {
         case bt: VBaseType => {
           val initVal = bt match {
@@ -164,26 +173,28 @@ case class VCustomizedType(s: String) extends VValType {
           }
           MetaData(itemId, bt, initVal)
         }
-        case ct: VCustomizedType =>
-          MetaData(itemId, valType, IExp_customizedConstant(ct, IConstCustomized_gen(ct), ExpCustomizedKind))
+        case ct: VCustomizedType => ct match {
+          case recordType : VRecordType => MetaData(itemId, valType, IExp_RecordConstant(recordType, IConstRecord_gen(recordType), ExpRecordKind))
+          case subtype : VSubtype => handler(s"${subtype}")
+        }
       }
     }
     iVals.toList
   }
 
   // expOption is taken from definition; but type information should be record type declaration
-  def getInitVals(typeDeclTbl: TDTy, expOption: Option[VExp])(defInfo: DefInfo): List[MetaData] = {
+  def getInitVals(typeDeclarationMap: TypeDeclarationMap, expOption: Option[VExp])(defInfo: DefInfo): List[MetaData] = {
     val iVals: Seq[MetaData] = expOption match {
       case Some(vExp) => {
         vExp.getPrimary match {
           case Some(VPrimaryAggregate(aggregate)) => {
-            val recordInfo = typeDeclTbl(this)
+            val recordInfo = typeDeclarationMap(this)
             val aggregateIdExpMap = aggregate.getAssoc
             for {
               (itemId, sti) <- recordInfo
             } yield {
               val itemExp = aggregateIdExpMap(itemId)
-              val itemValType = VValType(sti.getSimpleName)
+              val itemValType = VTypeDefinition(sti.getSimpleName)
               val initVal: IsabelleExpression = itemValType match {
                 case bt: VBaseType => bt match {
                   case st: VScalarType => {
@@ -214,33 +225,47 @@ case class VCustomizedType(s: String) extends VValType {
                   }
                 }
                 case ct: VCustomizedType => {
-                  val printVal = println("\n\nprintVal " + ct + "\n\n")
-                  handler(s"list-list: ${itemValType}")
+                  handler(s"${ct}")
                 }
               }
               MetaData(itemId, itemValType, initVal)
-            } // end of yield
+            } // End of yield
           }
           case _ => {
             logger.warn(s"unknown record exp, guessing")
-            guessInitVals(typeDeclTbl)
+            guessInitVals(typeDeclarationMap)
           }
         }
       }
-      case None => guessInitVals(typeDeclTbl)
+      case None => guessInitVals(typeDeclarationMap)
     }
     iVals.toList
   }
 
 }
 
+// VSubType should be separate with VTypeDefinition
+case class VSubtype(s: String) extends VCustomizedType
 
 class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
 
-  val typeDeclTbl: TDTy = typeInfo match {
-    case Some(ti) => ti.typeDeclTbl
+  val typeDeclaration: TypeDeclarationMap = typeInfo match {
+    case Some(ti) => ti.typeDeclaration
     case None => mutable.Map.empty
   }
 
-  def +=(id: VCustomizedType, items: RecordInfoTy): Unit = typeDeclTbl += (id -> items)
+  val subtypeDeclaration: SubtypeInfoMap = typeInfo match {
+    case Some(ti) => ti.subtypeDeclaration
+    case None => mutable.Map.empty
+  }
+
+  def updateRecordType(id: VRecordType, items: RecordInfoSeq): Unit = {
+    VCustomizedType.recordTypes += id.s
+    typeDeclaration += (id -> items)
+  }
+
+  def updateSubType(id: VSubtype, items: VSubtypeIndication): Unit = {
+    VCustomizedType.subTypes += id.s
+    subtypeDeclaration += (id -> items)
+  }
 }

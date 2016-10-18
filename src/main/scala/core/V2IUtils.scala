@@ -25,7 +25,7 @@ object V2IUtils {
           vk match {
             case ExpVectorKindTo => ec.const match {
               case s: IConstS => handler(s"${s}")
-              case c: IConstCustomized => handler(s"${c}")
+              case c: IConstRecord => handler(s"${c}")
               case l: IConstL => IExp_constant(idef.getVType.asInstanceOf[VBaseType], ec.const, idef.getExpKind)
               case rl: IConstRL => {
                 val valType = idef.getVType.asInstanceOf[VVectorType]
@@ -41,7 +41,7 @@ object V2IUtils {
             }
             case ExpVectorKindDownTo => ec.const match {
               case s: IConstS => handler(s"${s}")
-              case c: IConstCustomized => handler(s"${c}")
+              case c: IConstRecord => handler(s"${c}")
               case l: IConstL => {
                 val valType = idef.getVType.asInstanceOf[VVectorType]
                 l match {
@@ -57,7 +57,7 @@ object V2IUtils {
             }
           }
         }
-        case ExpCustomizedKind => handler (s"${ec}")
+        case ExpRecordKind => handler (s"${ec}")
         case ExpUnknownKind => handler(s"${ec}")
       }
       case _ => tobeRefined

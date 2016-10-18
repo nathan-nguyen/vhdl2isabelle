@@ -18,27 +18,27 @@ object VLabelColon {
 
 import core.V2IUtils._
 
-case class VConstDecl(idList: List[String], subtypeInd: VSubtypeInd, vExp: Option[VExp])
+case class VConstantDeclaration(idList: List[String], subtypeIndication: VSubtypeIndication, vExp: Option[VExp])
 
-object VConstDecl {
-  def apply(ctx: Constant_declarationContext): VConstDecl = {
+object VConstantDeclaration {
+  def apply(ctx: Constant_declarationContext): VConstantDeclaration = {
     val idList = getIdList(ctx.identifier_list())
-    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
+    val subtypeIndication = VSubtypeIndication(ctx.subtype_indication())
     val vExp = Option(ctx.expression()).map(VExp(_))
-    VConstDecl(idList, subtypeInd, vExp)
+    VConstantDeclaration(idList, subtypeIndication, vExp)
   }
 }
 
 
 //********************************************************************************************************************//
 
-case class VSignalDecl(idList: List[String], subtypeInd: VSubtypeInd,
+case class VSignalDecl(idList: List[String], subtypeInd: VSubtypeIndication,
                        signalKind: Option[String], exp: Option[VExp])
 
 object VSignalDecl {
   def apply(ctx: Signal_declarationContext): VSignalDecl = {
     val idList = getIdList(ctx.identifier_list())
-    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
+    val subtypeInd = VSubtypeIndication(ctx.subtype_indication())
     val signalKind = Option(ctx.signal_kind()).map(_.getText.toLowerCase)
     val exp = Option(ctx.expression()).map(VExp(_))
     VSignalDecl(idList, subtypeInd, signalKind, exp)
@@ -47,36 +47,36 @@ object VSignalDecl {
 
 //********************************************************************************************************************//
 
-case class VInterfaceSignalDecl(idList: List[String], subtypeInd: VSubtypeInd, vExp: Option[VExp])
+case class VInterfaceSignalDecl(idList: List[String], subtypeInd: VSubtypeIndication, vExp: Option[VExp])
 
 object VInterfaceSignalDecl {
   def apply(ctx: Interface_signal_declarationContext): VInterfaceSignalDecl = {
     val idList = getIdList(ctx.identifier_list())
-    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
+    val subtypeInd = VSubtypeIndication(ctx.subtype_indication())
     val vExp = Option(ctx.expression()).map(VExp(_))
     VInterfaceSignalDecl(idList, subtypeInd, vExp)
   }
 }
 
-case class VInterfaceConstDecl(idList: List[String], subtypeInd: VSubtypeInd, vExp: Option[VExp])
+case class VInterfaceConstDecl(idList: List[String], subtypeInd: VSubtypeIndication, vExp: Option[VExp])
 
 object VInterfaceConstDecl {
   def apply(ctx: Interface_constant_declarationContext): VInterfaceConstDecl = {
     val idList = getIdList(ctx.identifier_list())
-    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
+    val subtypeInd = VSubtypeIndication(ctx.subtype_indication())
     val vExp = Option(ctx.expression()).map(VExp(_))
     VInterfaceConstDecl(idList, subtypeInd, vExp)
   }
 }
 
 case class VInterfacePortDecl(idList: List[String], mode: String,
-                              subtypeInd: VSubtypeInd, vExp: Option[VExp])
+                              subtypeInd: VSubtypeIndication, vExp: Option[VExp])
 
 object VInterfacePortDecl {
   def apply(ctx: Interface_port_declarationContext): VInterfacePortDecl = {
     val idList = getIdList(ctx.identifier_list())
     val mode = ctx.signal_mode().getText
-    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
+    val subtypeInd = VSubtypeIndication(ctx.subtype_indication())
     val vExp = Option(ctx.expression()).map(VExp(_))
     VInterfacePortDecl(idList, mode, subtypeInd, vExp)
   }
@@ -345,13 +345,13 @@ case class VConcSignalAssignStatS(labelColon: Option[String],
 
 //********************************************************************************************************************//
 case class VVarDecl(shared: Boolean, idList: List[String],
-                    subtypeInd: VSubtypeInd, vExp: Option[VExp])
+                    subtypeInd: VSubtypeIndication, vExp: Option[VExp])
 
 object VVarDecl {
   def apply(ctx: Variable_declarationContext): VVarDecl = {
     val shared = ctx.SHARED() != null
     val idList = getIdList(ctx.identifier_list())
-    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
+    val subtypeInd = VSubtypeIndication(ctx.subtype_indication())
     val vExp = Option(ctx.expression()).map(VExp(_))
     VVarDecl(shared, idList, subtypeInd, vExp)
   }
@@ -492,7 +492,7 @@ object VProcDeclItem {
     } else if (typeDecl != null) {
       VProcDeclItemSTD(VSubtypeDeclaration(subtypeDecl))
     } else if (constDecl != null) {
-      VProcDeclItemCD(VConstDecl(constDecl))
+      VProcDeclItemCD(VConstantDeclaration(constDecl))
     } else if (varDecl != null) {
       VProcDeclItemVD(VVarDecl(varDecl))
     } else if (fileDecl != null) {
@@ -522,7 +522,7 @@ case class VProcDeclItemTD(typeDecl: VTypeDecl) extends VProcDeclItem
 
 case class VProcDeclItemSTD(subtypeDecl: VSubtypeDeclaration) extends VProcDeclItem
 
-case class VProcDeclItemCD(constDecl: VConstDecl) extends VProcDeclItem
+case class VProcDeclItemCD(constDecl: VConstantDeclaration) extends VProcDeclItem
 
 case class VProcDeclItemVD(varDecl: VVarDecl) extends VProcDeclItem
 
@@ -1297,7 +1297,7 @@ object VBlockDeclItem {
     } else if (subtype_declaration != null) {
       VBlockDeclItemSTD(VSubtypeDeclaration(subtype_declaration))
     } else if (constant_declarationContext != null) {
-      VBlockDeclItemCD(VConstDecl(constant_declarationContext))
+      VBlockDeclItemCD(VConstantDeclaration(constant_declarationContext))
     } else if (signal_declaration != null) {
       VBlockDeclItemSD(VSignalDecl(signal_declaration))
     } else if (variable_declaration != null) {
@@ -1344,7 +1344,7 @@ case class VBlockDeclItemSTD(vSubtypeDecl: VSubtypeDeclaration) extends VBlockDe
 
 case class VBlockDeclItemTD(vTypeDecl: VTypeDecl) extends VBlockDeclItem
 
-case class VBlockDeclItemCD(vConstDecl: VConstDecl) extends VBlockDeclItem
+case class VBlockDeclItemCD(vConstDecl: VConstantDeclaration) extends VBlockDeclItem
 
 case class VBlockDeclItemSD(vSignalDecl: VSignalDecl) extends VBlockDeclItem
 
@@ -1380,12 +1380,12 @@ case class VBlockDeclItemQD(vQuantityDecl: VQuantityDecl) extends VBlockDeclItem
 
 case class VBlockDeclItemTermD(VTermDecl: VTermDecl) extends VBlockDeclItem
 
-case class VSubtypeDeclaration(id: String, subtypeInd: VSubtypeInd)
+case class VSubtypeDeclaration(id: String, subtypeInd: VSubtypeIndication)
 
 object VSubtypeDeclaration {
   def apply(ctx: Subtype_declarationContext): VSubtypeDeclaration = {
     val id = ctx.identifier().getText
-    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
+    val subtypeInd = VSubtypeIndication(ctx.subtype_indication())
     VSubtypeDeclaration(id, subtypeInd)
   }
 }

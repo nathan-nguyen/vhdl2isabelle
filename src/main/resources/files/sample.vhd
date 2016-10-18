@@ -59,6 +59,7 @@ entity iu3 is
 end;
 
 architecture rtl of iu3 is
-
+  --CONSTANT arrayConst : cdatatype := (0, 1, 2, 3);
+  --CONSTANT arrayConst : cdatatype := (v0 => 0,v1 => 1,v2 => 2,v3 => 3);
 begin
 end;

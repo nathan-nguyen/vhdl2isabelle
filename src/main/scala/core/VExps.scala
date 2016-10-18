@@ -248,7 +248,7 @@ object VTypeDef {
   }
 }
 
-case class VAccessTypeDef(subtypeInd: VSubtypeInd) extends VTypeDef
+case class VAccessTypeDef(subtypeInd: VSubtypeIndication) extends VTypeDef
 
 object VAccessTypeDef {
   def apply(ctx: Access_type_definitionContext): VAccessTypeDef = {
@@ -256,7 +256,7 @@ object VAccessTypeDef {
   }
 }
 
-case class VFileTypeDef(subtypeInd: VSubtypeInd) extends VTypeDef
+case class VFileTypeDef(subtypeInd: VSubtypeIndication) extends VTypeDef
 
 object VFileTypeDef {
   def apply(ctx: File_type_definitionContext): VFileTypeDef = {
@@ -343,36 +343,36 @@ object VArrayTypeDef {
 case class VIndexSubtypeDef(name: String)
 
 case class VUArrayDef(indexSubtypeDefList: List[VIndexSubtypeDef],
-                      subtypeInd: VSubtypeInd) extends VArrayTypeDef
+                      subtypeInd: VSubtypeIndication) extends VArrayTypeDef
 
 object VUArrayDef {
   def apply(ctx: Unconstrained_array_definitionContext): VUArrayDef = {
     val indexSubtypeDefList = ctx.index_subtype_definition().map(d => VIndexSubtypeDef(d.name().getText)).toList
-    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
+    val subtypeInd = VSubtypeIndication(ctx.subtype_indication())
     VUArrayDef(indexSubtypeDefList, subtypeInd)
   }
 }
 
 case class VCArrayDef(indexConstraint: VIndexConstraint,
-                      subtypeInd: VSubtypeInd) extends VArrayTypeDef
+                      subtypeInd: VSubtypeIndication) extends VArrayTypeDef
 
 object VCArrayDef {
   def apply(ctx: Constrained_array_definitionContext): VCArrayDef = {
     val indexConstraint = VIndexConstraint(ctx.index_constraint())
-    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
+    val subtypeInd = VSubtypeIndication(ctx.subtype_indication())
     VCArrayDef(indexConstraint, subtypeInd)
   }
 }
 
 // no element_subtype_definition
-case class VElementDecl(ids: List[String], subtypeInd: VSubtypeInd) {
+case class VElementDecl(ids: List[String], subtypeInd: VSubtypeIndication) {
   def flatten = for (id <- ids) yield (id, subtypeInd)
 }
 
 object VElementDecl {
   def apply(ctx: Element_declarationContext): VElementDecl = {
     val idList = getIdList(ctx.identifier_list())
-    val subtypeInd = VSubtypeInd(ctx.element_subtype_definition().subtype_indication())
+    val subtypeInd = VSubtypeIndication(ctx.element_subtype_definition().subtype_indication())
     VElementDecl(idList, subtypeInd)
   }
 }
@@ -480,13 +480,13 @@ object VAggregate {
 
 sealed trait VQExp
 
-case class VQExpA(subtypeInd: VSubtypeInd, aggregate: VAggregate) extends VQExp
+case class VQExpA(subtypeInd: VSubtypeIndication, aggregate: VAggregate) extends VQExp
 
-case class VQExpE(subtypeInd: VSubtypeInd, exp: VExp) extends VQExp
+case class VQExpE(subtypeInd: VSubtypeIndication, exp: VExp) extends VQExp
 
 object VQExp {
   def apply(ctx: Qualified_expressionContext): VQExp = {
-    val subtypeInd = VSubtypeInd(ctx.subtype_indication())
+    val subtypeInd = VSubtypeIndication(ctx.subtype_indication())
     val (aggregate, expression) = (ctx.aggregate(), ctx.expression())
     if (aggregate != null) {
       val vAggregate = VAggregate(aggregate)
@@ -502,7 +502,7 @@ sealed trait VAllocator
 
 case class VallocatorE(qexp: VQExp) extends VAllocator
 
-case class VAllocatorS(subtypeInd: VSubtypeInd) extends VAllocator
+case class VAllocatorS(subtypeInd: VSubtypeIndication) extends VAllocator
 
 object VAllocator {
   def apply(ctx: AllocatorContext): VAllocator = {
@@ -511,7 +511,7 @@ object VAllocator {
     if (qualified_expression != null) {
       VallocatorE(VQExp(qualified_expression))
     } else if (subtype_indication != null) {
-      VAllocatorS(VSubtypeInd(subtype_indication))
+      VAllocatorS(VSubtypeIndication(subtype_indication))
     } else throw VIError
   }
 }
@@ -858,20 +858,20 @@ object VNameParts {
 
 sealed trait VAliasIndication
 
-case class VSubtypeInd(selectedName: VSelectedName,
-                       constraint: Option[VConstraint],
-                       tolerance: Option[VToleranceAspect]) extends VAliasIndication {
+case class VSubtypeIndication(selectedName: VSelectedName,
+                              constraint: Option[VConstraint],
+                              tolerance: Option[VToleranceAspect]) extends VAliasIndication {
   def getRange: Option[VRangeV] = constraint.map(_.getRange)
 
   def getSimpleName = selectedName.getSimpleNameOpt.getOrElse(s"ERROR: ${toString}")
 }
 
-object VSubtypeInd {
-  def apply(ctx: Subtype_indicationContext): VSubtypeInd = {
+object VSubtypeIndication {
+  def apply(ctx: Subtype_indicationContext): VSubtypeIndication = {
     val selectedName = selectedNameFromSubtypeInd(ctx)
     val constraint = Option(ctx.constraint()).map(VConstraint(_))
     val tolerance = Option(ctx.tolerance_aspect()).map(VToleranceAspect(_))
-    VSubtypeInd(selectedName, constraint, tolerance)
+    VSubtypeIndication(selectedName, constraint, tolerance)
   }
 }
 
@@ -931,14 +931,14 @@ object VDiscreteRange {
     if (range != null) {
       VDiscreteRangeR(VRange(range))
     } else if (subtype_indication != null) {
-      VDiscreteRangeSub(VSubtypeInd(subtype_indication))
+      VDiscreteRangeSub(VSubtypeIndication(subtype_indication))
     } else throw VIError
   }
 }
 
 case class VDiscreteRangeR(range: VRange) extends VDiscreteRange
 
-case class VDiscreteRangeSub(subtypeInd: VSubtypeInd) extends VDiscreteRange
+case class VDiscreteRangeSub(subtypeInd: VSubtypeIndication) extends VDiscreteRange
 
 //********************************************************************************************************************//
 

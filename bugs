@@ -34,11 +34,14 @@ To Isabelle -> 34
 
 (V2I-007) Base Literal
 
+(V2I-004) Subtype declaration
+Example:
+subtype cword is std_logic_vector(IDBITS-1 downto 0);
+CONSTANT subtypeConst : subtype;
+
 /*********************************************************************************************************************/
 /***************************************************  NOT FIXED  *****************************************************/
 /*********************************************************************************************************************/
-
-(V2I-004) TODO : subtype declaration is not translated to Isabelle
 
 (V2I-006) TODO : array_type_definition is not implemented
 

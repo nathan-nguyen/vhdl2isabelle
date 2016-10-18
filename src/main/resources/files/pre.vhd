@@ -13,37 +13,45 @@ type boolean is (false,true);
 
 constant IDBITS : integer := 32;
 
---subtype cword is std_logic_vector(IDBITS-1 downto 0);
+subtype cword is std_logic_vector(IDBITS-1 downto 0);
 --type cdatatype is array (0 to 3) of cword;
+--type cdatatype is array (0 to 3) of integer;
+
+--type cdatatype is record
+--  v0 : integer;
+--  v1 : integer;
+--  v2 : integer;
+--  v3 : integer;
+--end record;
 
 type icache_in_type is record
-     rpc              : std_logic_vector(31 downto 0);  -- raw address (npc)
-     fpc              : std_logic_vector(31 downto 0);  -- latched address (fpc)
-     dpc              : std_logic_vector(31 downto 0);  -- latched address (dpc)
-     rbranch          : std_ulogic;                     -- Instruction branch
-     fbranch          : std_ulogic;                     -- Instruction branch
-     inull            : std_ulogic;                     -- instruction nullify
-     su               : std_ulogic;                     -- super-user
-     flush            : std_ulogic;                     -- flush icache
-     fline            : std_logic_vector(31 downto 3);  -- flush line offset
-     nobpmiss         : std_ulogic;                     -- Predicted instruction, block hold
-  end record;
+  rpc              : std_logic_vector(31 downto 0);  -- raw address (npc)
+  fpc              : std_logic_vector(31 downto 0);  -- latched address (fpc)
+  dpc              : std_logic_vector(31 downto 0);  -- latched address (dpc)
+  rbranch          : std_ulogic;                     -- Instruction branch
+  fbranch          : std_ulogic;                     -- Instruction branch
+  inull            : std_ulogic;                     -- instruction nullify
+  su               : std_ulogic;                     -- super-user
+  flush            : std_ulogic;                     -- flush icache
+  fline            : std_logic_vector(31 downto 3);  -- flush line offset
+  nobpmiss         : std_ulogic;                     -- Predicted instruction, block hold
+end record;
 
-  type icache_out_type is record
-     --data             : cdatatype;
-     set              : std_logic_vector(1 downto 0);
-     mexc             : std_ulogic;
-     hold             : std_ulogic;
-     flush            : std_ulogic;                             -- flush in progress
-     diagrdy          : std_ulogic;                             -- diagnostic access ready
-     diagdata         : std_logic_vector(IDBITS-1 downto 0);    -- diagnostic data
-     mds              : std_ulogic;                             -- memory data strobe
-     cfg              : std_logic_vector(31 downto 0);
-     idle             : std_ulogic;                             -- idle mode
-     --cstat            : l3_cstat_type;
-     bpmiss           : std_ulogic;
-     eocl             : std_ulogic;
-  end record;
+type icache_out_type is record
+  --data             : cdatatype;
+  set              : std_logic_vector(1 downto 0);
+  mexc             : std_ulogic;
+  hold             : std_ulogic;
+  flush            : std_ulogic;                             -- flush in progress
+  diagrdy          : std_ulogic;                             -- diagnostic access ready
+  diagdata         : std_logic_vector(IDBITS-1 downto 0);    -- diagnostic data
+  mds              : std_ulogic;                             -- memory data strobe
+  cfg              : std_logic_vector(31 downto 0);
+  idle             : std_ulogic;                             -- idle mode
+  --cstat            : l3_cstat_type;
+  bpmiss           : std_ulogic;
+  eocl             : std_ulogic;
+end record;
 -----------------------------------------------------------------------------
 -- END
 -----------------------------------------------------------------------------

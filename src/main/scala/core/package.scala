@@ -13,8 +13,12 @@ package object core {
 
   case class VIErrorMsg(msg: String) extends Exception(msg)
 
-  type TDTy = scala.collection.mutable.Map[VCustomizedType, RecordInfoTy]
-  type RecordInfoTy = Seq[(String, VSubtypeInd)]
+  // [TN] What does Ty stand for?
+  type TypeDeclarationMap = scala.collection.mutable.Map[VRecordType, RecordInfoSeq]
+  type RecordInfoSeq = Seq[(String, VSubtypeIndication)]
+
+  type SubtypeInfoMap = scala.collection.mutable.Map[VSubtype, VSubtypeIndication]
+
   type IdTy = String
   type DefIdPair = (Option[IDef], IdTy)
 

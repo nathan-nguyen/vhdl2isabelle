@@ -7,9 +7,11 @@ package core
 /**
   * It's only used for idef generation
   */
-final case class MetaData(itemId: String, valType: VValType, initVal: IsabelleExpression)
+final case class MetaData(itemId: String, valType: VTypeDefinition, initVal: IsabelleExpression)
 
 //********************************************************************************************************************//
+
+sealed trait V_IDef extends IDef
 
 case class Variable(id: String, valType: VBaseType, iExp: IsabelleExpression) extends V_IDef {
   override def toString = s"""(''${id}'', ${VHDLize(valType)}, ${iExp})"""
@@ -26,8 +28,6 @@ case class Variable(id: String, valType: VBaseType, iExp: IsabelleExpression) ex
   override def getExpKind = iExp.expKind
 
 }
-
-sealed trait V_IDef extends IDef
 
 sealed trait Vl extends V_IDef {
 
@@ -62,9 +62,7 @@ sealed trait Vl extends V_IDef {
   }
 
 
-  /**
-    * it may return a "variable" or a "vl" (which is vnl-generated)
-    */
+  // [HC] It may return a "variable" or a "vl" (which is vnl-generated)
   def get(nList: List[String]): Option[V_IDef] = {
     def aux(l: List[String], cur: Option[Vl]): Option[Vl] = l match {
       case h :: t => cur match {
@@ -116,7 +114,7 @@ sealed trait IDef {
   // [HC] Only the "final" classes have the id
   def getId: IdTy
 
-  def getVType: VValType = this match {
+  def getVType: VTypeDefinition = this match {
     case v: Variable => v.valType
     case s: Signal => s.valType
     case p: Port => p.valType
@@ -144,7 +142,7 @@ sealed abstract class SPl extends SP_IDef {
     case SPl_signal(s) => s"(spl_s ${s})"
     case SPl_port(p) => p match {
       case pbt : Port_BaseType => s"(spl_p ${p})"
-      case pct : Port_CustomizedType => s"(spnl ${p})"
+      case pct : Port_RecordType => s"(spnl ${p})"
     }
     case Spnl_list(id, splList) => s"(spnl ('''', ${splList.ISABELLE}))"
     case Spnl_nestedList(id, splList) => s"${splList.ISABELLE}"
@@ -225,14 +223,15 @@ object Spnl_list {
     Spnl_list(id, splList)
   }
 
-  def generateFromPort(id: String, dataList: List[MetaData], mode: PortMode.Ty, conn: PortConn.Ty, typeInfo: TypeInfo, defInfo: DefInfo): Spnl_list = {
+  def generateFromPort(id: String, dataList: List[MetaData], mode: PortMode.Ty, conn: PortConn.Ty, typeDeclarationMap : TypeDeclarationMap): Spnl_list = {
     val splList = for {
       data <- dataList
     } yield {
       val itemId = s"${id}_${data.itemId}"
       data.valType match {
         case baseType : VBaseType => SPl_port(Port_BaseType(itemId, baseType, data.initVal, mode, conn))
-        case customizedType : VCustomizedType => SPl_port(Port_CustomizedType(itemId, customizedType, data.initVal, mode, conn, typeInfo, defInfo))
+        case recordType : VRecordType => SPl_port(Port_RecordType(itemId, recordType, data.initVal, mode, conn, typeDeclarationMap))
+        case _ => handler(s"${data.valType}")
       }
     }
     Spnl_list(id, splList)
@@ -243,14 +242,15 @@ object Spnl_list {
 case class Spnl_nestedList(id: String, splList: List[SPl]) extends SPl
 
 object Spnl_nestedList {
-  def generateFromPort(id: String, dataList: List[MetaData], mode: PortMode.Ty, conn: PortConn.Ty, typeInfo: TypeInfo, defInfo: DefInfo): Spnl_nestedList = {
+  def generateFromPort(id: String, dataList: List[MetaData], mode: PortMode.Ty, conn: PortConn.Ty, typeDeclarationMap : TypeDeclarationMap): Spnl_nestedList = {
     val splList = for {
       data <- dataList
     } yield {
       val itemId = s"${id}_${data.itemId}"
       data.valType match {
         case baseType : VBaseType => SPl_port(Port_BaseType(itemId, baseType, data.initVal, mode, conn))
-        case customizedType : VCustomizedType => SPl_port(Port_CustomizedType(itemId, customizedType, data.initVal, mode, conn, typeInfo, defInfo))
+        case recordType : VRecordType => SPl_port(Port_RecordType(itemId, recordType, data.initVal, mode, conn, typeDeclarationMap))
+        case _ => handler(s"${data.valType}")
       }
     }
     Spnl_nestedList(id, splList)
@@ -296,7 +296,7 @@ object PortConn extends Enumeration {
 
 sealed abstract class Port extends SP_IDef {
   val id: String
-  val valType : VValType
+  val valType : VTypeDefinition
   val iExp: IsabelleExpression
 
   def as_definition: String = {
@@ -315,10 +315,10 @@ case class Port_BaseType(id: String, valType: VBaseType, iExp: IsabelleExpressio
   override def toString = s"(''${id}'', ${VHDLize(valType)}, ${mode}, ${conn}, ${iExp})"
 }
 
-case class Port_CustomizedType(id: String, valType: VCustomizedType, iExp: IsabelleExpression, mode: PortMode.Ty, conn: PortConn.Ty, typeInfo: TypeInfo, defInfo : DefInfo) extends Port {
+case class Port_RecordType(id: String, valType: VRecordType, iExp: IsabelleExpression, mode: PortMode.Ty, conn: PortConn.Ty, typeDeclarationMap : TypeDeclarationMap) extends Port {
   override def toString = {
-    val initVals = valType.guessInitVals(typeInfo.typeDeclTbl)
-    val SpnlNestedList = Spnl_nestedList.generateFromPort(id, initVals, mode, conn, typeInfo, defInfo)
+    val initVals = valType.guessInitVals(typeDeclarationMap)
+    val SpnlNestedList = Spnl_nestedList.generateFromPort(id, initVals, mode, conn, typeDeclarationMap)
     s"(''${id}'', ${SpnlNestedList})"
   }
 }

@@ -23,7 +23,7 @@ sealed abstract class IConst {
       case IConstRL_raw(valType, iConstList) => s"(val_rlist ${iConstList.ISABELLE_r})"
       case g@IConstRL_gen(valType, length, rawVal) => s"(val_rlist ${generateInitialValue(valType, length, rawVal)})"
     }
-    case c: IConstCustomized => handler(s"${c}")
+    case c: IConstRecord => handler(s"${c}")
   }
 }
 
@@ -48,14 +48,14 @@ case class IConstRL_raw(valType: VVectorType, iConstList: List[IConst]) extends 
 case class IConstRL_gen(valType: VVectorType, length: String, rawVal: Char) extends IConstRL
 
 // Nested list
-abstract class IConstCustomized extends IConst {
-  val valType: VCustomizedType
+abstract class IConstRecord extends IConst {
+  val valType: VRecordType
 }
 
-// TODO: Add IConstCustomized_raw() for the case initial values exist.
+// TODO: Add IConstRecord_raw() for the case initial values exist.
 
 // Generate the initial value
-case class IConstCustomized_gen(valType: VCustomizedType) extends IConstCustomized
+case class IConstRecord_gen(valType: VRecordType) extends IConstRecord
 
 //********************************************************************************************************************//
 
@@ -77,7 +77,7 @@ case object ExpVectorKindTo extends ExpVectorKind
 // Vector downto
 case object ExpVectorKindDownTo extends ExpVectorKind
 
-case object ExpCustomizedKind extends ExpKind
+case object ExpRecordKind extends ExpKind
 
 case object ExpUnknownKind extends ExpKind
 
@@ -86,7 +86,7 @@ case object ExpUnknownKind extends ExpKind
 sealed abstract class IsabelleExpression {
   val expKind: ExpKind
 
-  def getVType: VValType = getIDef.getVType
+  def getVType: VTypeDefinition = getIDef.getVType
 
   def getIDef: IDef = this match {
     case vl_rhs: IExp_vl_rhs => vl_rhs.v
@@ -99,7 +99,7 @@ sealed abstract class IsabelleExpression {
 
   override def toString = this match {
     case IExp_constant(baseType, const, _) => s"""(exp_con (${VHDLize(baseType)}, ${const}))"""
-    case IExp_customizedConstant(customizedType, const, _) => throw VIError
+    case IExp_RecordConstant(recordType, const, _) => throw VIError
     case IExp_variable(variable, _) => s"""(exp_var ${variable.getId})"""
     case IExp_signal(signal, _) => s"""(exp_sig ${signal.getId})"""
     case IExp_port(port, _) => s"""(exp_prt ${port.getId})"""
@@ -133,7 +133,7 @@ sealed abstract class IsabelleExpression {
 
 case class IExp_constant(baseType: VBaseType, const: IConst, expKind: ExpKind) extends IsabelleExpression
 
-case class IExp_customizedConstant(customizedType: VCustomizedType, const: IConst, expKind: ExpKind) extends IsabelleExpression
+case class IExp_RecordConstant(recordType: VRecordType, const: IConst, expKind: ExpKind) extends IsabelleExpression
 
 // For storing identifiers
 // Different from Isabelle, it must be a defined "variable"

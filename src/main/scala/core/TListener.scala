@@ -106,7 +106,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
       flattened <- elementDecl.flatten
     } yield flattened
     val typeDeclId = ctx.getParent.getParent.getParent.asInstanceOf[Type_declarationContext].identifier().getText
-    typeInfo +=(VCustomizedType(typeDeclId), items)
+    typeInfo.updateRecordType(VRecordType(typeDeclId), items)
   }
 
   override def exitTerm(ctx: TermContext): Unit = {}
@@ -116,11 +116,11 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def exitSelected_waveforms(ctx: Selected_waveformsContext): Unit = {}
 
   override def exitConstant_declaration(ctx: Constant_declarationContext): Unit = {
-    val constDecl = VConstDecl(ctx)
+    val constantDeclaration = VConstantDeclaration(ctx)
     for {
-      id <- constDecl.idList
+      id <- constantDeclaration.idList
     } {
-      genIVariable(id, constDecl.vExp, constDecl.subtypeInd)
+      genIVariable(id, constantDeclaration.vExp, constantDeclaration.subtypeIndication)
     }
   }
 
@@ -348,7 +348,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
     val subtypeDeclaration = VSubtypeDeclaration(ctx)
     val identifier = subtypeDeclaration.id
     val subtypeIndication = subtypeDeclaration.subtypeInd
-//    typeInfo += (VCustomizedType(identifier), Seq(identifier -> subtypeIndication)) -> This is wrong, this only apply to record
+    typeInfo.updateSubType (VSubtype(identifier), subtypeIndication)
   }
 
   override def exitEntity_header(ctx: Entity_headerContext): Unit = {}
