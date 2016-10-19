@@ -11,7 +11,7 @@ object Driver {
 
   def getInFile(fileName: String) = s"${userHome}/VHDL2Isabelle/vhdl2isabelle/src/main/resources/files/${fileName}"
 
-  def getOutDir = s"${userHome}/VHDL2Isabelle/VHDLModel/VHDLModel/"
+  def getOutDir = s"${userHome}/VHDL2Isabelle/VHDLModel/"
 
   def preInfo: VInfo = {
     val preFile = getInFile("pre.vhd")

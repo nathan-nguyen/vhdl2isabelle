@@ -54,7 +54,7 @@ sealed abstract class VLiteral {
     }
   }
 
-  def asRangeExp(defInfo: DefInfo): IExp_constant = this match {
+  def asRangeExp(defInfo: DefInfo): IExp_baseTypeConstant = this match {
     case ln: VAbstractLiteral => ln match {
       case VIntegerLiteral(s) => VScalarType("natural").getInitValFromLiteral(s)
       case VRealLiteral(s) => handler(s"real as range? ${}")
@@ -100,28 +100,28 @@ case object VLiteralNull extends VLiteral
 case class VLiteralBitS(s: String) extends VLiteral
 
 case class VLiteralS(s: String) extends VLiteral {
-  def num2Exp(valType: VScalarType, rangeTy: VRangeV): IExp_constant = {
+  def num2Exp(valType: VScalarType, rangeTy: VRangeV): IExp_baseTypeConstant = {
     val ss = s.substring(1, s.length - 1)
     require(ss.forall(_.isDigit), s"${s} not all digits")
     val iConstList = ss.toList.map(c => IConstS("val_c", s"(CHR ''${c}'')"))
     val vt = valType.vectorize
     if (rangeTy.rangeD == RangeD.to) {
       if (ss.forall(_ == ss(0))) {
-        IExp_constant(vt, IConstL_gen(vt, ss.length.toString, ss(0)), ExpVectorKindTo)
+        IExp_baseTypeConstant(vt, IConstL_gen(vt, ss.length.toString, ss(0)), ExpVectorKindTo)
       } else {
-        IExp_constant(vt, IConstL_raw(vt, iConstList), ExpVectorKindTo)
+        IExp_baseTypeConstant(vt, IConstL_raw(vt, iConstList), ExpVectorKindTo)
       }
     } else if (rangeTy.rangeD == RangeD.downto) {
       if (ss.forall(_ == ss(0))) {
-        IExp_constant(vt, IConstRL_gen(vt, ss.length.toString, ss(0)), ExpVectorKindDownTo)
+        IExp_baseTypeConstant(vt, IConstRL_gen(vt, ss.length.toString, ss(0)), ExpVectorKindDownTo)
       } else {
-        IExp_constant(vt, IConstRL_raw(vt, iConstList), ExpVectorKindDownTo)
+        IExp_baseTypeConstant(vt, IConstRL_raw(vt, iConstList), ExpVectorKindDownTo)
       }
     } else throw VIError
   }
 
   // FIXME this is quite wrong, but seems that we have to infer it late
-  def num2Exp: IExp_constant = num2Exp(VScalarType(defaultCharType), VRangeV(unknownString, RangeD.to, unknownString))
+  def num2Exp: IExp_baseTypeConstant = num2Exp(VScalarType(defaultCharType), VRangeV(unknownString, RangeD.to, unknownString))
 
 }
 
@@ -333,34 +333,34 @@ object VArrayTypeDef {
     val uad = ctx.unconstrained_array_definition()
     val cad = ctx.constrained_array_definition()
     if (uad != null) {
-      VUArrayDef(uad)
+      VUnconstrainedArrayDefinition(uad)
     } else if (cad != null) {
-      VCArrayDef(cad)
+      VConstrainedArrayDefinition(cad)
     } else throw VIError
   }
 }
 
 case class VIndexSubtypeDef(name: String)
 
-case class VUArrayDef(indexSubtypeDefList: List[VIndexSubtypeDef],
-                      subtypeInd: VSubtypeIndication) extends VArrayTypeDef
+case class VUnconstrainedArrayDefinition(indexSubtypeDefList: List[VIndexSubtypeDef],
+                                         subtypeIndication: VSubtypeIndication) extends VArrayTypeDef
 
-object VUArrayDef {
-  def apply(ctx: Unconstrained_array_definitionContext): VUArrayDef = {
+object VUnconstrainedArrayDefinition {
+  def apply(ctx: Unconstrained_array_definitionContext): VUnconstrainedArrayDefinition = {
     val indexSubtypeDefList = ctx.index_subtype_definition().map(d => VIndexSubtypeDef(d.name().getText)).toList
-    val subtypeInd = VSubtypeIndication(ctx.subtype_indication())
-    VUArrayDef(indexSubtypeDefList, subtypeInd)
+    val subtypeIndication = VSubtypeIndication(ctx.subtype_indication())
+    VUnconstrainedArrayDefinition(indexSubtypeDefList, subtypeIndication)
   }
 }
 
-case class VCArrayDef(indexConstraint: VIndexConstraint,
-                      subtypeInd: VSubtypeIndication) extends VArrayTypeDef
+case class VConstrainedArrayDefinition(indexConstraint: VIndexConstraint,
+                                       subtypeIndication: VSubtypeIndication) extends VArrayTypeDef
 
-object VCArrayDef {
-  def apply(ctx: Constrained_array_definitionContext): VCArrayDef = {
+object VConstrainedArrayDefinition {
+  def apply(ctx: Constrained_array_definitionContext): VConstrainedArrayDefinition = {
     val indexConstraint = VIndexConstraint(ctx.index_constraint())
-    val subtypeInd = VSubtypeIndication(ctx.subtype_indication())
-    VCArrayDef(indexConstraint, subtypeInd)
+    val subtypeIndication = VSubtypeIndication(ctx.subtype_indication())
+    VConstrainedArrayDefinition(indexConstraint, subtypeIndication)
   }
 }
 

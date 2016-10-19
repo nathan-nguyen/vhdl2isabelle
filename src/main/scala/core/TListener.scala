@@ -105,13 +105,21 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
       elementDecl <- recordTypeDef.elementDecls
       flattened <- elementDecl.flatten
     } yield flattened
-    val typeDeclId = ctx.getParent.getParent.getParent.asInstanceOf[Type_declarationContext].identifier().getText
-    typeInfo.updateRecordType(VRecordType(typeDeclId), items)
+    val typeDeclarationId = ctx.getParent.getParent.getParent.asInstanceOf[Type_declarationContext].identifier().getText
+    typeInfo += (VRecordType(typeDeclarationId), items)
   }
 
   override def exitTerm(ctx: TermContext): Unit = {}
 
-  override def enterArray_type_definition(ctx: Array_type_definitionContext): Unit = {}
+  override def enterArray_type_definition(ctx: Array_type_definitionContext): Unit = {
+    val arrayTypeDef = VArrayTypeDef(ctx) match {
+      case uad : VUnconstrainedArrayDefinition => handler(s"${uad}")
+      case cad : VConstrainedArrayDefinition => {
+        val arrayTypeDeclarationId = ctx.getParent.getParent.getParent.asInstanceOf[Type_declarationContext].identifier().getText
+        typeInfo += (VArrayType(arrayTypeDeclarationId), cad)
+      }
+    }
+  }
 
   override def exitSelected_waveforms(ctx: Selected_waveformsContext): Unit = {}
 
@@ -348,7 +356,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
     val subtypeDeclaration = VSubtypeDeclaration(ctx)
     val identifier = subtypeDeclaration.id
     val subtypeIndication = subtypeDeclaration.subtypeInd
-    typeInfo.updateSubType (VSubtype(identifier), subtypeIndication)
+    typeInfo += (VSubtype(identifier), subtypeIndication)
   }
 
   override def exitEntity_header(ctx: Entity_headerContext): Unit = {}

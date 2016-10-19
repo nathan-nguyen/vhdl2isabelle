@@ -13,48 +13,62 @@ sealed abstract class IConst {
     s"(${genCmd} ${length} ${iVarChar})"
   }
 
-  override def toString = this match {
-    case IConstS(isarType, initVal) => s"(${isarType} ${initVal})"
-    case l: IConstL => l match {
-      case IConstL_raw(valType, iConstList) => s"(val_list ${iConstList.ISABELLE_r})"
-      case g@IConstL_gen(valType, length, rawVal) => s"(val_list ${generateInitialValue(valType, length, rawVal)})"
-    }
-    case l: IConstRL => l match {
-      case IConstRL_raw(valType, iConstList) => s"(val_rlist ${iConstList.ISABELLE_r})"
-      case g@IConstRL_gen(valType, length, rawVal) => s"(val_rlist ${generateInitialValue(valType, length, rawVal)})"
-    }
-    case c: IConstRecord => handler(s"${c}")
-  }
+  override def toString : String
 }
 
-case class IConstS(isarType: String, initVal: String) extends IConst
+case class IConstS(isaType: String, initVal: String) extends IConst {
+  override def toString = s"(${isaType} ${initVal})"
+}
 
 // IConstL -> to -> "var_list"
 sealed abstract class IConstL extends IConst {
   val valType: VVectorType
 }
 
-case class IConstL_raw(valType: VVectorType, iConstList: List[IConst]) extends IConstL
+case class IConstL_raw(valType: VVectorType, iConstList: List[IConst]) extends IConstL {
+  override def toString = s"(val_list ${iConstList.ISABELLE_r})"
+}
 
-case class IConstL_gen(valType: VVectorType, length: String, rawVal: Char) extends IConstL
+case class IConstL_gen(valType: VVectorType, length: String, rawVal: Char) extends IConstL {
+  override def toString = s"(val_list ${generateInitialValue(valType, length, rawVal)})"
+}
 
 // IConstRL -> downto -> "var_rlist"
 sealed abstract class IConstRL extends IConst {
   val valType: VVectorType
 }
 
-case class IConstRL_raw(valType: VVectorType, iConstList: List[IConst]) extends IConstRL
-
-case class IConstRL_gen(valType: VVectorType, length: String, rawVal: Char) extends IConstRL
-
-sealed abstract class IConstRecord extends IConst {
-  val valType: VRecordType
+case class IConstRL_raw(valType: VVectorType, iConstList: List[IConst]) extends IConstRL {
+  override def toString = s"(val_rlist ${iConstList.ISABELLE_r})"
 }
 
-// TODO: Add IConstRecord_raw() for the case initial values exist.
+case class IConstRL_gen(valType: VVectorType, length: String, rawVal: Char) extends IConstRL {
+  override def toString = s"(val_rlist ${generateInitialValue(valType, length, rawVal)})"
+}
+
+sealed abstract class IConstCustomized extends IConst
+
+sealed abstract class IConstRecord extends IConstCustomized
 
 // This is used for nested record - Generate the initial value
 case class IConstRecord_gen(valType: VRecordType) extends IConstRecord
+
+// TODO: Add IConstRecord_raw() for the case initial values exist.
+
+sealed abstract class IConstArray extends IConstCustomized
+
+sealed abstract class IConstArrayL extends IConstArray
+
+case class IConstArrayL_gen(valType: VArrayType, length: Int, const_original: IConst) extends IConstArrayL {
+  val iVarChar = IConstS("val_c", s"(CHR '${10}')")
+  override def toString = s"(val_list (vec_gen ${length} ${const_original}))"
+}
+
+sealed abstract class IConstArrayRL extends IConstArray
+
+case class IConstArrayRL_gen(valType: VArrayType, length: Int, const_original: IConst) extends IConstArrayRL {
+  override def toString = s"(val_rlist (vec_gen ${length} IConstArrayRL_gen))"
+}
 
 //********************************************************************************************************************//
 
@@ -68,7 +82,7 @@ sealed trait ExpKind {
 // Scala
 case object ExpScalarKind extends ExpKind
 
-abstract class ExpVectorKind extends ExpKind
+sealed abstract class ExpVectorKind extends ExpKind
 
 // Vector to
 case object ExpVectorKindTo extends ExpVectorKind
@@ -76,7 +90,17 @@ case object ExpVectorKindTo extends ExpVectorKind
 // Vector downto
 case object ExpVectorKindDownTo extends ExpVectorKind
 
-case object ExpRecordKind extends ExpKind
+sealed abstract class ExpCustomizedKind extends ExpKind
+
+case object ExpRecordKind extends ExpCustomizedKind
+
+sealed abstract class ExpArrayKind extends ExpCustomizedKind
+
+// Array to
+case object ExpArrayKindTo extends ExpArrayKind
+
+// Array downto
+case object ExpArrayKindDownTo extends ExpArrayKind
 
 case object ExpUnknownKind extends ExpKind
 
@@ -93,12 +117,15 @@ sealed abstract class IsabelleExpression {
     case v: IExp_variable => v.variable
     case s: IExp_signal => s.signal
     case p: IExp_port => p.port
-    case _ => ???
+    case _ => throw VIError
   }
 
   override def toString = this match {
-    case IExp_constant(baseType, const, _) => s"""(exp_con (${VHDLize(baseType)}, ${const}))"""
-    case IExp_RecordConstant(recordType, const, _) => throw VIError
+    case IExp_baseTypeConstant(baseType, const, _) => s"""(exp_con (${VHDLize(baseType)}, ${const}))"""
+
+    case IExp_recordTypeConstant(recordType, const, _) => handler(s"${recordType}")
+    case IExp_arrayTypeConstant(arrayType, const, _) => s"""(exp_con (vhdl_array, ${const}))"""
+
     case IExp_variable(variable, _) => s"""(exp_var ${variable.getId})"""
     case IExp_signal(signal, _) => s"""(exp_sig ${signal.getId})"""
     case IExp_port(port, _) => s"""(exp_prt ${port.getId})"""
@@ -126,13 +153,23 @@ sealed abstract class IsabelleExpression {
   def crhs_e_rhso: Crhs_e = Crhs_e(Rhs_o(this))
 
   // Implemented outside
-  def crhs_r(defInfo: DefInfo): Crhs_r = ???
+  def crhs_r(defInfo: DefInfo): Crhs_r = throw VIError
 
 }
 
-case class IExp_constant(baseType: VBaseType, const: IConst, expKind: ExpKind) extends IsabelleExpression
+sealed abstract class IExp_constant extends IsabelleExpression {
+  val const: IConst
+}
 
-case class IExp_RecordConstant(recordType: VRecordType, const: IConst, expKind: ExpKind) extends IsabelleExpression
+case class IExp_baseTypeConstant(baseType: VBaseType, const: IConst, expKind: ExpKind) extends IExp_constant
+
+sealed abstract class IExp_customizedTypeConstant extends IExp_constant
+
+sealed abstract class IExp_compositeTypeConstant extends IExp_customizedTypeConstant
+
+case class IExp_recordTypeConstant(recordType : VRecordType, const: IConst, expKind: ExpKind) extends IExp_compositeTypeConstant
+
+case class IExp_arrayTypeConstant(arrayType : VArrayType, const: IConst, expKind: ExpKind) extends IExp_compositeTypeConstant
 
 // For storing identifiers
 // Different from Isabelle, it must be a defined "variable"

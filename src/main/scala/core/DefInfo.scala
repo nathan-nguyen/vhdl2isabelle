@@ -24,7 +24,7 @@ final class DefInfo(defInfo: Option[DefInfo]) {
   type Vnl_PTy = Vnl
   type S_PTy = Signal
   type P_PTy = Port
-  type SPnl_PTy = Spnl_list
+  type SPnl_PTy = Spnl
 
   val v_raw = mutable.ListBuffer.empty[Variable]
   val vnl_raw = mutable.ListBuffer.empty[Vnl_PTy]
@@ -94,11 +94,11 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     case Vl_v(v) => List(v)
   }
 
-  def spnl_flatten(spnl: Spnl_list): (List[S_PTy], List[P_PTy]) = {
-    def aux(sPnl: Spnl_list): List[(S_PTy, P_PTy)] = spnl.splList flatMap {
+  def spnl_flatten(spnl: Spnl): (List[S_PTy], List[P_PTy]) = {
+    def aux(sPnl: Spnl): List[(S_PTy, P_PTy)] = spnl.splList flatMap {
       case SPl_signal(s) => List((s, null))
-      case SPl_port(p) => List((null, p))
-      case spnl_list: Spnl_list => aux(spnl_list)
+      case Spl_port(p) => List((null, p))
+      case spnl_list: Spnl => aux(spnl_list)
     }
     val (signalList, portList) = aux(spnl).unzip
     (signalList.filter(_ != null), portList.filter(_ != null))
@@ -138,7 +138,7 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     p_map += (id -> d)
   }
 
-  def +=(id: String, d: Spnl_list): Unit = {
+  def +=(id: String, d: Spnl): Unit = {
     spnl_raw += d
     val (sl, pl) = spnl_flatten(d)
     s_map ++= sl.map(_.id).zip(sl)

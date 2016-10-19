@@ -32,19 +32,20 @@ abstract class Keeper(vInfo: Option[VInfo]) {
         defInfo += (id, variable)
       }
       case ct : VCustomizedType => ct match{
-        case rt : VRecordType => {
-          val initVals = rt.getInitVals(typeInfo.typeDeclaration, expOption)(defInfo)
-          val vnl = Vnl.gen(id, initVals)
-          defInfo +=(id, vnl)
-        }
         case subtype : VSubtype => {
-          val subtypeIndication = typeInfo.subtypeDeclaration(subtype)
+          val subtypeIndication = typeInfo.subtypeDeclarationMap(subtype)
           generateIDefinition(id, expOption, subtypeIndication, defInfo, typeInfo) match{
             case variable : Variable => defInfo += (id, variable)
             case vnl : Vnl => defInfo += (id, vnl)
             case _ => throw VIError
           }
         }
+        case recordType : VRecordType => {
+          val initVals = recordType.getInitVals(typeInfo, expOption)(defInfo)
+          val vnl = Vnl.gen(id, initVals)
+          defInfo +=(id, vnl)
+        }
+        case arrayType : VArrayType => handler(s"${arrayType}")
       }
     }
   }
@@ -64,16 +65,17 @@ abstract class Keeper(vInfo: Option[VInfo]) {
             }
           }
         }
-        val port = Port_BaseType(id, bt, initVal, mode, conn)
+        val port = Port_baseType(id, bt, initVal, mode, conn)
         defInfo +=(id, port)
       }
       case ct: VCustomizedType => ct match {
+        case subtype : VSubtype => handler(s"${subtype}")
         case recordType : VRecordType => {
-          val initVals = recordType.getInitVals(typeInfo.typeDeclaration, expOption)(defInfo)
-          val spnl = Spnl_list.generateFromPort(id, initVals, mode, conn, typeInfo.typeDeclaration)
+          val initVals = recordType.getInitVals(typeInfo, expOption)(defInfo)
+          val spnl = Spnl.generateFromPort(id, initVals, mode, conn, typeInfo)
           defInfo +=(id, spnl)
         }
-        case subtype : VSubtype => handler(s"${subtype}")
+        case arrayType :VArrayType => handler(s"${arrayType}")
       }
     }
   }
@@ -93,12 +95,13 @@ abstract class Keeper(vInfo: Option[VInfo]) {
         defInfo +=(id, signal)
       }
       case ct: VCustomizedType => ct match {
+        case subtype : VSubtype => handler(s"${subtype}")
         case recordType : VRecordType => {
-          val initVals = recordType.guessInitVals(typeInfo.typeDeclaration)
-          val spnl = Spnl_list.genFromSignal(id, initVals, signalKind)
+          val initVals = recordType.guessInitVals(typeInfo)
+          val spnl = Spnl.genFromSignal(id, initVals, signalKind)
           defInfo +=(id, spnl)
         }
-        case subtype : VSubtype => handler(s"${subtype}")
+        case arrayType : VArrayType => handler(s"${arrayType}")
       }
     }
   }
@@ -118,14 +121,15 @@ abstract class Keeper(vInfo: Option[VInfo]) {
         Variable(id, baseType, initVal)
       }
       case ct : VCustomizedType => ct match{
-        case rt : VRecordType => {
-          val initVals = rt.getInitVals(typeInfo.typeDeclaration, expOption)(defInfo)
-          Vnl.gen(id, initVals)
-        }
         case subtype : VSubtype => {
-          val subtypeIndication = typeInfo.subtypeDeclaration(subtype)
+          val subtypeIndication = typeInfo.subtypeDeclarationMap(subtype)
           generateIDefinition(id, expOption, subtypeIndication, defInfo, typeInfo)
         }
+        case rt : VRecordType => {
+          val initVals = rt.getInitVals(typeInfo, expOption)(defInfo)
+          Vnl.gen(id, initVals)
+        }
+        case arrayType : VArrayType => handler(s"${arrayType}")
       }
     }
   }

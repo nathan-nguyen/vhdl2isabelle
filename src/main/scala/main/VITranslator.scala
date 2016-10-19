@@ -92,7 +92,7 @@ class VITranslator(inFile: String, vInfo: Option[VInfo]) {
   }
 
   def header: String = {
-    s"theory ${moduleName}\nimports Main vhdl_component vhdl_syntax_complex"
+    s"theory ${moduleName}\nimports Main VHDL_Component VHDL_Syntax_Complex"
   }
 
   def foot(entityName: String, outFileName: String, target: String): String = {

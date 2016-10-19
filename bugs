@@ -39,14 +39,14 @@ Example:
 subtype cword is std_logic_vector(IDBITS-1 downto 0);
 CONSTANT subtypeConst : subtype;
 
+(V2I-010) One Dimensional Array for VBaseType
+
 /*********************************************************************************************************************/
 /***************************************************  NOT FIXED  *****************************************************/
 /*********************************************************************************************************************/
 
-(V2I-006) TODO : array_type_definition is not implemented
+(V2I-006) TODO : multidimensional array declaration is not implemented including: Unconstrained Array and ConstrainedArray with multiple ranges
 
-(V2I-009)
-
-(V2I-010)
+(V2I-009) Replace std_logic_vec_gen with vec_gen
 
 (V2I-011)

@@ -14,15 +14,7 @@ type boolean is (false,true);
 constant IDBITS : integer := 32;
 
 subtype cword is std_logic_vector(IDBITS-1 downto 0);
---type cdatatype is array (0 to 3) of cword;
---type cdatatype is array (0 to 3) of integer;
-
---type cdatatype is record
---  v0 : integer;
---  v1 : integer;
---  v2 : integer;
---  v3 : integer;
---end record;
+type cdatatype is array (0 to 3) of cword;
 
 type icache_in_type is record
   rpc              : std_logic_vector(31 downto 0);  -- raw address (npc)
@@ -38,7 +30,7 @@ type icache_in_type is record
 end record;
 
 type icache_out_type is record
-  --data             : cdatatype;
+  data             : cdatatype;
   set              : std_logic_vector(1 downto 0);
   mexc             : std_ulogic;
   hold             : std_ulogic;

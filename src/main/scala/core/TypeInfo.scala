@@ -15,7 +15,8 @@ import scala.collection.mutable
   * 3 kinds of types <---
   * - * scalar: integer, std_logic, std_ulogic
   * - * vector: std_logic_vector, std_ulogic_vector
-  * - * customized:
+  * - * customized: composite, subtype
+  * - * - * composite: record, array
   */
 sealed abstract class VTypeDefinition {
   val s: String
@@ -27,15 +28,17 @@ object VTypeDefinition {
       VScalarType(s)
     } else if (VBaseType.vectors(s)) {
       VVectorType(s)
-    } else if (VCustomizedType.recordTypes(s)) {
-      VRecordType(s)
     } else if (VCustomizedType.subTypes(s)){
       VSubtype(s)
-    } else handler(s)
+    } else if (VCompositeType.recordTypes(s)) {
+      VRecordType(s)
+    } else if (VCompositeType.arrayTypes(s)) {
+      VArrayType(s)
+    } else handler(s"${s}")
   }
 }
 
-abstract class VBaseType extends VTypeDefinition {
+sealed abstract class VBaseType extends VTypeDefinition {
   val s: String
 }
 
@@ -52,7 +55,7 @@ case class VScalarType(s: String) extends VBaseType {
     VVectorType(s + vectorFlag)
   }
 
-  def guessInitVal: IExp_constant = {
+  def guessInitVal: IExp_baseTypeConstant = {
     val iconstS = s match {
       case "integer" => IConstS("val_i", "0")
       case "real" => IConstS("val_r", "0.0")
@@ -62,10 +65,10 @@ case class VScalarType(s: String) extends VBaseType {
       case "std_logic" => IConstS("val_c", "(CHR ''0'')")
       case _ => handler(s"scalar unknown ${s}")
     }
-    IExp_constant(this, iconstS, ExpScalarKind)
+    IExp_baseTypeConstant(this, iconstS, ExpScalarKind)
   }
 
-  def getInitValFromLiteral(v: String): IExp_constant = {
+  def getInitValFromLiteral(v: String): IExp_baseTypeConstant = {
     val iconstS = s match {
       case "integer" => IConstS("val_i", v)
       case "real" => IConstS("val_r", v)
@@ -78,13 +81,13 @@ case class VScalarType(s: String) extends VBaseType {
       case `defaultCharType` => IConstS("val_c", s"(CHR '${v}')")
       case _ => handler(s"scalar unknown ${toString} (${v})")
     }
-    IExp_constant(this, iconstS, ExpScalarKind)
+    IExp_baseTypeConstant(this, iconstS, ExpScalarKind)
   }
 
   def getInitVal(expOption: Option[VExp])(defInfo: DefInfo): IsabelleExpression = expOption match {
     case Some(exp) => {
       val refined = exp.toIExp(defInfo) match {
-        case e: IExp_constant => IExp_constant(this, e.const, ExpScalarKind)
+        case e: IExp_baseTypeConstant => IExp_baseTypeConstant(this, e.const, ExpScalarKind)
         case o => o
       }
       val expRepr = refined.toString
@@ -104,7 +107,7 @@ case class VVectorType(s: String) extends VBaseType {
 
   def scalarize: VScalarType = VScalarType(s.substring(0, s.length - vectorFlag.length))
 
-  def getInitVal(r: VRangeV, expOption: Option[VExp]): IExp_constant = {
+  def getInitVal(r: VRangeV, expOption: Option[VExp]): IExp_baseTypeConstant = {
     expOption match {
       case Some(vExp) => {
         val literalS = vExp.getLiteralS
@@ -116,16 +119,16 @@ case class VVectorType(s: String) extends VBaseType {
   }
 
   // This has something to do with TO/DOWNTO but not about "character"/"std_logic"/"std_ulogic"
-  def guessInitVal(range: VRangeV, rawVal: Char = '0'): IExp_constant = {
+  def guessInitVal(range: VRangeV, rawVal: Char = '0'): IExp_baseTypeConstant = {
     try {
       range.rangeD match {
         case RangeD.`to` => {
           val length = range.r.toInt - range.l.toInt + 1;
-          IExp_constant(this, IConstL_gen(this, length.toString, rawVal), ExpVectorKindTo)
+          IExp_baseTypeConstant(this, IConstL_gen(this, length.toString, rawVal), ExpVectorKindTo)
         }
         case RangeD.`downto` => {
           val length = range.l.toInt - range.r.toInt + 1
-          IExp_constant(this, IConstRL_gen(this, length.toString, rawVal), ExpVectorKindDownTo)
+          IExp_baseTypeConstant(this, IConstRL_gen(this, length.toString, rawVal), ExpVectorKindDownTo)
         }
         case RangeD.`unkown` => handler(s"${range}")
       }
@@ -133,10 +136,10 @@ case class VVectorType(s: String) extends VBaseType {
       case nfe : NumberFormatException => {
         range.rangeD match {
           case RangeD.`to` => {
-            IExp_constant(this, IConstL_gen(this, s"(${range.r} - ${range.l} + 1)", rawVal), ExpVectorKindTo)
+            IExp_baseTypeConstant(this, IConstL_gen(this, s"(${range.r} - ${range.l} + 1)", rawVal), ExpVectorKindTo)
           }
           case RangeD.`downto` => {
-            IExp_constant(this, IConstRL_gen(this, s"(${range.l} - ${range.r} + 1)", rawVal), ExpVectorKindDownTo)
+            IExp_baseTypeConstant(this, IConstRL_gen(this, s"(${range.l} - ${range.r} + 1)", rawVal), ExpVectorKindDownTo)
           }
           case RangeD.`unkown` => handler(s"${range}")
         }
@@ -151,13 +154,48 @@ sealed abstract class VCustomizedType extends VTypeDefinition
 
 object VCustomizedType {
   var subTypes = Set("");
-  var recordTypes = Set("");
 }
 
-case class VRecordType(s: String) extends VCustomizedType {
+// VSubType should be separate with VTypeDefinition
+case class VSubtype(s: String) extends VCustomizedType {
 
-  def guessInitVals(typeDeclarationMap: TypeDeclarationMap): List[MetaData] = {
-    val recordInfo = typeDeclarationMap(this)
+  def guessInitVals(itemId: String, typeInfo : TypeInfo): MetaData = {
+    val subtypeIndication = typeInfo.subtypeDeclarationMap(this)
+    val valType = VTypeDefinition(subtypeIndication.getSimpleName)
+    valType match {
+      case baseType: VBaseType => {
+        val initVal = baseType match {
+          case scalarType: VScalarType => scalarType.guessInitVal
+          case vectorType: VVectorType => {
+            val range = subtypeIndication.getRange.getOrElse(defaultRangeV(s"guessListInit vector ${subtypeIndication}"))
+            vectorType.guessInitVal(range)
+          }
+        }
+        MetaData(itemId, baseType, initVal)
+      }
+      case customizedType : VCustomizedType => customizedType match{
+        case subtype : VSubtype => {
+          subtype.guessInitVals(itemId, typeInfo)
+        }
+        case recordType : VRecordType => handler(s"${recordType}")  // Subtype of a record is not implemented
+        case arrayType : VArrayType => handler(s"${arrayType}")
+      }
+    }
+  }
+
+}
+
+sealed abstract class VCompositeType extends VCustomizedType
+
+object VCompositeType {
+  var recordTypes = Set("");
+  var arrayTypes = Set("");
+}
+
+case class VRecordType(s: String) extends VCompositeType {
+
+  def guessInitVals(typeInfo : TypeInfo): List[MetaData] = {
+    val recordInfo = typeInfo.recordTypeDeclarationMap(this)
     val iVals = for {
       (itemId, sti) <- recordInfo
     } yield {
@@ -174,8 +212,9 @@ case class VRecordType(s: String) extends VCustomizedType {
           MetaData(itemId, bt, initVal)
         }
         case ct: VCustomizedType => ct match {
-          case recordType : VRecordType => MetaData(itemId, valType, IExp_RecordConstant(recordType, IConstRecord_gen(recordType), ExpRecordKind))
-          case subtype : VSubtype => handler(s"${subtype}")
+          case subtype : VSubtype => subtype.guessInitVals(itemId, typeInfo)
+          case recordType : VRecordType => MetaData(itemId, recordType, IExp_recordTypeConstant(recordType, IConstRecord_gen(recordType), ExpRecordKind))
+          case arrayType : VArrayType => MetaData(itemId, arrayType, arrayType.guessInitVals(itemId, typeInfo))
         }
       }
     }
@@ -183,12 +222,12 @@ case class VRecordType(s: String) extends VCustomizedType {
   }
 
   // expOption is taken from definition; but type information should be record type declaration
-  def getInitVals(typeDeclarationMap: TypeDeclarationMap, expOption: Option[VExp])(defInfo: DefInfo): List[MetaData] = {
+  def getInitVals(typeInfo: TypeInfo, expOption: Option[VExp])(defInfo: DefInfo): List[MetaData] = {
     val iVals: Seq[MetaData] = expOption match {
       case Some(vExp) => {
         vExp.getPrimary match {
           case Some(VPrimaryAggregate(aggregate)) => {
-            val recordInfo = typeDeclarationMap(this)
+            val recordInfo = typeInfo.recordTypeDeclarationMap(this)
             val aggregateIdExpMap = aggregate.getAssoc
             for {
               (itemId, sti) <- recordInfo
@@ -233,39 +272,80 @@ case class VRecordType(s: String) extends VCustomizedType {
           }
           case _ => {
             logger.warn(s"unknown record exp, guessing")
-            guessInitVals(typeDeclarationMap)
+            guessInitVals(typeInfo)
           }
         }
       }
-      case None => guessInitVals(typeDeclarationMap)
+      case None => guessInitVals(typeInfo)
     }
     iVals.toList
   }
 
 }
 
-// VSubType should be separate with VTypeDefinition
-case class VSubtype(s: String) extends VCustomizedType
+case class VArrayType(s: String) extends VCompositeType {
+
+  // TODO : This implementation only consider 1 dimensional array - Need to implement multidimensional array
+  def guessInitVals(itemId: String, typeInfo : TypeInfo): IsabelleExpression = {
+    val constrainedArrayDefinition = typeInfo.arrayTypeDeclarationMap(this)
+    val subtypeIndication = constrainedArrayDefinition.subtypeIndication
+    // FIXME getRange doesn't seem right - constrainedArrayDefinition.indexConstraint is list of range corresponding to multidimensional array
+
+    val constOriginal = VTypeDefinition(subtypeIndication.getSimpleName) match {
+      case scalarType : VScalarType => scalarType.guessInitVal.const
+      case vectorType : VVectorType => {
+        val vectorRange = subtypeIndication.getRange.getOrElse(defaultRangeV(s"${subtypeIndication}"))
+        vectorType.guessInitVal(vectorRange).const
+      }
+      case subType : VSubtype => subType.guessInitVals(itemId, typeInfo).initVal.asInstanceOf[IExp_constant].const
+      case recordType : VRecordType => handler(s"${recordType}")
+      case arrayType : VArrayType => handler(s"${arrayType}")
+    }
+
+    val range = constrainedArrayDefinition.indexConstraint.getRange
+    range.rangeD match {
+      case RangeD.`to` => {
+        val length = range.r.toInt - range.l.toInt + 1;
+        IExp_arrayTypeConstant(this, IConstArrayL_gen(this, length, constOriginal), ExpArrayKindTo)
+      }
+      case RangeD.`downto` => {
+        val length = range.l.toInt - range.r.toInt + 1
+        IExp_arrayTypeConstant(this, IConstArrayRL_gen(this, length, constOriginal), ExpArrayKindDownTo)
+      }
+      case RangeD.`unkown` => handler(s"${range}")
+    }
+  }
+}
 
 class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
 
-  val typeDeclaration: TypeDeclarationMap = typeInfo match {
-    case Some(ti) => ti.typeDeclaration
+  val recordTypeDeclarationMap: RecordTypeDeclarationMap = typeInfo match {
+    case Some(ti) => ti.recordTypeDeclarationMap
     case None => mutable.Map.empty
   }
 
-  val subtypeDeclaration: SubtypeInfoMap = typeInfo match {
-    case Some(ti) => ti.subtypeDeclaration
+  val subtypeDeclarationMap: SubtypeDeclarationMap = typeInfo match {
+    case Some(ti) => ti.subtypeDeclarationMap
     case None => mutable.Map.empty
   }
 
-  def updateRecordType(id: VRecordType, items: RecordInfoSeq): Unit = {
-    VCustomizedType.recordTypes += id.s
-    typeDeclaration += (id -> items)
+  val arrayTypeDeclarationMap: ArrayTypeDeclarationMap = typeInfo match {
+    case Some(ti) => ti.arrayTypeDeclarationMap
+    case None => mutable.Map.empty
   }
 
-  def updateSubType(id: VSubtype, items: VSubtypeIndication): Unit = {
+  def +=(id: VRecordType, items: RecordInfoSeq): Unit = {
+    VCompositeType.recordTypes += id.s
+    recordTypeDeclarationMap += (id -> items)
+  }
+
+  def +=(id: VSubtype, items: VSubtypeIndication): Unit = {
     VCustomizedType.subTypes += id.s
-    subtypeDeclaration += (id -> items)
+    subtypeDeclarationMap += (id -> items)
+  }
+
+  def +=(id: VArrayType, items: VConstrainedArrayDefinition): Unit = {
+    VCompositeType.arrayTypes += id.s
+    arrayTypeDeclarationMap += (id -> items)
   }
 }

@@ -5,7 +5,7 @@ import scala.language.implicitConversions
 /**
   * Created by Hongxu Chen.
   */
-case class IEnv_sp(signalList: List[Signal], portList: List[Port], spnlList: List[Spnl_list]) {
+case class IEnv_sp(signalList: List[Signal], portList: List[Port], spnlList: List[Spnl]) {
 
   override def toString: String = {
     val signalListNotEmpty  = signalList.map(_.as_list).size  > 0
@@ -332,7 +332,7 @@ case class IEntity(id: String, env: IEnv, resFn: IResFn, conc_stmt_complexList: 
         |  let env = ${env};
         |      resfn = ${resFn};
         |      cst_list = ${conc_stmt_complexList.ISABELLE}
-        |  in (env, resfn, cst_list)
+        |  in (env, resfn, cst_list, [])
         |"
      """.stripMargin
 }
