@@ -59,9 +59,11 @@ entity iu3 is
 end;
 
 architecture rtl of iu3 is
-  --function simpleFunction(tbuf: integer) return integer is
-  --  begin
-  --    return(tbuf);
-  --end function simpleFunction;
+  function get_tbuf(tbuf: integer) return integer is
+    begin
+      return 0;
+  end function get_tbuf;
+
+  --constant functionCallConst : integer := 1 + get_tbuf(tbuf);
 begin
 end;

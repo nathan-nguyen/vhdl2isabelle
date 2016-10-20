@@ -36,11 +36,11 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def exitSensitivity_list(ctx: Sensitivity_listContext): Unit = {}
 
   override def enterVariable_declaration(ctx: Variable_declarationContext): Unit = {
-    val variabledecl = VVarDecl(ctx)
+    val variableDeclaration = VVariableDeclaration(ctx)
     for {
-      id <- variabledecl.idList
+      id <- variableDeclaration.idList
     } yield {
-      genIVariable(id, variabledecl.vExp, variabledecl.subtypeInd)
+      genIVariable(id, variableDeclaration.vExp, variableDeclaration.subtypeInd)
     }
   }
 
@@ -161,12 +161,12 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def exitConstrained_nature_definition(ctx: Constrained_nature_definitionContext): Unit = {}
 
   override def enterSignal_declaration(ctx: Signal_declarationContext): Unit = {
-    val signalDecl = VSignalDecl(ctx)
+    val signalDeclaration = VSignalDeclaration(ctx)
     for {
-      id <- signalDecl.idList
+      id <- signalDeclaration.idList
     } {
-      val signalKind = signalDecl.signalKind.map(SignalKind.withName).getOrElse(SignalKind.register)
-      val sti = signalDecl.subtypeInd
+      val signalKind = signalDeclaration.signalKind.map(SignalKind.withName).getOrElse(SignalKind.register)
+      val sti = signalDeclaration.subtypeInd
       genISignal(id, sti, signalKind)
     }
   }
@@ -325,12 +325,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def enterBreak_selector_clause(ctx: Break_selector_clauseContext): Unit = {}
 
-  override def exitInterface_constant_declaration(ctx: Interface_constant_declarationContext): Unit = {
-    val interfaceConstDecl = VInterfaceConstDecl(ctx)
-    for (id <- interfaceConstDecl.idList) {
-      genIVariable(id, interfaceConstDecl.vExp, interfaceConstDecl.subtypeInd)
-    }
-  }
+  override def exitInterface_constant_declaration(ctx: Interface_constant_declarationContext): Unit = {}
 
   override def exitAttribute_declaration(ctx: Attribute_declarationContext): Unit = {}
 
@@ -342,7 +337,17 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def enterPort_map_aspect(ctx: Port_map_aspectContext): Unit = {}
 
-  override def enterFunction_specification(ctx: Function_specificationContext): Unit = {}
+  override def enterFunction_specification(ctx: Function_specificationContext): Unit = {
+    // Rename and define environment variables from function parameter list
+    val functionSpecification = VFunctionSpecification(ctx);
+    val interfaceElementList = functionSpecification.formalParameterList.asInstanceOf[VInterfaceList].interfaceElementList
+    for (interfaceElement <- interfaceElementList){
+      val interfaceConstantDeclaration = interfaceElement.asInstanceOf[VInterfaceDeclaration].asInstanceOf[VInterfaceConstantDeclaration]
+      for (id <- interfaceConstantDeclaration.idList){
+        genIVariable(functionSpecification.designator.id + "_" + id, interfaceConstantDeclaration.vExp, interfaceConstantDeclaration.subtypeInd)
+      }
+    }
+  }
 
   override def enterProcess_declarative_item(ctx: Process_declarative_itemContext): Unit = {}
 
@@ -409,7 +414,15 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def enterSignal_mode(ctx: Signal_modeContext): Unit = {}
 
-  override def exitGeneric_list(ctx: Generic_listContext): Unit = {}
+  override def exitGeneric_list(ctx: Generic_listContext): Unit = {
+    // Define the environment variables from VHDL Generic list
+    val genericListInfo = VGenericList(ctx)
+    for (interfaceConstantDeclaration <- genericListInfo.interfaceConstantDeclarationList){
+      for (id <- interfaceConstantDeclaration.idList){
+        genIVariable(id, interfaceConstantDeclaration.vExp, interfaceConstantDeclaration.subtypeInd)
+      }
+    }
+  }
 
   override def enterConditional_signal_assignment(ctx: Conditional_signal_assignmentContext): Unit = {}
 
@@ -548,7 +561,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def enterPort_list(ctx: Port_listContext): Unit = {
     for {
       port_declaration <- ctx.interface_port_list().interface_port_declaration()
-      interfacePortDecl = VInterfacePortDecl(port_declaration)
+      interfacePortDecl = VInterfacePortDeclaration(port_declaration)
       id <- interfacePortDecl.idList
     } {
       val mode = PortMode.withName(s"mode_${interfacePortDecl.mode}")
@@ -1107,8 +1120,8 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def exitProcess_statement(ctx: Process_statementContext): Unit = {
     val procStat = VProcStat(ctx)
-    val isar = procStat.toI(defInfo)
-    conc_stmt_complexes += isar
+    val isa = procStat.toI(defInfo)
+    conc_stmt_complexes += isa
     //    logger.info(s"${isar}")
   }
 

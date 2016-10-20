@@ -32,53 +32,90 @@ object VConstantDeclaration {
 
 //********************************************************************************************************************//
 
-case class VSignalDecl(idList: List[String], subtypeInd: VSubtypeIndication,
-                       signalKind: Option[String], exp: Option[VExp])
+case class VSignalDeclaration(idList: List[String], subtypeInd: VSubtypeIndication,
+                              signalKind: Option[String], exp: Option[VExp])
 
-object VSignalDecl {
-  def apply(ctx: Signal_declarationContext): VSignalDecl = {
+object VSignalDeclaration {
+  def apply(ctx: Signal_declarationContext): VSignalDeclaration = {
     val idList = getIdList(ctx.identifier_list())
     val subtypeInd = VSubtypeIndication(ctx.subtype_indication())
     val signalKind = Option(ctx.signal_kind()).map(_.getText.toLowerCase)
     val exp = Option(ctx.expression()).map(VExp(_))
-    VSignalDecl(idList, subtypeInd, signalKind, exp)
+    VSignalDeclaration(idList, subtypeInd, signalKind, exp)
   }
 }
 
 //********************************************************************************************************************//
 
-case class VInterfaceSignalDecl(idList: List[String], subtypeInd: VSubtypeIndication, vExp: Option[VExp])
+sealed abstract class VInterfaceDeclaration extends VInterfaceElement
 
-object VInterfaceSignalDecl {
-  def apply(ctx: Interface_signal_declarationContext): VInterfaceSignalDecl = {
-    val idList = getIdList(ctx.identifier_list())
-    val subtypeInd = VSubtypeIndication(ctx.subtype_indication())
-    val vExp = Option(ctx.expression()).map(VExp(_))
-    VInterfaceSignalDecl(idList, subtypeInd, vExp)
+object VInterfaceDeclaration {
+  def apply(ctx: Interface_declarationContext): VInterfaceDeclaration = {
+    if (ctx.interface_constant_declaration() != null) VInterfaceConstantDeclaration(ctx.interface_constant_declaration())
+    else if (ctx.interface_signal_declaration() != null) VInterfaceSignalDeclaration(ctx.interface_signal_declaration())
+    else if (ctx.interface_variable_declaration() != null) VInterfaceVariableDeclaration(ctx.interface_variable_declaration())
+    else if (ctx.interface_file_declaration() != null) VInterfaceFileDeclaration(ctx.interface_file_declaration())
+    else if (ctx.interface_terminal_declaration() != null) VInterfaceTerminalDeclaration(ctx.interface_terminal_declaration())
+    else VInterfaceQuantityDeclaration(ctx.interface_quantity_declaration())
   }
 }
 
-case class VInterfaceConstDecl(idList: List[String], subtypeInd: VSubtypeIndication, vExp: Option[VExp])
+case class VInterfaceConstantDeclaration(idList: List[String], subtypeInd: VSubtypeIndication, vExp: Option[VExp]) extends VInterfaceDeclaration
 
-object VInterfaceConstDecl {
-  def apply(ctx: Interface_constant_declarationContext): VInterfaceConstDecl = {
+object VInterfaceConstantDeclaration {
+  def apply(ctx: Interface_constant_declarationContext): VInterfaceConstantDeclaration = {
     val idList = getIdList(ctx.identifier_list())
     val subtypeInd = VSubtypeIndication(ctx.subtype_indication())
     val vExp = Option(ctx.expression()).map(VExp(_))
-    VInterfaceConstDecl(idList, subtypeInd, vExp)
+    VInterfaceConstantDeclaration(idList, subtypeInd, vExp)
   }
 }
 
-case class VInterfacePortDecl(idList: List[String], mode: String,
-                              subtypeInd: VSubtypeIndication, vExp: Option[VExp])
+case class VInterfaceSignalDeclaration(idList: List[String], subtypeInd: VSubtypeIndication, vExp: Option[VExp]) extends VInterfaceDeclaration
 
-object VInterfacePortDecl {
-  def apply(ctx: Interface_port_declarationContext): VInterfacePortDecl = {
+object VInterfaceSignalDeclaration {
+  def apply(ctx: Interface_signal_declarationContext): VInterfaceSignalDeclaration = {
+    val idList = getIdList(ctx.identifier_list())
+    val subtypeInd = VSubtypeIndication(ctx.subtype_indication())
+    val vExp = Option(ctx.expression()).map(VExp(_))
+    VInterfaceSignalDeclaration(idList, subtypeInd, vExp)
+  }
+}
+
+case class VInterfaceVariableDeclaration() extends VInterfaceDeclaration
+
+object VInterfaceVariableDeclaration {
+  def apply(ctx: Interface_variable_declarationContext): VInterfaceVariableDeclaration = ???
+}
+
+case class VInterfaceFileDeclaration() extends VInterfaceDeclaration
+
+object VInterfaceFileDeclaration {
+  def apply(ctx: Interface_file_declarationContext): VInterfaceFileDeclaration = ???
+}
+
+case class VInterfaceTerminalDeclaration() extends VInterfaceDeclaration
+
+object VInterfaceTerminalDeclaration {
+  def apply(ctx: Interface_terminal_declarationContext): VInterfaceTerminalDeclaration = ???
+}
+
+case class VInterfaceQuantityDeclaration () extends VInterfaceDeclaration
+
+object VInterfaceQuantityDeclaration {
+  def apply(ctx: Interface_quantity_declarationContext): VInterfaceQuantityDeclaration = ???
+}
+
+case class VInterfacePortDeclaration(idList: List[String], mode: String,
+                                     subtypeInd: VSubtypeIndication, vExp: Option[VExp])
+
+object VInterfacePortDeclaration {
+  def apply(ctx: Interface_port_declarationContext): VInterfacePortDeclaration = {
     val idList = getIdList(ctx.identifier_list())
     val mode = ctx.signal_mode().getText
     val subtypeInd = VSubtypeIndication(ctx.subtype_indication())
     val vExp = Option(ctx.expression()).map(VExp(_))
-    VInterfacePortDecl(idList, mode, subtypeInd, vExp)
+    VInterfacePortDeclaration(idList, mode, subtypeInd, vExp)
   }
 }
 
@@ -344,70 +381,123 @@ case class VConcSignalAssignStatS(labelColon: Option[String],
 
 
 //********************************************************************************************************************//
-case class VVarDecl(shared: Boolean, idList: List[String],
-                    subtypeInd: VSubtypeIndication, vExp: Option[VExp])
 
-object VVarDecl {
-  def apply(ctx: Variable_declarationContext): VVarDecl = {
+case class VVariableDeclaration(shared: Boolean, idList: List[String],
+                                subtypeInd: VSubtypeIndication, vExp: Option[VExp])
+
+object VVariableDeclaration {
+  def apply(ctx: Variable_declarationContext): VVariableDeclaration = {
     val shared = ctx.SHARED() != null
     val idList = getIdList(ctx.identifier_list())
     val subtypeInd = VSubtypeIndication(ctx.subtype_indication())
     val vExp = Option(ctx.expression()).map(VExp(_))
-    VVarDecl(shared, idList, subtypeInd, vExp)
+    VVariableDeclaration(shared, idList, subtypeInd, vExp)
   }
 }
 
 //********************************************************************************************************************//
 
-case class VSubProgDecl(vSubProgSpec: VSubProgSpec)
+case class VSubprogramDeclaration(vSubProgSpec: VSubprogramSpecification)
 
-object VSubProgDecl {
-  def apply(ctx: Subprogram_declarationContext): VSubProgDecl = {
+object VSubprogramDeclaration {
+  def apply(ctx: Subprogram_declarationContext): VSubprogramDeclaration = {
     val spec = ctx.subprogram_specification()
-    VSubProgDecl(VSubProgSpec(spec))
+    VSubprogramDeclaration(VSubprogramSpecification(spec))
   }
 }
 
 //********************************************************************************************************************//
 
-sealed abstract class VSubProgSpec
+// TODO: Put this somewhere else in the order
+case class VDesignator(id: String)
 
-object VSubProgSpec {
-  def apply(ctx: Subprogram_specificationContext): VSubProgSpec = ???
+object VDesignator {
+  def apply(ctx: DesignatorContext): VDesignator = {
+    if (ctx.identifier() != null) VDesignator(ctx.identifier().getText)
+    else VDesignator(ctx.STRING_LITERAL().getText)
+  }
 }
 
-case class VProcSpec() extends VSubProgSpec
+sealed abstract class VFormalParameterList
 
-case class VFuncSpec() extends VSubProgSpec
+object VFormalParameterList {
+  def apply(ctx: Formal_parameter_listContext): VFormalParameterList = {
+    VInterfaceList(ctx.interface_list())
+  }
+}
+
+case class VInterfaceList(interfaceElementList : List[VInterfaceElement]) extends VFormalParameterList
+
+object VInterfaceList {
+  def apply(ctx: Interface_listContext): VInterfaceList = {
+    VInterfaceList(ctx.interface_element().map(interfaceElementCtx => VInterfaceElement(interfaceElementCtx)).toList)
+  }
+}
+
+sealed abstract class VInterfaceElement
+
+object VInterfaceElement {
+  def apply(ctx: Interface_elementContext): VInterfaceElement = {
+    VInterfaceDeclaration(ctx.interface_declaration())
+  }
+}
 
 //********************************************************************************************************************//
 
-case class VSubProgBody()
+sealed abstract class VSubprogramSpecification
 
-object VSubProgBody {
-  def apply(ctx: Subprogram_bodyContext): VSubProgBody = {
+object VSubprogramSpecification {
+  def apply(ctx: Subprogram_specificationContext): VSubprogramSpecification = {
+    if (ctx.function_specification() != null) VFunctionSpecification(ctx.function_specification())
+    else VProcedureSpecification(ctx.procedure_specification())
+  }
+}
+
+case class VProcedureSpecification() extends VSubprogramSpecification
+
+object VProcedureSpecification {
+  def apply(ctx: Procedure_specificationContext): VProcedureSpecification = ???
+}
+
+case class VFunctionSpecification(subtypeIndication : VSubtypeIndication, designator: VDesignator, formalParameterList : VFormalParameterList) extends VSubprogramSpecification
+
+object VFunctionSpecification {
+  def apply(ctx: Function_specificationContext): VFunctionSpecification = {
+    val subtypeIndication = VSubtypeIndication(ctx.subtype_indication())
+    val designator = VDesignator(ctx.designator())
+    val formalParameterList = VFormalParameterList(ctx.formal_parameter_list())
+    VFunctionSpecification(subtypeIndication, designator, formalParameterList)
+  }
+}
+
+//********************************************************************************************************************//
+
+case class VSubprogramBody()
+
+object VSubprogramBody {
+  def apply(ctx: Subprogram_bodyContext): VSubprogramBody = {
     ???
   }
 }
 
 //********************************************************************************************************************//
 
-case class VTypeDecl(id: String, vTypeDef: Option[VTypeDef])
+case class VTypeDeclaration(id: String, vTypeDef: Option[VTypeDef])
 
-object VTypeDecl {
-  def apply(ctx: Type_declarationContext): VTypeDecl = {
+object VTypeDeclaration {
+  def apply(ctx: Type_declarationContext): VTypeDeclaration = {
     val id = ctx.identifier().getText
     val typeDef = Option(ctx.type_definition()).map(VTypeDef(_))
-    VTypeDecl(id, typeDef)
+    VTypeDeclaration(id, typeDef)
   }
 }
 
 //********************************************************************************************************************//
 
-case class VFileDecl()
+case class VFileDeclaration()
 
-object VFileDecl {
-  def apply(ctx: File_declarationContext): VFileDecl = {
+object VFileDeclaration {
+  def apply(ctx: File_declarationContext): VFileDeclaration = {
     ???
   }
 }
@@ -468,10 +558,10 @@ object VGrpDecl {
 
 //********************************************************************************************************************//
 
-sealed abstract class VProcDeclItem
+sealed abstract class VProcedureDeclarativeItem
 
-object VProcDeclItem {
-  def apply(ctx: Process_declarative_itemContext): VProcDeclItem = {
+object VProcedureDeclarativeItem {
+  def apply(ctx: Process_declarative_itemContext): VProcedureDeclarativeItem = {
     val spDecl = ctx.subprogram_declaration()
     val spBody = ctx.subprogram_body()
     val typeDecl = ctx.type_declaration()
@@ -486,17 +576,17 @@ object VProcDeclItem {
     val grpTempDecl = ctx.group_template_declaration()
     val grpDecl = ctx.group_declaration()
     if (spDecl != null) {
-      VProcDeclItemSPD(VSubProgDecl(spDecl))
+      VProcDeclItemSPD(VSubprogramDeclaration(spDecl))
     } else if (spBody != null) {
-      VProcDeclItemSPB(VSubProgBody(spBody))
+      VProcDeclItemSPB(VSubprogramBody(spBody))
     } else if (typeDecl != null) {
       VProcDeclItemSTD(VSubtypeDeclaration(subtypeDecl))
     } else if (constDecl != null) {
       VProcDeclItemCD(VConstantDeclaration(constDecl))
     } else if (varDecl != null) {
-      VProcDeclItemVD(VVarDecl(varDecl))
+      VProcDeclItemVD(VVariableDeclaration(varDecl))
     } else if (fileDecl != null) {
-      VProcDeclItemFD(VFileDecl(fileDecl))
+      VProcDeclItemFD(VFileDeclaration(fileDecl))
     } else if (aliasDecl != null) {
       VProcDeclItemAliasD(VAliasDecl(aliasDecl))
     } else if (attrDecl != null) {
@@ -514,31 +604,31 @@ object VProcDeclItem {
 }
 
 // subprogram_declaration not defined
-case class VProcDeclItemSPD(subProgDecl: VSubProgDecl) extends VProcDeclItem
+case class VProcDeclItemSPD(subProgDecl: VSubprogramDeclaration) extends VProcedureDeclarativeItem
 
-case class VProcDeclItemSPB(subProgBody: VSubProgBody) extends VProcDeclItem
+case class VProcDeclItemSPB(subProgBody: VSubprogramBody) extends VProcedureDeclarativeItem
 
-case class VProcDeclItemTD(typeDecl: VTypeDecl) extends VProcDeclItem
+case class VProcDeclItemTD(typeDecl: VTypeDeclaration) extends VProcedureDeclarativeItem
 
-case class VProcDeclItemSTD(subtypeDecl: VSubtypeDeclaration) extends VProcDeclItem
+case class VProcDeclItemSTD(subtypeDecl: VSubtypeDeclaration) extends VProcedureDeclarativeItem
 
-case class VProcDeclItemCD(constDecl: VConstantDeclaration) extends VProcDeclItem
+case class VProcDeclItemCD(constDecl: VConstantDeclaration) extends VProcedureDeclarativeItem
 
-case class VProcDeclItemVD(varDecl: VVarDecl) extends VProcDeclItem
+case class VProcDeclItemVD(varDecl: VVariableDeclaration) extends VProcedureDeclarativeItem
 
-case class VProcDeclItemFD(fileDecl: VFileDecl) extends VProcDeclItem
+case class VProcDeclItemFD(fileDecl: VFileDeclaration) extends VProcedureDeclarativeItem
 
-case class VProcDeclItemAliasD(aliasDecl: VAliasDecl) extends VProcDeclItem
+case class VProcDeclItemAliasD(aliasDecl: VAliasDecl) extends VProcedureDeclarativeItem
 
-case class VProcDeclItemAttrD(attrDecl: VAttrDecl) extends VProcDeclItem
+case class VProcDeclItemAttrD(attrDecl: VAttrDecl) extends VProcedureDeclarativeItem
 
-case class VProcDeclItemAttrS(attrSpec: VAttrSpec) extends VProcDeclItem
+case class VProcDeclItemAttrS(attrSpec: VAttrSpec) extends VProcedureDeclarativeItem
 
-case class VProcDeclItemUC(useClause: VUseClause) extends VProcDeclItem
+case class VProcDeclItemUC(useClause: VUseClause) extends VProcedureDeclarativeItem
 
-case class VProcDeclGTD(grpTemplDecl: VGrpTempDecl) extends VProcDeclItem
+case class VProcDeclGTD(grpTemplDecl: VGrpTempDecl) extends VProcedureDeclarativeItem
 
-case class VProcDeclGD(grpDecl: VGrpDecl) extends VProcDeclItem
+case class VProcDeclGD(grpDecl: VGrpDecl) extends VProcedureDeclarativeItem
 
 //********************************************************************************************************************//
 
@@ -1015,11 +1105,11 @@ object VProcStatPart {
   }
 }
 
-case class VProcDeclPart(procDeclItem: List[VProcDeclItem])
+case class VProcDeclPart(procDeclItem: List[VProcedureDeclarativeItem])
 
 object VProcDeclPart {
   def apply(ctx: Process_declarative_partContext): VProcDeclPart = {
-    val processDeclItemList = ctx.process_declarative_item().map(VProcDeclItem(_)).toList
+    val processDeclItemList = ctx.process_declarative_item().map(VProcedureDeclarativeItem(_)).toList
     VProcDeclPart(processDeclItemList)
   }
 }
@@ -1033,12 +1123,12 @@ case class VProcStat(labelColon: Option[String],
                      p2: Boolean,
                      identifier: Option[String]) {
   def toI(defInfo: DefInfo): Csc_ps = {
-    // guess
+    // [HC] guess
     val id = labelColon.orElse(identifier).getOrElse(defaultId)
     val iSensitiveList = sensitivitylist.map(_.toI(defInfo))
-    //    logger.info(s"${iSensitiveList}")
-    // don't care about procDeclPart
-    // procStatPart => seq_stmt_complexList
+    // [HC] logger.info(s"${iSensitiveList}")
+    // [HC] don't care about procDeclPart
+    // [HC] procStatPart => seq_stmt_complexList
     val seq_stmt_complexList: List[Seq_stmt_complex] = procStatPart.toI(defInfo)
     Csc_ps(id, iSensitiveList, seq_stmt_complexList)
   }
@@ -1289,21 +1379,21 @@ object VBlockDeclItem {
     val quantity_declarationContext = ctx.quantity_declaration()
     val terminal_declarationContext = ctx.terminal_declaration()
     if (subprogram_declarationContext != null) {
-      VBlockDeclItemSPD(VSubProgDecl(subprogram_declarationContext))
+      VBlockDeclItemSPD(VSubprogramDeclaration(subprogram_declarationContext))
     } else if (subprogram_bodyContext != null) {
-      VBlockDeclItemSPB(VSubProgBody(subprogram_bodyContext))
+      VBlockDeclItemSPB(VSubprogramBody(subprogram_bodyContext))
     } else if (type_declaration != null) {
-      VBlockDeclItemTD(VTypeDecl(type_declaration))
+      VBlockDeclItemTD(VTypeDeclaration(type_declaration))
     } else if (subtype_declaration != null) {
       VBlockDeclItemSTD(VSubtypeDeclaration(subtype_declaration))
     } else if (constant_declarationContext != null) {
       VBlockDeclItemCD(VConstantDeclaration(constant_declarationContext))
     } else if (signal_declaration != null) {
-      VBlockDeclItemSD(VSignalDecl(signal_declaration))
+      VBlockDeclItemSD(VSignalDeclaration(signal_declaration))
     } else if (variable_declaration != null) {
-      VBlockDeclItemVD(VVarDecl(variable_declaration))
+      VBlockDeclItemVD(VVariableDeclaration(variable_declaration))
     } else if (file_declaration != null) {
-      VBlockDeclItemFD(VFileDecl(file_declaration))
+      VBlockDeclItemFD(VFileDeclaration(file_declaration))
     } else if (alias_declaration != null) {
       VBlockDeclItemAD(VAliasDecl(alias_declaration))
     } else if (component_declarationContext != null) {
@@ -1336,21 +1426,21 @@ object VBlockDeclItem {
   }
 }
 
-case class VBlockDeclItemSPD(vSubProgDecl: VSubProgDecl) extends VBlockDeclItem
+case class VBlockDeclItemSPD(vSubProgDecl: VSubprogramDeclaration) extends VBlockDeclItem
 
-case class VBlockDeclItemSPB(vSubProgBody: VSubProgBody) extends VBlockDeclItem
+case class VBlockDeclItemSPB(vSubProgBody: VSubprogramBody) extends VBlockDeclItem
 
 case class VBlockDeclItemSTD(vSubtypeDecl: VSubtypeDeclaration) extends VBlockDeclItem
 
-case class VBlockDeclItemTD(vTypeDecl: VTypeDecl) extends VBlockDeclItem
+case class VBlockDeclItemTD(vTypeDecl: VTypeDeclaration) extends VBlockDeclItem
 
 case class VBlockDeclItemCD(vConstDecl: VConstantDeclaration) extends VBlockDeclItem
 
-case class VBlockDeclItemSD(vSignalDecl: VSignalDecl) extends VBlockDeclItem
+case class VBlockDeclItemSD(vSignalDecl: VSignalDeclaration) extends VBlockDeclItem
 
-case class VBlockDeclItemVD(vVariable: VVarDecl) extends VBlockDeclItem
+case class VBlockDeclItemVD(vVariable: VVariableDeclaration) extends VBlockDeclItem
 
-case class VBlockDeclItemFD(vFileDecl: VFileDecl) extends VBlockDeclItem
+case class VBlockDeclItemFD(vFileDecl: VFileDeclaration) extends VBlockDeclItem
 
 case class VBlockDeclItemAD(vAliasDecl: VAliasDecl) extends VBlockDeclItem
 
@@ -1392,14 +1482,14 @@ object VSubtypeDeclaration {
 
 //********************************************************************************************************************//
 
-case class VGenericList(vInterfaceConstDeclList: List[VInterfaceConstDecl]) {
-  require(vInterfaceConstDeclList.nonEmpty)
+case class VGenericList(interfaceConstantDeclarationList: List[VInterfaceConstantDeclaration]) {
+  require(interfaceConstantDeclarationList.nonEmpty)
 }
 
 object VGenericList {
   def apply(ctx: Generic_listContext): VGenericList = {
-    val vInterfaceConstDeclList = ctx.interface_constant_declaration().map(VInterfaceConstDecl(_)).toList
-    VGenericList(vInterfaceConstDeclList)
+    val interfaceConstantDeclarationList = ctx.interface_constant_declaration().map(VInterfaceConstantDeclaration(_)).toList
+    VGenericList(interfaceConstantDeclarationList)
   }
 }
 
@@ -1421,13 +1511,13 @@ object VGenericClause {
   }
 }
 
-case class VInterfacePortList(vInterfacePortDeclList: List[VInterfacePortDecl]) {
+case class VInterfacePortList(vInterfacePortDeclList: List[VInterfacePortDeclaration]) {
   require(vInterfacePortDeclList.nonEmpty)
 }
 
 object VInterfacePortList {
   def apply(ctx: Interface_port_listContext): VInterfacePortList = {
-    val vInterfacePortDeclList = ctx.interface_port_declaration().map(VInterfacePortDecl(_)).toList
+    val vInterfacePortDeclList = ctx.interface_port_declaration().map(VInterfacePortDeclaration(_)).toList
     VInterfacePortList(vInterfacePortDeclList)
   }
 }
