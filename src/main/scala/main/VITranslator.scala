@@ -1,14 +1,14 @@
 package main
 
+import core._
+import core.vhdlsyntax._
 import java.io.File
 import java.nio.file.{Files, Paths}
 
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{ANTLRFileStream, CommonTokenStream, Lexer, Token}
 import org.slf4j.LoggerFactory
-import core._
 import sg.edu.ntu.vhdl2isabelle.{VHDLLexer, VHDLParser}
-import utils.PErrorListener
 
 /**
   * Created by Hongxu Chen.

@@ -64,6 +64,11 @@ architecture rtl of iu3 is
       return 0;
   end function get_tbuf;
 
+  function get_pwd(pwd: integer) return integer is
+      begin
+        return 1;
+    end function get_pwd;
+
   --constant functionCallConst : integer := 1 + get_tbuf(tbuf);
 begin
 end;

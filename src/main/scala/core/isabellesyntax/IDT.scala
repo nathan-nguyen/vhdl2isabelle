@@ -1,4 +1,7 @@
-package core
+package core.isabellesyntax
+
+import core._
+import core.vhdlsyntax._
 
 /**
   * Created by Hongxu Chen.
@@ -7,13 +10,13 @@ package core
 /**
   * It's only used for idef generation
   */
-final case class MetaData(itemId: String, valType: VTypeDefinition, initVal: IsabelleExpression)
+final case class MetaData(itemId: String, valType: VTypeDefinition, initVal: IExpression)
 
 //********************************************************************************************************************//
 
 sealed trait V_IDef extends IDef
 
-case class Variable(id: String, valType: VBaseType, iExp: IsabelleExpression) extends V_IDef {
+case class IVariable_old(id: String, valType: VBaseType, iExp: IExpression) extends V_IDef {
   override def toString = s"""(''${id}'', ${VHDLize(valType)}, ${iExp})"""
 
   override def as_definition: String = {
@@ -29,7 +32,7 @@ case class Variable(id: String, valType: VBaseType, iExp: IsabelleExpression) ex
 
 }
 
-sealed trait Vl extends V_IDef {
+sealed trait Ivl_old extends V_IDef {
 
   override def toString = this match {
     case Vl_v(iVariable) => s"(vl_v ${iVariable})"
@@ -64,7 +67,7 @@ sealed trait Vl extends V_IDef {
 
   // [HC] It may return a "variable" or a "vl" (which is vnl-generated)
   def get(nList: List[String]): Option[V_IDef] = {
-    def aux(l: List[String], cur: Option[Vl]): Option[Vl] = l match {
+    def aux(l: List[String], cur: Option[Ivl_old]): Option[Ivl_old] = l match {
       case h :: t => cur match {
         case Some(vl) => vl match {
           // vl_v contains
@@ -85,10 +88,10 @@ sealed trait Vl extends V_IDef {
   }
 }
 
-case class Vl_v(iVariable: Variable) extends Vl
+case class Vl_v(iVariable: IVariable_old) extends Ivl_old
 
 
-case class Vnl(id: String, vlList: List[Vl]) extends Vl
+case class Vnl(id: String, vlList: List[Ivl_old]) extends Ivl_old
 
 object Vnl {
   // FIXME: this gen is TOO specific!
@@ -98,7 +101,7 @@ object Vnl {
       data <- dataList
     } yield {
       val itemId = s"${id}_${data.itemId}"
-      Vl_v(Variable(itemId, data.valType.asInstanceOf[VBaseType], data.initVal))
+      Vl_v(IVariable_old(itemId, data.valType.asInstanceOf[VBaseType], data.initVal))
     }
     Vnl(id, vlList)
   }
@@ -115,10 +118,10 @@ sealed trait IDef {
   def getId: IdTy
 
   def getVType: VTypeDefinition = this match {
-    case v: Variable => v.valType
+    case v: IVariable_old => v.valType
     case s: Signal => s.valType
     case p: Port => p.valType
-    case vl: Vl => vl match {
+    case vl: Ivl_old => vl match {
       case vl_v: Vl_v => vl_v.iVariable.valType
       case vnl: Vnl => handler(s"${vnl}")
     }
@@ -222,7 +225,7 @@ object Spnl {
     Spnl(id, splList)
   }
 
-  def generateFromPort(id: String, dataList: List[MetaData], mode: PortMode.Ty, conn: PortConn.Ty, typeInfo : TypeInfo): Spnl = {
+  def generateFromPort(id: String, dataList: List[MetaData], mode: PortMode.Ty, conn: PortConn.Ty, typeInfo : VTypeInfo): Spnl = {
     val splList = for {
       data <- dataList
     } yield {
@@ -246,7 +249,7 @@ object SignalKind extends Enumeration {
   val register, bus = Value
 }
 
-case class Signal(id: String, valType: VBaseType, iExp: IsabelleExpression, signalKind: SignalKind.Ty) extends SP_IDef {
+case class Signal(id: String, valType: VBaseType, iExp: IExpression, signalKind: SignalKind.Ty) extends SP_IDef {
   override def toString = s"""(''${id}'', ${VHDLize(valType)}, ${signalKind}, ${iExp})"""
 
   override def as_definition: String = {
@@ -278,7 +281,7 @@ object PortConn extends Enumeration {
 sealed abstract class Port extends SP_IDef {
   val id: String
   val valType : VTypeDefinition
-  val iExp: IsabelleExpression
+  val iExp: IExpression
 
   def as_definition: String = {
     s"""definition ${id}:: \"port\" where
@@ -287,18 +290,18 @@ sealed abstract class Port extends SP_IDef {
 
   def getExpKind = iExp.expKind
 
-  def as_list: String = s"[(sp_p ${id})]"
+  def as_list: String = s"[sp_p ${id}]"
 
   def getId = id
 }
 
-case class Port_baseType(id: String, valType: VBaseType, iExp: IsabelleExpression, mode: PortMode.Ty, conn: PortConn.Ty) extends Port {
+case class Port_baseType(id: String, valType: VBaseType, iExp: IExpression, mode: PortMode.Ty, conn: PortConn.Ty) extends Port {
   override def toString = s"(''${id}'', ${VHDLize(valType)}, ${mode}, ${conn}, ${iExp})"
 }
 
 sealed abstract class Port_customizedType extends Port
 
-case class Port_recordType(id: String, valType: VRecordType, iExp: IsabelleExpression, mode: PortMode.Ty, conn: PortConn.Ty, typeInfo : TypeInfo) extends Port_customizedType {
+case class Port_recordType(id: String, valType: VRecordType, iExp: IExpression, mode: PortMode.Ty, conn: PortConn.Ty, typeInfo : VTypeInfo) extends Port_customizedType {
   override def toString = {
     val initVals = valType.guessInitVals(typeInfo)
     val spnlNestedList = Spnl.generateFromPort(id, initVals, mode, conn, typeInfo)
@@ -307,7 +310,7 @@ case class Port_recordType(id: String, valType: VRecordType, iExp: IsabelleExpre
   }
 }
 
-case class Port_arrayType(id: String, valType: VArrayType, iExp: IsabelleExpression, mode: PortMode.Ty, conn: PortConn.Ty, typeInfo : TypeInfo) extends Port_customizedType {
+case class Port_arrayType(id: String, valType: VArrayType, iExp: IExpression, mode: PortMode.Ty, conn: PortConn.Ty, typeInfo : VTypeInfo) extends Port_customizedType {
   override def toString = s"(''${id}'', vhdl_array, ${mode}, ${conn}, ${iExp})"
 }
 

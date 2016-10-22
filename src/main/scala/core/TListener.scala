@@ -1,11 +1,14 @@
 package core
 
+import core.isabellesyntax._
+import core.vhdlsyntax._
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.{ErrorNode, TerminalNode}
 import sg.edu.ntu.vhdl2isabelle.VHDLListener
 import sg.edu.ntu.vhdl2isabelle.VHDLParser._
 
 import scala.collection.JavaConversions._
+import scala.collection.mutable.ListBuffer
 
 /**
   * Created by Hongxu Chen.
@@ -338,15 +341,24 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def enterPort_map_aspect(ctx: Port_map_aspectContext): Unit = {}
 
   override def enterFunction_specification(ctx: Function_specificationContext): Unit = {
-    // Rename and define environment variables from function parameter list
+    // TODO: Put this inside IFunction
     val functionSpecification = VFunctionSpecification(ctx);
-    val interfaceElementList = functionSpecification.formalParameterList.asInstanceOf[VInterfaceList].interfaceElementList
+    val parameterList = new ListBuffer[IParameter]()
+    val interfaceElementList = functionSpecification.getInterfaceElementList()
     for (interfaceElement <- interfaceElementList){
-      val interfaceConstantDeclaration = interfaceElement.asInstanceOf[VInterfaceDeclaration].asInstanceOf[VInterfaceConstantDeclaration]
+      val interfaceConstantDeclaration = interfaceElement.getInterfaceConstantDeclaration()
       for (id <- interfaceConstantDeclaration.idList){
-        genIVariable(functionSpecification.designator.id + "_" + id, interfaceConstantDeclaration.vExp, interfaceConstantDeclaration.subtypeInd)
+        // Generate variable in parameter list
+        genIVariable(functionSpecification.designator.id + "_" + id, None, interfaceConstantDeclaration.subtypeIndication)
+        parameterList += IParameter(functionSpecification.designator.id + "_" + id, IDirection.IDirectionIn, interfaceConstantDeclaration.subtypeIndication)
       }
     }
+    // Generate return variable
+    genIVariable(functionSpecification.designator.id + "_return", None, functionSpecification.subtypeIndication)
+
+    parameterList += IParameter(functionSpecification.designator.id + "_return", IDirection.IDirectionOut, functionSpecification.subtypeIndication)
+
+    IdentifierMap.iFunctionMap += functionSpecification.designator.id -> IFunction(functionSpecification.designator.id, parameterList.toList, List.empty, IType(functionSpecification.subtypeIndication), List.empty)
   }
 
   override def enterProcess_declarative_item(ctx: Process_declarative_itemContext): Unit = {}
@@ -419,7 +431,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
     val genericListInfo = VGenericList(ctx)
     for (interfaceConstantDeclaration <- genericListInfo.interfaceConstantDeclarationList){
       for (id <- interfaceConstantDeclaration.idList){
-        genIVariable(id, interfaceConstantDeclaration.vExp, interfaceConstantDeclaration.subtypeInd)
+        genIVariable(id, interfaceConstantDeclaration.vExp, interfaceConstantDeclaration.subtypeIndication)
       }
     }
   }

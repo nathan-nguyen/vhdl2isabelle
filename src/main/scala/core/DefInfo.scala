@@ -1,5 +1,7 @@
 package core
 
+import core.isabellesyntax._
+import core.vhdlsyntax._
 import scala.collection.mutable
 
 /**
@@ -20,20 +22,20 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     * signal (scalar), port (scalar), spnl (record)
     */
 
-  type V_PTy = Variable
+  type V_PTy = IVariable_old
   type Vnl_PTy = Vnl
   type S_PTy = Signal
   type P_PTy = Port
   type SPnl_PTy = Spnl
 
-  val v_raw = mutable.ListBuffer.empty[Variable]
+  val v_raw = mutable.ListBuffer.empty[IVariable_old]
   val vnl_raw = mutable.ListBuffer.empty[Vnl_PTy]
   val s_raw = mutable.ListBuffer.empty[S_PTy]
   val p_raw = mutable.ListBuffer.empty[P_PTy]
   val spnl_raw = mutable.ListBuffer.empty[SPnl_PTy]
 
   //  for Env
-  val v_map = mutable.Map.empty[IdTy, Variable]
+  val v_map = mutable.Map.empty[IdTy, IVariable_old]
   val s_map = mutable.Map.empty[IdTy, Signal]
   val p_map = mutable.Map.empty[IdTy, Port]
 
@@ -117,7 +119,7 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     case None =>
   }
 
-  def +=(id: String, d: Variable): Unit = {
+  def +=(id: String, d: IVariable_old): Unit = {
     v_raw += d
     v_map += (id -> d)
   }

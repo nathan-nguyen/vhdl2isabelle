@@ -1,5 +1,8 @@
 package core
 
+import core.isabellesyntax._
+import core.vhdlsyntax._
+
 import scala.collection.mutable
 
 /**
@@ -13,11 +16,11 @@ abstract class Keeper(vInfo: Option[VInfo]) {
 
   val defInfo = new DefInfo(vInfo.map(_.defInfo))
 
-  val typeInfo = new TypeInfo(vInfo.map(_.typeInfo))
+  val typeInfo = new VTypeInfo(vInfo.map(_.typeInfo))
 
   val definedEntities = mutable.ArrayBuffer.empty[String]
 
-  def genIVariable(id: String, expOption: Option[VExp], subtypeIndication: VSubtypeIndication): Unit = {
+  def genIVariable(id: String, expOption: Option[VExpression], subtypeIndication: VSubtypeIndication): Unit = {
     val valType = VTypeDefinition(subtypeIndication.getSimpleName)
     valType match {
       case baseType: VBaseType => {
@@ -28,14 +31,15 @@ abstract class Keeper(vInfo: Option[VInfo]) {
             case None => vectorType.guessInitVal(defaultRangeV(s"ConstDecl vector ${subtypeIndication}"))
           }
         }
-        val variable = Variable(id, baseType, initVal)
+        val variable = IVariable_old(id, baseType, initVal)
+        IdentifierMap.iVariableMap += id -> IVariable(id, subtypeIndication, initVal)
         defInfo += (id, variable)
       }
       case ct : VCustomizedType => ct match{
         case subtype : VSubtype => {
           val subtypeIndication = typeInfo.subtypeDeclarationMap(subtype)
           generateIDefinition(id, expOption, subtypeIndication, defInfo, typeInfo) match{
-            case variable : Variable => defInfo += (id, variable)
+            case variable : IVariable_old => defInfo += (id, variable)
             case vnl : Vnl => defInfo += (id, vnl)
             case _ => throw VIError
           }
@@ -50,7 +54,7 @@ abstract class Keeper(vInfo: Option[VInfo]) {
     }
   }
 
-  def generateIPort(id: String, expOption: Option[VExp], sti: VSubtypeIndication, mode: PortMode.Ty, conn: PortConn.Ty): Unit = {
+  def generateIPort(id: String, expOption: Option[VExpression], sti: VSubtypeIndication, mode: PortMode.Ty, conn: PortConn.Ty): Unit = {
     val valType = VTypeDefinition(sti.getSimpleName)
     valType match {
       case bt: VBaseType => {
@@ -107,7 +111,7 @@ abstract class Keeper(vInfo: Option[VInfo]) {
   }
 
   // This method is called when trying to get subtype definition
-  def generateIDefinition(id: String, expOption: Option[VExp], subtypeIndication: VSubtypeIndication, defInfo: DefInfo, typeInfo: TypeInfo) : V_IDef = {
+  def generateIDefinition(id: String, expOption: Option[VExpression], subtypeIndication: VSubtypeIndication, defInfo: DefInfo, typeInfo: VTypeInfo) : V_IDef = {
     val valType = VTypeDefinition(subtypeIndication.getSimpleName)
     valType match {
       case baseType: VBaseType => {
@@ -118,7 +122,7 @@ abstract class Keeper(vInfo: Option[VInfo]) {
             case None => vectorType.guessInitVal(defaultRangeV(s"ConstDecl vector ${subtypeIndication}"))
           }
         }
-        Variable(id, baseType, initVal)
+        IVariable_old(id, baseType, initVal)
       }
       case ct : VCustomizedType => ct match{
         case subtype : VSubtype => {
@@ -133,5 +137,4 @@ abstract class Keeper(vInfo: Option[VInfo]) {
       }
     }
   }
-
 }

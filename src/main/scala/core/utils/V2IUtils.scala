@@ -1,5 +1,7 @@
 package core
 
+import core.isabellesyntax._
+import core.vhdlsyntax._
 import sg.edu.ntu.vhdl2isabelle.VHDLParser.{Identifier_listContext, Subtype_indicationContext}
 
 import scala.collection.JavaConversions._
@@ -9,14 +11,14 @@ import scala.util.{Failure, Success, Try}
 /**
   * Created by Hongxu Chen.
   */
-case class VInfo(typeInfo: TypeInfo, defInfo: DefInfo)
+case class VInfo(typeInfo: VTypeInfo, defInfo: DefInfo)
 
 object V2IUtils {
 
   /**
     * Change valType to correct one (character/std_logic/std_ulogic)
     */
-  def refine__valType(idef: IDef, tobeRefined: IsabelleExpression): IsabelleExpression = {
+  def refine__valType(idef: IDef, tobeRefined: IExpression): IExpression = {
     tobeRefined match {
       case ec: IExp_baseTypeConstant => idef.getExpKind match {
         case ExpScalarKind => IExp_baseTypeConstant(idef.getVType.asInstanceOf[VBaseType], ec.const, idef.getExpKind)
@@ -64,7 +66,7 @@ object V2IUtils {
     }
   }
 
-  def refine__valType(trusted: IsabelleExpression, tobeRefined: IsabelleExpression): IsabelleExpression = {
+  def refine__valType(trusted: IExpression, tobeRefined: IExpression): IExpression = {
     val idef = Try(trusted.getIDef)
     idef match {
       case Success(idefV) => {
@@ -78,7 +80,7 @@ object V2IUtils {
   }
 
   // NOTE: we don't deal with "OTHERS" directly, but check the type mismatch and then change it
-  def exp__Crhs(lhs_def: IDef, rhsExp: IsabelleExpression): Crhs = {
+  def exp__Crhs(lhs_def: IDef, rhsExp: IExpression): Crhs = {
     // this itself does little, only to change the valType
     // "valType" is reliable, however may change to "scalarized"
     def refine__sv_inner(e: IExp_baseTypeConstant, valType: VBaseType): IExp_baseTypeConstant = {
@@ -87,7 +89,7 @@ object V2IUtils {
     }
 
     if (lhs_def.getExpKind.isV && rhsExp.expKind == ExpScalarKind) {
-      val exp: IsabelleExpression = rhsExp match {
+      val exp: IExpression = rhsExp match {
         case exp_con: IExp_baseTypeConstant => {
           val valType = lhs_def.getVType.asInstanceOf[VBaseType]
           refine__sv_inner(exp_con, valType)
@@ -97,7 +99,7 @@ object V2IUtils {
       exp.crhs_e_rhso
     } else if ((lhs_def.getExpKind.isV && rhsExp.expKind.isV)
       || (lhs_def.getExpKind == ExpScalarKind && rhsExp.expKind == ExpScalarKind)) {
-      val exp: IsabelleExpression = rhsExp match {
+      val exp: IExpression = rhsExp match {
         case exp_con: IExp_baseTypeConstant => {
           refine__valType(lhs_def, rhsExp)
         }
@@ -125,14 +127,14 @@ object V2IUtils {
 
   // TODO
   def def__v_clhs(idef: V_IDef, range: Option[Discrete_range], sn: VSelectedName): V_clhs = idef match {
-    case variable: Variable => {
+    case variable: IVariable_old => {
       val v_lhs = range match {
         case None => Lhs_v(variable, sn)
         case Some(discrete_range) => Lhs_va(variable, discrete_range, sn)
       }
       Clhs_v(v_lhs)
     }
-    case vl: Vl => Clhs_vr(vl)
+    case vl: Ivl_old => Clhs_vr(vl)
     case _ => handler(s"${idef}")
   }
 

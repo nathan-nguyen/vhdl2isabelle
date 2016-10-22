@@ -1,5 +1,7 @@
-package core
+package core.vhdlsyntax
 
+import core._
+import core.isabellesyntax._
 import scala.collection.mutable
 
 /**
@@ -51,7 +53,6 @@ case class VScalarType(s: String) extends VBaseType {
 
   def vectorize: VVectorType = {
     require(s.startsWith("std_"))
-    //    require(s == "std_logic" || s == "std_ulogic")
     VVectorType(s + vectorFlag)
   }
 
@@ -84,7 +85,7 @@ case class VScalarType(s: String) extends VBaseType {
     IExp_baseTypeConstant(this, iconstS, ExpScalarKind)
   }
 
-  def getInitVal(expOption: Option[VExp])(defInfo: DefInfo): IsabelleExpression = expOption match {
+  def getInitVal(expOption: Option[VExpression])(defInfo: DefInfo): IExpression = expOption match {
     case Some(exp) => {
       val refined = exp.toIExp(defInfo) match {
         case e: IExp_baseTypeConstant => IExp_baseTypeConstant(this, e.const, ExpScalarKind)
@@ -107,7 +108,7 @@ case class VVectorType(s: String) extends VBaseType {
 
   def scalarize: VScalarType = VScalarType(s.substring(0, s.length - vectorFlag.length))
 
-  def getInitVal(r: VRangeV, expOption: Option[VExp]): IExp_baseTypeConstant = {
+  def getInitVal(r: VRangeV, expOption: Option[VExpression]): IExp_baseTypeConstant = {
     expOption match {
       case Some(vExp) => {
         val literalS = vExp.getLiteralS
@@ -159,7 +160,7 @@ object VCustomizedType {
 // VSubType should be separate with VTypeDefinition
 case class VSubtype(s: String) extends VCustomizedType {
 
-  def guessInitVals(itemId: String, typeInfo : TypeInfo): MetaData = {
+  def guessInitVals(itemId: String, typeInfo : VTypeInfo): MetaData = {
     val subtypeIndication = typeInfo.subtypeDeclarationMap(this)
     val valType = VTypeDefinition(subtypeIndication.getSimpleName)
     valType match {
@@ -194,7 +195,7 @@ object VCompositeType {
 
 case class VRecordType(s: String) extends VCompositeType {
 
-  def guessInitVals(typeInfo : TypeInfo): List[MetaData] = {
+  def guessInitVals(typeInfo : VTypeInfo): List[MetaData] = {
     val recordInfo = typeInfo.recordTypeDeclarationMap(this)
     val iVals = for {
       (itemId, sti) <- recordInfo
@@ -222,7 +223,7 @@ case class VRecordType(s: String) extends VCompositeType {
   }
 
   // expOption is taken from definition; but type information should be record type declaration
-  def getInitVals(typeInfo: TypeInfo, expOption: Option[VExp])(defInfo: DefInfo): List[MetaData] = {
+  def getInitVals(typeInfo: VTypeInfo, expOption: Option[VExpression])(defInfo: DefInfo): List[MetaData] = {
     val iVals: Seq[MetaData] = expOption match {
       case Some(vExp) => {
         vExp.getPrimary match {
@@ -234,7 +235,7 @@ case class VRecordType(s: String) extends VCompositeType {
             } yield {
               val itemExp = aggregateIdExpMap(itemId)
               val itemValType = VTypeDefinition(sti.getSimpleName)
-              val initVal: IsabelleExpression = itemValType match {
+              val initVal: IExpression = itemValType match {
                 case bt: VBaseType => bt match {
                   case st: VScalarType => {
                     st.getInitVal(Option(itemExp))(defInfo)
@@ -286,7 +287,7 @@ case class VRecordType(s: String) extends VCompositeType {
 case class VArrayType(s: String) extends VCompositeType {
 
   // TODO : This implementation only consider 1 dimensional array - Need to implement multidimensional array
-  def guessInitVals(itemId: String, typeInfo : TypeInfo): IsabelleExpression = {
+  def guessInitVals(itemId: String, typeInfo : VTypeInfo): IExpression = {
     val constrainedArrayDefinition = typeInfo.arrayTypeDeclarationMap(this)
     val subtypeIndication = constrainedArrayDefinition.subtypeIndication
     // FIXME getRange doesn't seem right - constrainedArrayDefinition.indexConstraint is list of range corresponding to multidimensional array
@@ -317,7 +318,7 @@ case class VArrayType(s: String) extends VCompositeType {
   }
 }
 
-class TypeInfo(private[this] val typeInfo: Option[TypeInfo]) {
+class VTypeInfo(private[this] val typeInfo: Option[VTypeInfo]) {
 
   val recordTypeDeclarationMap: RecordTypeDeclarationMap = typeInfo match {
     case Some(ti) => ti.recordTypeDeclarationMap

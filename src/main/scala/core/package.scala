@@ -1,5 +1,8 @@
 import org.slf4j.LoggerFactory
 
+import core.isabellesyntax._
+import core.vhdlsyntax._
+
 /**
   * Created by Hongxu Chen.
   */
@@ -47,7 +50,7 @@ package object core {
     VRangeV(unknownString, RangeD.unkown, unknownString)
   }
 
-  def handleExpKindMismatch(e1: IsabelleExpression, e2: IsabelleExpression, msg: String) = {
+  def handleExpKindMismatch(e1: IExpression, e2: IExpression, msg: String) = {
     logger.error(s"""expKindMismatch: ${msg}\n${e1.expKind}\t"${e1}"\n${e2.expKind}\t"${e2}"""")
   }
 

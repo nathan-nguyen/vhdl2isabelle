@@ -1,4 +1,7 @@
-package core
+package core.isabellesyntax
+
+import core._
+import core.vhdlsyntax._
 
 /**
   * Created by Hongxu Chen.
@@ -106,7 +109,7 @@ case object ExpUnknownKind extends ExpKind
 
 //********************************************************************************************************************//
 
-sealed abstract class IsabelleExpression {
+sealed abstract class IExpression {
   val expKind: ExpKind
 
   def getVType: VTypeDefinition = getIDef.getVType
@@ -157,7 +160,7 @@ sealed abstract class IsabelleExpression {
 
 }
 
-sealed abstract class IExp_constant extends IsabelleExpression {
+sealed abstract class IExp_constant extends IExpression {
   val const: IConst
 }
 
@@ -165,55 +168,52 @@ case class IExp_baseTypeConstant(baseType: VBaseType, const: IConst, expKind: Ex
 
 sealed abstract class IExp_customizedTypeConstant extends IExp_constant
 
-sealed abstract class IExp_compositeTypeConstant extends IExp_customizedTypeConstant
+case class IExp_recordTypeConstant(recordType : VRecordType, const: IConst, expKind: ExpKind) extends IExp_customizedTypeConstant
 
-case class IExp_recordTypeConstant(recordType : VRecordType, const: IConst, expKind: ExpKind) extends IExp_compositeTypeConstant
-
-case class IExp_arrayTypeConstant(arrayType : VArrayType, const: IConst, expKind: ExpKind) extends IExp_compositeTypeConstant
+case class IExp_arrayTypeConstant(arrayType : VArrayType, const: IConst, expKind: ExpKind) extends IExp_customizedTypeConstant
 
 // For storing identifiers
 // Different from Isabelle, it must be a defined "variable"
-case class IExp_variable(variable: Variable, expKind: ExpKind) extends IsabelleExpression
+case class IExp_variable(variable: IVariable_old, expKind: ExpKind) extends IExpression
 
-case class IExp_signal(signal: Signal, expKind: ExpKind) extends IsabelleExpression
+case class IExp_signal(signal: Signal, expKind: ExpKind) extends IExpression
 
-case class IExp_port(port: Port, expKind: ExpKind) extends IsabelleExpression
+case class IExp_port(port: Port, expKind: ExpKind) extends IExpression
 
-case class IUnaryExpression(op: VUnaryOperator.Ty, e: IsabelleExpression) extends IsabelleExpression {
+case class IUnaryExpression(op: VUnaryOperator.Ty, e: IExpression) extends IExpression {
   val expKind: ExpKind = e.expKind
 }
 
-case class IBinaryLogicalExpression(e1: IsabelleExpression, op: VLogicOp.Ty, e2: IsabelleExpression) extends IsabelleExpression {
+case class IBinaryLogicalExpression(e1: IExpression, op: VLogicOp.Ty, e2: IExpression) extends IExpression {
   require(e1.expKind == e2.expKind)
   val expKind: ExpKind = e1.expKind
 }
 
-case class IBinaryRelationalExpression(e1: IsabelleExpression, op: VRelationOp.Ty, e2: IsabelleExpression) extends IsabelleExpression {
+case class IBinaryRelationalExpression(e1: IExpression, op: VRelationOp.Ty, e2: IExpression) extends IExpression {
   require(e1.expKind == e2.expKind, s"\n${e1}, ${e1.expKind}\n${e2}, ${e2.expKind}")
-  // if (e1.expKind != e2.expKind) handleExpKindMismatch(e1, e2, s"${toString}")
   val expKind: ExpKind = ExpScalarKind
 }
 
-case class IBinaryShiftingExpression(e1: IsabelleExpression, op: VShiftOp.Ty, e2: IsabelleExpression) extends IsabelleExpression {
+case class IBinaryShiftingExpression(e1: IExpression, op: VShiftOp.Ty, e2: IExpression) extends IExpression {
   require(e1.expKind == e2.expKind)
   val expKind: ExpKind = e1.expKind
 }
 
 //********************************************************************************************************************//
 
-sealed abstract class IBinaryArithmeticExpression extends IsabelleExpression
+sealed abstract class IBinaryArithmeticExpression extends IExpression
 
-case class IBinaryArithmeticFactorExpression(e1: IsabelleExpression, op: VMultiplyingOperator.Ty, e2: IsabelleExpression) extends IBinaryArithmeticExpression {
+case class IBinaryArithmeticFactorExpression(e1: IExpression, op: VMultiplyingOperator.Ty, e2: IExpression) extends IBinaryArithmeticExpression {
   require(e1.expKind == e2.expKind)
   val expKind: ExpKind = e1.expKind
 }
 
-case class IBinaryArithmeticPrimaryExpression(e1: IsabelleExpression, op: VDoubleStarOperator.Ty, e2: IsabelleExpression) extends IBinaryArithmeticExpression {
+case class IBinaryArithmeticPrimaryExpression(e1: IExpression, op: VDoubleStarOperator.Ty, e2: IExpression) extends IBinaryArithmeticExpression {
   require(e1.expKind == e2.expKind)
   val expKind: ExpKind = e1.expKind
 }
 
-case class IBinaryArithmeticTermExpression(e1: IsabelleExpression, op: VAddingOperator.Ty, e2: IsabelleExpression) extends IBinaryArithmeticExpression {
+case class IBinaryArithmeticTermExpression(e1: IExpression, op: VAddingOperator.Ty, e2: IExpression) extends IBinaryArithmeticExpression {
   require(e1.expKind == e2.expKind, s"\n${e1}, ${e1.expKind}, \n${e2}, ${e2.expKind}")
   // if (e1.expKind != e2.expKind) handleExpKindMismatch(e1, e2, s"${toString}")
   val expKind: ExpKind = e1.expKind
@@ -221,29 +221,29 @@ case class IBinaryArithmeticTermExpression(e1: IsabelleExpression, op: VAddingOp
 
 //********************************************************************************************************************//
 
-case class IExp_nth(e: IsabelleExpression, nthExp: IsabelleExpression) extends IsabelleExpression {
+case class IExp_nth(e: IExpression, nthExp: IExpression) extends IExpression {
   require(e.expKind.isV && nthExp.expKind == ExpScalarKind)
   val expKind: ExpKind = ExpScalarKind
 }
 
-case class IExp_sl(e: IsabelleExpression, e1: IsabelleExpression, e2: IsabelleExpression) extends IsabelleExpression {
+case class IExp_sl(e: IExpression, e1: IExpression, e2: IExpression) extends IExpression {
   // FIXME: not sure whether "DT" or "T": (1) rely on "e" (2) order of "e1", "e2"
   require(e.expKind.isV && e1.expKind == ExpScalarKind && e2.expKind == ExpScalarKind)
   val expKind: ExpKind = e.expKind
 }
 
-case class IExp_tl(e: IsabelleExpression) extends IsabelleExpression {
+case class IExp_tl(e: IExpression) extends IExpression {
   require(e.expKind == ExpScalarKind)
   val expKind: ExpKind = ExpVectorKindTo
 }
 
-case class IExp_trl(e: IsabelleExpression) extends IsabelleExpression {
+case class IExp_trl(e: IExpression) extends IExpression {
   require(e.expKind == ExpScalarKind)
   val expKind: ExpKind = ExpVectorKindDownTo
 }
 
 // Fake IExp to convert vl/spl to IExp
 
-case class IExp_vl_rhs(v: V_IDef, sn: VSelectedName, expKind: ExpKind) extends IsabelleExpression
+case class IExp_vl_rhs(v: V_IDef, sn: VSelectedName, expKind: ExpKind) extends IExpression
 
-case class IExp_spl_rhs(sp: SP_IDef, sn: VSelectedName, expKind: ExpKind) extends IsabelleExpression
+case class IExp_spl_rhs(sp: SP_IDef, sn: VSelectedName, expKind: ExpKind) extends IExpression
