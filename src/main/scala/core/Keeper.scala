@@ -12,7 +12,7 @@ abstract class Keeper(vInfo: Option[VInfo]) {
 
   var entity: IEntity = _
 
-  val conc_stmt_complexes = mutable.ArrayBuffer.empty[Conc_stmt_complex]
+  val conc_stmt_complexes = mutable.ArrayBuffer.empty[IConc_stmt_complex]
 
   val defInfo = new DefInfo(vInfo.map(_.defInfo))
 
@@ -31,15 +31,14 @@ abstract class Keeper(vInfo: Option[VInfo]) {
             case None => vectorType.guessInitVal(defaultRangeV(s"ConstDecl vector ${subtypeIndication}"))
           }
         }
-        val variable = IVariable_old(id, baseType, initVal)
-        IdentifierMap.iVariableMap += id -> IVariable(id, subtypeIndication, initVal)
+        val variable = IVariable(id, baseType, initVal)
         defInfo += (id, variable)
       }
       case ct : VCustomizedType => ct match{
         case subtype : VSubtype => {
           val subtypeIndication = typeInfo.subtypeDeclarationMap(subtype)
           generateIDefinition(id, expOption, subtypeIndication, defInfo, typeInfo) match{
-            case variable : IVariable_old => defInfo += (id, variable)
+            case variable : IVariable => defInfo += (id, variable)
             case vnl : Vnl => defInfo += (id, vnl)
             case _ => throw VIError
           }
@@ -54,7 +53,7 @@ abstract class Keeper(vInfo: Option[VInfo]) {
     }
   }
 
-  def generateIPort(id: String, expOption: Option[VExpression], sti: VSubtypeIndication, mode: PortMode.Ty, conn: PortConn.Ty): Unit = {
+  def generateIPort(id: String, expOption: Option[VExpression], sti: VSubtypeIndication, portMode: PortMode.Value, portConnection: PortConnection.Value): Unit = {
     val valType = VTypeDefinition(sti.getSimpleName)
     valType match {
       case bt: VBaseType => {
@@ -69,14 +68,14 @@ abstract class Keeper(vInfo: Option[VInfo]) {
             }
           }
         }
-        val port = Port_baseType(id, bt, initVal, mode, conn)
+        val port = Port_baseType(id, bt, initVal, portMode, portConnection)
         defInfo +=(id, port)
       }
       case ct: VCustomizedType => ct match {
         case subtype : VSubtype => handler(s"${subtype}")
         case recordType : VRecordType => {
           val initVals = recordType.getInitVals(typeInfo, expOption)(defInfo)
-          val spnl = Spnl.generateFromPort(id, initVals, mode, conn, typeInfo)
+          val spnl = ISpl_Spnl(id, initVals, portMode, portConnection, typeInfo)
           defInfo +=(id, spnl)
         }
         case arrayType :VArrayType => handler(s"${arrayType}")
@@ -84,7 +83,7 @@ abstract class Keeper(vInfo: Option[VInfo]) {
     }
   }
 
-  def genISignal(id: String, sti: VSubtypeIndication, signalKind: SignalKind.Ty): Unit = {
+  def genISignal(id: String, sti: VSubtypeIndication, signalKind: SignalKind.Value): Unit = {
     val valType = VTypeDefinition(sti.getSimpleName)
     valType match {
       case bt: VBaseType => {
@@ -102,15 +101,15 @@ abstract class Keeper(vInfo: Option[VInfo]) {
         case subtype : VSubtype => handler(s"${subtype}")
         case recordType : VRecordType => {
           val initVals = recordType.guessInitVals(typeInfo)
-          val spnl = Spnl.genFromSignal(id, initVals, signalKind)
-          defInfo +=(id, spnl)
+          val iSpl_Spnl = ISpl_Spnl(id, initVals, signalKind)
+          defInfo +=(id, iSpl_Spnl)
         }
         case arrayType : VArrayType => handler(s"${arrayType}")
       }
     }
   }
 
-  // This method is called when trying to get subtype definition
+  // [TN] This method is called when trying to get subtype definition
   def generateIDefinition(id: String, expOption: Option[VExpression], subtypeIndication: VSubtypeIndication, defInfo: DefInfo, typeInfo: VTypeInfo) : V_IDef = {
     val valType = VTypeDefinition(subtypeIndication.getSimpleName)
     valType match {
@@ -122,7 +121,7 @@ abstract class Keeper(vInfo: Option[VInfo]) {
             case None => vectorType.guessInitVal(defaultRangeV(s"ConstDecl vector ${subtypeIndication}"))
           }
         }
-        IVariable_old(id, baseType, initVal)
+        IVariable(id, baseType, initVal)
       }
       case ct : VCustomizedType => ct match{
         case subtype : VSubtype => {

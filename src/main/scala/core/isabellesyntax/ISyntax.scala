@@ -117,21 +117,23 @@ sealed abstract class IExpression {
   def getIDef: IDef = this match {
     case vl_rhs: IExp_vl_rhs => vl_rhs.v
     case spl_rhs: IExp_spl_rhs => spl_rhs.sp
-    case v: IExp_variable => v.variable
+    case v: IExpression_Variable => v.variable
     case s: IExp_signal => s.signal
     case p: IExp_port => p.port
     case _ => throw VIError
   }
 
   override def toString = this match {
-    case IExp_baseTypeConstant(baseType, const, _) => s"""(exp_con (${VHDLize(baseType)}, ${const}))"""
+    case IExp_baseTypeConstant(baseType, const, _) => s"""(exp_con (${IType(baseType)}, ${const}))"""
 
     case IExp_recordTypeConstant(recordType, const, _) => handler(s"${recordType}")
     case IExp_arrayTypeConstant(arrayType, const, _) => s"""(exp_con (vhdl_array, ${const}))"""
 
-    case IExp_variable(variable, _) => s"""(exp_var ${variable.getId})"""
-    case IExp_signal(signal, _) => s"""(exp_sig ${signal.getId})"""
-    case IExp_port(port, _) => s"""(exp_prt ${port.getId})"""
+    case IExpression_Variable(iVariable, _) => s"""(exp_var ${iVariable.getName})"""
+    case IExpression_Vl(iVl, _) => s"""(exp_r (rhsl_of_vl ${iVl.getName}))"""
+    case IExp_signal(signal, _) => s"""(exp_sig ${signal.getName})"""
+    case IExpression_Spl(iSpl: ISpl, _) => s"""(exp_r (rhsl_of_spl ${iSpl.getName}))"""
+    case IExp_port(port, _) => s"""(exp_prt ${port.getName})"""
 
     case IUnaryExpression(op, e) => s"""(uexp ${op} ${e})"""
     case IBinaryLogicalExpression(e1, lop, e2) => s"""(bexpl ${e1} ${lop} ${e2})"""
@@ -151,9 +153,9 @@ sealed abstract class IExpression {
     case IExp_spl_rhs(spl, selectedName, _) => s"""(exp_of_spl ${selectedName.isa_sp})"""
   }
 
-  def crhs_e_rhse: Crhs_e = Crhs_e(Rhs_e(this))
+  def crhs_e_rhse: Crhs_e = Crhs_e(IAsmt_rhs_Rhs_e(this))
 
-  def crhs_e_rhso: Crhs_e = Crhs_e(Rhs_o(this))
+  def crhs_e_rhso: Crhs_e = Crhs_e(IAsmt_rhs_Rhs_o(this))
 
   // Implemented outside
   def crhs_r(defInfo: DefInfo): Crhs_r = throw VIError
@@ -174,13 +176,17 @@ case class IExp_arrayTypeConstant(arrayType : VArrayType, const: IConst, expKind
 
 // For storing identifiers
 // Different from Isabelle, it must be a defined "variable"
-case class IExp_variable(variable: IVariable_old, expKind: ExpKind) extends IExpression
+case class IExpression_Variable(variable: IVariable, expKind: ExpKind) extends IExpression
+
+case class IExpression_Vl(iVl: IVl, expKind: ExpKind) extends IExpression
 
 case class IExp_signal(signal: Signal, expKind: ExpKind) extends IExpression
 
+case class IExpression_Spl(iSpl: ISpl, expKind: ExpKind) extends IExpression
+
 case class IExp_port(port: Port, expKind: ExpKind) extends IExpression
 
-case class IUnaryExpression(op: VUnaryOperator.Ty, e: IExpression) extends IExpression {
+case class IUnaryExpression(op: VUnaryOperator.Value, e: IExpression) extends IExpression {
   val expKind: ExpKind = e.expKind
 }
 
@@ -213,7 +219,7 @@ case class IBinaryArithmeticPrimaryExpression(e1: IExpression, op: VDoubleStarOp
   val expKind: ExpKind = e1.expKind
 }
 
-case class IBinaryArithmeticTermExpression(e1: IExpression, op: VAddingOperator.Ty, e2: IExpression) extends IBinaryArithmeticExpression {
+case class IBinaryArithmeticTermExpression(e1: IExpression, op: VAddingOperator.Value, e2: IExpression) extends IBinaryArithmeticExpression {
   require(e1.expKind == e2.expKind, s"\n${e1}, ${e1.expKind}, \n${e2}, ${e2.expKind}")
   // if (e1.expKind != e2.expKind) handleExpKindMismatch(e1, e2, s"${toString}")
   val expKind: ExpKind = e1.expKind
@@ -247,3 +253,24 @@ case class IExp_trl(e: IExpression) extends IExpression {
 case class IExp_vl_rhs(v: V_IDef, sn: VSelectedName, expKind: ExpKind) extends IExpression
 
 case class IExp_spl_rhs(sp: SP_IDef, sn: VSelectedName, expKind: ExpKind) extends IExpression
+
+//********************************************************************************************************************//
+
+sealed abstract class IV_lhs {
+  override def toString = this match {
+    case IV_lhs_Lhs_v(iVariable, selectedName) => selectedName.suffixList match {
+      // [TN]: The original value is selectedName.isa_v
+      // However when selectedName.suffixList == Nil then name of the variable will be name IVariable.name
+      case Nil => s"(lhs_v ${iVariable.name})"
+      case _ => s"(lhs_v (var_of_vl ${selectedName.isa_v}))"
+    }
+    case IV_lhs_Lhs_va(iVariable, discreteRange, selectedName) => selectedName.suffixList match {
+      case Nil => s"(lhs_va ${selectedName.isa_v} ${discreteRange})"
+      case _ => s"(lhs_va (var_of_vl ${selectedName.isa_v}) ${discreteRange})"
+    }
+  }
+}
+
+case class IV_lhs_Lhs_v(variable: IVariable, selectedName: VSelectedName) extends IV_lhs
+
+case class IV_lhs_Lhs_va(variable: IVariable, discreteRange: IDiscrete_range, selectedName: VSelectedName) extends IV_lhs

@@ -41,6 +41,8 @@ CONSTANT subtypeConst : subtype;
 
 (V2I-010) One Dimensional Array for VBaseType
 
+(V2I-013) Function call / Procedure call / Function body / Procedure body
+
 /*********************************************************************************************************************/
 /***************************************************  NOT FIXED  *****************************************************/
 /*********************************************************************************************************************/
@@ -49,4 +51,10 @@ CONSTANT subtypeConst : subtype;
 
 (V2I-009) Replace std_logic_vec_gen with vec_gen
 
-(V2I-011)
+(V2I-011) Remove VSelectedName in IV_lhs
+
+(V2I-012) Remove IdentifierMap.isParsingSubprogram and remove IdentifierMap.subprogramName
+
+(V2I-014)
+
+(V2I-015)

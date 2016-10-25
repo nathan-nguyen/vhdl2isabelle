@@ -10,8 +10,6 @@ package object core {
 
   val logger = LoggerFactory.getLogger(getClass)
 
-  def VHDLize(vhdlType: VBaseType) = s"vhdl_${vhdlType.s}"
-
   object VIError extends Throwable
 
   case class VIErrorMsg(msg: String) extends Exception(msg)
@@ -23,8 +21,7 @@ package object core {
   // TODO: Extend to both unconstrained and constrained
   type ArrayTypeDeclarationMap = scala.collection.mutable.Map[VArrayType, VConstrainedArrayDefinition]
 
-  type IdTy = String
-  type DefIdPair = (Option[IDef], IdTy)
+  type DefIdPair = (Option[IDef], String)
 
   val defaultId = ""
 

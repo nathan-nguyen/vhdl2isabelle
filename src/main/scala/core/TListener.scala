@@ -48,7 +48,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   }
 
   override def exitGenerate_statement(ctx: Generate_statementContext): Unit = {
-    val genStat = VGenStat(ctx)
+    val genStat = VGenerateStatement(ctx)
     conc_stmt_complexes += genStat.toI(defInfo)
     //    logger.info(s"${genStat.toI(defInfo)}")
   }
@@ -340,26 +340,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def enterPort_map_aspect(ctx: Port_map_aspectContext): Unit = {}
 
-  override def enterFunction_specification(ctx: Function_specificationContext): Unit = {
-    // TODO: Put this inside IFunction
-    val functionSpecification = VFunctionSpecification(ctx);
-    val parameterList = new ListBuffer[IParameter]()
-    val interfaceElementList = functionSpecification.getInterfaceElementList()
-    for (interfaceElement <- interfaceElementList){
-      val interfaceConstantDeclaration = interfaceElement.getInterfaceConstantDeclaration()
-      for (id <- interfaceConstantDeclaration.idList){
-        // Generate variable in parameter list
-        genIVariable(functionSpecification.designator.id + "_" + id, None, interfaceConstantDeclaration.subtypeIndication)
-        parameterList += IParameter(functionSpecification.designator.id + "_" + id, IDirection.IDirectionIn, interfaceConstantDeclaration.subtypeIndication)
-      }
-    }
-    // Generate return variable
-    genIVariable(functionSpecification.designator.id + "_return", None, functionSpecification.subtypeIndication)
-
-    parameterList += IParameter(functionSpecification.designator.id + "_return", IDirection.IDirectionOut, functionSpecification.subtypeIndication)
-
-    IdentifierMap.iFunctionMap += functionSpecification.designator.id -> IFunction(functionSpecification.designator.id, parameterList.toList, List.empty, IType(functionSpecification.subtypeIndication), List.empty)
-  }
+  override def enterFunction_specification(ctx: Function_specificationContext): Unit = {}
 
   override def enterProcess_declarative_item(ctx: Process_declarative_itemContext): Unit = {}
 
@@ -579,7 +560,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
       val mode = PortMode.withName(s"mode_${interfacePortDecl.mode}")
       val sti = interfacePortDecl.subtypeInd
       val expOption = interfacePortDecl.vExp
-      generateIPort(id, expOption, sti, mode, PortConn.connected)
+      generateIPort(id, expOption, sti, mode, PortConnection.connected)
     }
   }
 
@@ -609,7 +590,6 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
     if (vInfo.isDefined) {
       val iEnv = IEnv(defInfo)
       entity = IEntity(definedEntities.head, iEnv, IResFn(), conc_stmt_complexes.toList)
-    } else {
     }
   }
 
@@ -779,7 +759,10 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def exitEnumeration_literal(ctx: Enumeration_literalContext): Unit = {}
 
-  override def exitSubprogram_body(ctx: Subprogram_bodyContext): Unit = {}
+  override def exitSubprogram_body(ctx: Subprogram_bodyContext): Unit = {
+    val subprogramBody = VSubprogramBody(ctx)
+    ISubprogramComplex(subprogramBody)(defInfo)
+  }
 
   override def enterRecord_nature_definition(ctx: Record_nature_definitionContext): Unit = {}
 
@@ -1009,13 +992,13 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def enterEnumeration_type_definition(ctx: Enumeration_type_definitionContext): Unit = {}
 
   override def exitConcurrent_signal_assignment_statement(ctx: Concurrent_signal_assignment_statementContext): Unit = {
-    val concurrentSignalAssign = VConcSignalAssignStat(ctx)
+    val concurrentSignalAssign = VConcurrentSignalAssignmentStatement(ctx)
     concurrentSignalAssign match {
-      case csa@VConcSignalAssignStatC(labelColon, _, condSignAssign) => {
+      case csa@VConcurrentSignalAssignmentStatementConditional(labelColon, _, condSignAssign) => {
         conc_stmt_complexes += csa.toI(defInfo)
         //        logger.info(s"${csa.toI(defInfo)}")
       }
-      case VConcSignalAssignStatS(_, _, selectSignalAssign) => {
+      case VConcurrentSignalAssignmentStatementSelected(_, _, selectSignalAssign) => {
       }
     }
   }
@@ -1054,7 +1037,14 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def exitComponent_specification(ctx: Component_specificationContext): Unit = {}
 
-  override def enterSubprogram_specification(ctx: Subprogram_specificationContext): Unit = {}
+  override def enterSubprogram_specification(ctx: Subprogram_specificationContext): Unit = {
+    val subprogramSpecification = VSubprogramSpecification(ctx);
+    for (interfaceElement <- subprogramSpecification.getInterfaceElementList()){
+      val interfaceDeclaration = interfaceElement.asInstanceOf[VInterfaceDeclaration]
+      for (id <- interfaceDeclaration.idList)
+        genIVariable(subprogramSpecification.designator.id + "_" + id, None, interfaceDeclaration.subtypeIndication)
+    }
+  }
 
   override def exitProcedure_call_statement(ctx: Procedure_call_statementContext): Unit = {}
 
@@ -1131,10 +1121,9 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def exitLogical_name_list(ctx: Logical_name_listContext): Unit = {}
 
   override def exitProcess_statement(ctx: Process_statementContext): Unit = {
-    val procStat = VProcStat(ctx)
-    val isa = procStat.toI(defInfo)
+    val processStatement = VProcessStatement(ctx)
+    val isa = processStatement.toI(defInfo)
     conc_stmt_complexes += isa
-    //    logger.info(s"${isar}")
   }
 
   override def enterGroup_declaration(ctx: Group_declarationContext): Unit = {}

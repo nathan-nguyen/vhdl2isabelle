@@ -59,16 +59,32 @@ entity iu3 is
 end;
 
 architecture rtl of iu3 is
-  function get_tbuf(tbuf: integer) return integer is
+
+  procedure change_tbuf(tracebuf_2p: in boolean; tbuf: out integer; tbuf_in: in integer) is
     begin
-      return 0;
-  end function get_tbuf;
+      if (TRACEBUF_2P) then
+        tbuf := (tbuf-64);
+      else
+        tbuf := tbuf_in;
+      end if;
+    end procedure change_tbuf;
 
-  function get_pwd(pwd: integer) return integer is
-      begin
-        return 1;
-    end function get_pwd;
 
-  --constant functionCallConst : integer := 1 + get_tbuf(tbuf);
+  --CONSTANT addr : std_logic_vector(9 downto 0) := (others => '0');
+
+  function get_tbuf(tracebuf_2p: boolean; tbuf: integer) return integer is
+    begin
+      change_tbuf(true, tbuf, tbuf);
+      if (TRACEBUF_2P) then
+        return(tbuf-64);
+      else
+        return(tbuf);
+      end if;
+    end function get_tbuf;
+
+
+  --constant functionCallConst : integer := 1 + get_tbuf(true, tbuf);
+
+
 begin
 end;

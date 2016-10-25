@@ -2,7 +2,9 @@ package core
 
 import core.isabellesyntax._
 import core.vhdlsyntax._
+
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 
 /**
   * Created by Hongxu Chen.
@@ -22,47 +24,47 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     * signal (scalar), port (scalar), spnl (record)
     */
 
-  type V_PTy = IVariable_old
+  type V_PTy = IVariable
   type Vnl_PTy = Vnl
   type S_PTy = Signal
   type P_PTy = Port
-  type SPnl_PTy = Spnl
+  type SPnl_PTy = ISpl_Spnl
 
-  val v_raw = mutable.ListBuffer.empty[IVariable_old]
+  val v_raw = mutable.ListBuffer.empty[IVariable]
   val vnl_raw = mutable.ListBuffer.empty[Vnl_PTy]
   val s_raw = mutable.ListBuffer.empty[S_PTy]
   val p_raw = mutable.ListBuffer.empty[P_PTy]
   val spnl_raw = mutable.ListBuffer.empty[SPnl_PTy]
 
   //  for Env
-  val v_map = mutable.Map.empty[IdTy, IVariable_old]
-  val s_map = mutable.Map.empty[IdTy, Signal]
-  val p_map = mutable.Map.empty[IdTy, Port]
+  val v_map = mutable.Map.empty[String, IVariable]
+  val s_map = mutable.Map.empty[String, Signal]
+  val p_map = mutable.Map.empty[String, Port]
 
   /**
     * get def, which means getting
     * 1. "variable"(v_raw), "signal"(s_raw), "port"(p_raw)
     * 2. (1) from spnl_raw for "signal", "port", "spnl"
-    * (2) from v_raw for "variable", "vnl"
-    * NOTE: this could be implemented by flattening the map beforehand
-    * NOTE: isar representation of "top level scalar" and "inside scalar" should be different!
+    *    (2) from v_raw for "variable", "vnl"
+    * NOTE: This could be implemented by flattening the map beforehand
+    * NOTE: Isabelle representation of "top level scalar" and "inside scalar" should be different!
     */
 
   def getDef(n: String): IDef = getDefOpt(List(n)).getOrElse(handler(s"${n}"))
 
-  def getDef(sn: VSelectedName): IDef = {
-    val nList = sn.suffixList.scanLeft(sn.id)((acc, cur) => s"${acc}_${cur.s}")
-    getDefOpt(nList).getOrElse(handler(s"${sn}"))
+  def getDef(selectedName: VSelectedName): IDef = {
+    val nList = selectedName.suffixList.scanLeft(selectedName.id)((acc, cur) => s"${acc}_${cur.s}")
+    getDefOpt(nList).getOrElse(handler(s"${selectedName}"))
   }
 
-  def getSPDef(sn: VSelectedName): SP_IDef = {
-    val nList = sn.suffixList.scanLeft(sn.id)((acc, cur) => s"${acc}_${cur.s}")
-    getSPDefOpt(nList).getOrElse(handler(s"${sn}"))
+  def getSPDef(selectedName: VSelectedName): SP_IDef = {
+    val nList = selectedName.suffixList.scanLeft(selectedName.id)((acc, cur) => s"${acc}_${cur.s}")
+    getSPDefOpt(nList).getOrElse(handler(s"${selectedName}"))
   }
 
-  def getVDef(sn: VSelectedName): V_IDef = {
-    val nList = sn.suffixList.scanLeft(sn.id)((acc, cur) => s"${acc}_${cur.s}")
-    getVDefOpt(nList).getOrElse(handler(s"${sn}"))
+  def getVDef(selectedName: VSelectedName): V_IDef = {
+    val nList = selectedName.suffixList.scanLeft(selectedName.id)((acc, cur) => s"${acc}_${cur.s}")
+    getVDefOpt(nList).getOrElse(handler(s"${selectedName}"))
   }
 
   def getSPDefOpt(nList: List[String]): Option[SP_IDef] = {
@@ -79,12 +81,35 @@ final class DefInfo(defInfo: Option[DefInfo]) {
   }
 
   def getVDefOpt(nList: List[String]): Option[V_IDef] = {
+    /** [TN] This hack allows looking for local variable definition in subprogram call
+      * Because all the local variables are rename: subprogram_name + "_" + local_variable_name
+      * This function might not work with nested vl because the only used values are head and tail
+    */
     val h = nList.head
-    v_raw.find(_.id == h) match {
-      case v@Some(sv) => v
-      case None => vnl_raw.find(_.id == h) match {
-        case Some(vl) => vl.get(nList.tail)
-        case None => None
+    if (IdentifierMap.isParsingSubprogram){
+      val h_rename = IdentifierMap.subprogramName + "_" + h
+      v_raw.find(_.name == h_rename) match {
+        case v@Some(sv) => v
+        case None => vnl_raw.find(_.id == h_rename) match {
+          case Some(vl) => vl.get(nList.tail)
+          case None => {
+            v_raw.find(_.name == h) match {
+              case v@Some(sv) => v
+              case None => vnl_raw.find(_.id == h) match {
+                case Some(vl) => vl.get(nList.tail)
+                case None => None
+              }
+            }
+          }
+        }
+      }
+    } else {
+      v_raw.find(_.name == h) match {
+        case v@Some(sv) => v
+        case None => vnl_raw.find(_.id == h) match {
+          case Some(vl) => vl.get(nList.tail)
+          case None => None
+        }
       }
     }
   }
@@ -96,11 +121,11 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     case Vl_v(v) => List(v)
   }
 
-  def spnl_flatten(spnl: Spnl): (List[S_PTy], List[P_PTy]) = {
-    def aux(sPnl: Spnl): List[(S_PTy, P_PTy)] = spnl.splList flatMap {
-      case SPl_signal(s) => List((s, null))
-      case Spl_port(p) => List((null, p))
-      case spnl_list: Spnl => aux(spnl_list)
+  def spnl_flatten(spnl: ISpl_Spnl): (List[S_PTy], List[P_PTy]) = {
+    def aux(sPnl: ISpl_Spnl): List[(S_PTy, P_PTy)] = spnl.splList flatMap {
+      case ISPl_s(s) => List((s, null))
+      case ISpl_p(p) => List((null, p))
+      case spnl_list: ISpl_Spnl => aux(spnl_list)
     }
     val (signalList, portList) = aux(spnl).unzip
     (signalList.filter(_ != null), portList.filter(_ != null))
@@ -119,7 +144,7 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     case None =>
   }
 
-  def +=(id: String, d: IVariable_old): Unit = {
+  def +=(id: String, d: IVariable): Unit = {
     v_raw += d
     v_map += (id -> d)
   }
@@ -127,7 +152,7 @@ final class DefInfo(defInfo: Option[DefInfo]) {
   def +=(id: String, d: Vnl): Unit = {
     vnl_raw += d
     val vList = vnl_flatten(d)
-    v_map ++= vList.map(_.id).zip(vList)
+    v_map ++= vList.map(_.name).zip(vList)
   }
 
   def +=(id: String, d: Signal): Unit = {
@@ -140,7 +165,7 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     p_map += (id -> d)
   }
 
-  def +=(id: String, d: Spnl): Unit = {
+  def +=(id: String, d: ISpl_Spnl): Unit = {
     spnl_raw += d
     val (sl, pl) = spnl_flatten(d)
     s_map ++= sl.map(_.id).zip(sl)
@@ -160,5 +185,4 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     } yield d.as_definition
     defList.mkString("\n\n")
   }
-
 }

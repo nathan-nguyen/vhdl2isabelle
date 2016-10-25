@@ -31,7 +31,7 @@ sealed abstract class VLiteral {
       }
       // enumeral
       case enumL: VLiteralEnum => enumL match {
-        // TODO check whether s has been lowercased
+        // TODO: [HC] Check whether s has been lowercased
         case VLiteralEnumId(s) => {
           if (trueOrFalse(s)) {
             VScalarType("boolean").getInitValFromLiteral(s)
@@ -39,15 +39,16 @@ sealed abstract class VLiteral {
             val idef = defInfo.getDef(s)
             val expKind = idef.getExpKind
             idef match {
-              // NOTE: this should always use IExp_variable/IExp_signal/IExp_port
-              case iVariable: IVariable_old => IExp_variable(iVariable, expKind)
+              case iVariable: IVariable => IExpression_Variable(iVariable, expKind)
+              case iVl: IVl => IExpression_Vl(iVl, expKind)
               case signal: Signal => IExp_signal(signal, expKind)
+              case iSpl: ISpl => IExpression_Spl(iSpl, expKind)
               case port: Port => IExp_port(port, expKind)
               case _ => handler(s"${idef}, ${s}")
             }
           }
         }
-        // TODO will be refined later if is a scalar type; for other cases???
+        // TODO: [HC] will be refined later if is a scalar type; for other cases???
         case VLiteralEnumChar(s) => VScalarType(defaultCharType).getInitValFromLiteral(s)
       }
       case VLiteralBitS(s) => handler(s)
@@ -65,9 +66,9 @@ sealed abstract class VLiteral {
     case _ => handler(s"what as range? ${toString}")
   }
 
-  def to_IDiscreteRange(defInfo: DefInfo): Discrete_range = {
+  def to_IDiscreteRange(defInfo: DefInfo): IDiscrete_range = {
     val e = asRangeExp(defInfo)
-    VHDL_dis_downto(e, e)
+    IVhdl_dis_downto(e, e)
   }
 
   // [TN] Not sure this is a valid way to put get_init_val, should move to ISyntax
@@ -437,17 +438,17 @@ object VChoices {
 
 //********************************************************************************************************************//
 
-case class VElemAssoc(choices: Option[VChoices], expr: VExpression)
+case class VElememntAssocication(choices: Option[VChoices], expr: VExpression)
 
-object VElemAssoc {
-  def apply(ctx: Element_associationContext): VElemAssoc = {
+object VElememntAssocication {
+  def apply(ctx: Element_associationContext): VElememntAssocication = {
     val choices = Option(ctx.choices()).map(VChoices(_))
     val vExp = VExpression(ctx.expression())
-    VElemAssoc(choices, vExp)
+    VElememntAssocication(choices, vExp)
   }
 }
 
-case class VAggregate(elemAssocList: List[VElemAssoc]) {
+case class VAggregate(elemAssocList: List[VElememntAssocication]) extends VTarget{
   require(elemAssocList.nonEmpty, "elemAssocList")
   lazy val _getAssoc: List[(String, VExpression)] = {
     for {
@@ -475,7 +476,7 @@ case class VAggregate(elemAssocList: List[VElemAssoc]) {
 
 object VAggregate {
   def apply(ctx: AggregateContext): VAggregate = {
-    val element_assocList = ctx.element_association().map(VElemAssoc(_)).toList
+    val element_assocList = ctx.element_association().map(VElememntAssocication(_)).toList
     VAggregate(element_assocList)
   }
 }
@@ -527,7 +528,7 @@ abstract class VPrimary {
     case VPrimaryAggregate(aggregate) => {
       aggregate.getFirstMap._2.toIExp(defInfo)
     }
-    case VPrimaryName(name) => name.toI_rhs(defInfo)
+    case VPrimaryName(name) => name.toIRhs(defInfo)
   }
 
   def asVal: String = this match {
@@ -590,9 +591,11 @@ case class VSuffix(s: String) {
 
 
 // [HC] Perhaps needing separation
-sealed abstract class VName {
+sealed abstract class VName extends VTarget {
 
-  def getSimpleNameOpt: Option[String] = this match {
+  def getVSelectedName(defInfo: DefInfo): (VSelectedName, Option[IDiscrete_range])
+
+  def getSimpleNameOption: Option[String] = this match {
     case VSelectedName(id, suffixList) => {
       if (suffixList.nonEmpty) {
         logger.warn(s"VSelectedName ${toString}")
@@ -606,29 +609,27 @@ sealed abstract class VName {
     }
   }
 
-  def getSimpleName: String = getSimpleNameOpt match {
+  def getSimpleName: String = getSimpleNameOption match {
     case Some(s) => s
     case None => handler(s"${toString}")
   }
 
-  def toI_rhs(defInfo: DefInfo): IExpression
+  def toIRhs(defInfo: DefInfo): IExpression
 
 }
 
 object VName {
   def apply(ctx: NameContext): VName = {
-    val selectedName = ctx.selected_name()
-    val name_partList = ctx.name_part()
-    if (selectedName != null) {
-      VSelectedName(selectedName)
-    } else {
-      VNameParts.gen(name_partList.toList)
-    }
+    if (ctx.selected_name() != null) {
+      VSelectedName(ctx.selected_name())
+    } else VNameParts(ctx)
   }
 }
 
 
 case class VSelectedName(id: String, suffixList: List[VSuffix]) extends VName {
+
+  override def getVSelectedName(defInfo: DefInfo) = (this, None)
 
   def extracted(extractor: String): String = {
     val nList = suffixList.scanLeft(id)((acc, cur) => s"${acc}_${cur}")
@@ -639,17 +640,16 @@ case class VSelectedName(id: String, suffixList: List[VSuffix]) extends VName {
 
   def isa_sp = extracted("s.")
 
-  override def toI_rhs(defInfo: DefInfo): IExpression = {
-    //    logger.info(s"${toString}")
-    val idef = defInfo.getDef(this)
-    val expKind = idef.getExpKind
-    idef match {
-      case vl: Ivl_old => IExp_vl_rhs(vl, this, expKind)
-      case v: IVariable_old => suffixList match {
-        case Nil => IExp_variable(v, expKind)
+  override def toIRhs(defInfo: DefInfo): IExpression = {
+    val iDef = defInfo.getDef(this)
+    val expKind = iDef.getExpKind
+    iDef match {
+      case vl: IVl => IExp_vl_rhs(vl, this, expKind)
+      case v: IVariable => suffixList match {
+        case Nil => IExpression_Variable(v, expKind)
         case _ => IExp_vl_rhs(v, this, expKind)
       }
-      case spl: SPl => IExp_spl_rhs(spl, this, expKind)
+      case spl: ISpl => IExp_spl_rhs(spl, this, expKind)
       case s: Signal => suffixList match {
         case Nil => IExp_signal(s, expKind)
         case _ => IExp_spl_rhs(s, this, expKind)
@@ -714,27 +714,27 @@ object VAttrDesignatorRef extends VAttrDesignator
 
 object VAttrDesignatorT extends VAttrDesignator
 
-case class VNameAttrPart(attrDesignator: VAttrDesignator, exprList: List[VExpression])
+case class VNameAttributePart(attrDesignator: VAttrDesignator, exprList: List[VExpression])
 
-object VNameAttrPart {
-  def apply(ctx: Name_attribute_partContext): VNameAttrPart = {
+object VNameAttributePart {
+  def apply(ctx: Name_attribute_partContext): VNameAttributePart = {
     val attrDesignator = VAttrDesignator(ctx.attribute_designator())
     val exps = ctx.expression().map(VExpression(_)).toList
-    VNameAttrPart(attrDesignator, exps)
+    VNameAttributePart(attrDesignator, exps)
   }
 }
 
-case class VNameFnCallOrIndexPart(assocListOpt: Option[VAssocList]) {
+case class VNameFunctionCallOrIndexedPart(assocListOpt: Option[VAssociationList]) {
   def getExp: VExpression = assocListOpt match {
     case Some(al) => {
-      val elem = al.assocElemList.head.actualPart
+      val elem = al.vAssociationElementList.head.actualPart
       val designator = elem match {
         case VActualPartD(d) => d
         case VActualPartN(sn, d) => d
       }
       designator match {
-        case VActualDesignatorE(vExp) => vExp
-        case VActualDesignatorO => ???
+        case VActualDesignatorExpression(vExp) => vExp
+        case VActualDesignatorOpen => ???
       }
     }
     case None => handler(s"${toString}")
@@ -745,16 +745,16 @@ case class VNameFnCallOrIndexPart(assocListOpt: Option[VAssocList]) {
   }
 }
 
-object VNameFnCallOrIndexPart {
-  def apply(ctx: Name_function_call_or_indexed_partContext): VNameFnCallOrIndexPart = {
-    val assocList = Option(ctx.actual_parameter_part()).map(al => VAssocList(al.association_list()))
-    VNameFnCallOrIndexPart(assocList)
+object VNameFunctionCallOrIndexedPart {
+  def apply(ctx: Name_function_call_or_indexed_partContext): VNameFunctionCallOrIndexedPart = {
+    val assocList = Option(ctx.actual_parameter_part()).map(al => VAssociationList(al.association_list()))
+    VNameFunctionCallOrIndexedPart(assocList)
   }
 }
 
 case class VNameSlicePart(r1: VExplicitRange, r2: Option[VExplicitRange]) {
   // TODO r2
-  def toI_lhs(defInfo: DefInfo): Discrete_range = {
+  def toI_lhs(defInfo: DefInfo): IDiscrete_range = {
     r1.toI(defInfo)
   }
 
@@ -774,7 +774,7 @@ object VNameSlicePart {
 }
 
 sealed abstract class VNamePart {
-  def toI_lhs(defInfo: DefInfo): (VSelectedName, Option[Discrete_range]) = this match {
+  def toILhs(defInfo: DefInfo): (VSelectedName, Option[IDiscrete_range]) = this match {
     case VNamePartAttr(selectedName, nameAttrPart) => ???
     case VNamePartFnI(selectedName, nameFnCallOrIndexPart) => {
       val literal = nameFnCallOrIndexPart.getExp.getLiteral
@@ -793,13 +793,13 @@ sealed abstract class VNamePart {
     case VNamePartAttr(selectedName, nameAttrPart) => ???
     case VNamePartFnI(selectedName, nameFnCallOrIndexPart) => {
       //      logger.info(s"${toString}")
-      val iexp = selectedName.toI_rhs(defInfo)
+      val iexp = selectedName.toIRhs(defInfo)
       val nth = nameFnCallOrIndexPart.toI_rhs(defInfo)
       // always
       IExp_nth(iexp, nth)
     }
     case vNamePartSlice@VNamePartSlice(selectedName, nameSlicePart) => {
-      val iexp = selectedName.toI_rhs(defInfo)
+      val iexp = selectedName.toIRhs(defInfo)
       // not checked type, trust VHDL semantics
       val (e1, e2) = nameSlicePart.toI_rhs(defInfo)
       // always
@@ -811,24 +811,21 @@ sealed abstract class VNamePart {
 object VNamePart {
   def apply(ctx: Name_partContext): VNamePart = {
     val selectedName = VSelectedName(ctx.selected_name())
-    val nameAttrPart = ctx.name_attribute_part()
-    val nameFnCallOrIndexPart = ctx.name_function_call_or_indexed_part()
-    val nameSlicePart = ctx.name_slice_part()
-    if (nameAttrPart != null) {
-      VNamePartAttr(selectedName, VNameAttrPart(nameAttrPart))
-    } else if (nameFnCallOrIndexPart != null) {
-      VNamePartFnI(selectedName, VNameFnCallOrIndexPart(nameFnCallOrIndexPart))
-    } else if (nameSlicePart != null) {
-      VNamePartSlice(selectedName, VNameSlicePart(nameSlicePart))
+    if (ctx.name_attribute_part() != null) {
+      VNamePartAttr(selectedName, VNameAttributePart(ctx.name_attribute_part()))
+    } else if (ctx.name_function_call_or_indexed_part() != null) {
+      VNamePartFnI(selectedName, VNameFunctionCallOrIndexedPart(ctx.name_function_call_or_indexed_part()))
+    } else if (ctx.name_slice_part() != null) {
+      VNamePartSlice(selectedName, VNameSlicePart(ctx.name_slice_part()))
     } else throw VIError
   }
 }
 
 case class VNamePartAttr(selectedName: VSelectedName,
-                         nameAttrPart: VNameAttrPart) extends VNamePart
+                         nameAttrPart: VNameAttributePart) extends VNamePart
 
 case class VNamePartFnI(selectedName: VSelectedName,
-                        nameFnCallOrIndexPart: VNameFnCallOrIndexPart) extends VNamePart {
+                        nameFnCallOrIndexPart: VNameFunctionCallOrIndexedPart) extends VNamePart {
 }
 
 case class VNamePartSlice(selectedName: VSelectedName,
@@ -838,21 +835,21 @@ case class VNamePartSlice(selectedName: VSelectedName,
 case class VNameParts(namePartList: List[VNamePart]) extends VName {
   require(namePartList.nonEmpty, "VNameParts")
 
-  def toI_lhs(defInfo: DefInfo): (VSelectedName, Option[Discrete_range]) = {
-    namePartList.head.toI_lhs(defInfo)
+  override def getVSelectedName(defInfo: DefInfo): (VSelectedName, Option[IDiscrete_range]) = {
+    // TODO: Currently we only deal with head of namePartList
+    namePartList.head.toILhs(defInfo)
   }
 
-  // TODO only deal with ONE
-  override def toI_rhs(defInfo: DefInfo): IExpression = {
+  override def toIRhs(defInfo: DefInfo): IExpression = {
+    // TODO: Currently we only deal with head of namePartList
     namePartList.head.toI_rhs(defInfo)
   }
 }
 
 object VNameParts {
-  //  Fxxk type erasure
-  def gen(ctxList: List[Name_partContext]): VNameParts = {
-    val namePartList = ctxList.map(np => VNamePart(np))
-    VNameParts(namePartList)
+  def apply(ctx: NameContext): VNameParts = {
+    val namePartList = ctx.name_part().map(VNamePart(_))
+    VNameParts(namePartList.toList)
   }
 }
 
@@ -865,7 +862,7 @@ case class VSubtypeIndication(selectedName: VSelectedName,
                               tolerance: Option[VToleranceAspect]) extends VAliasIndication {
   def getRange: Option[VRangeV] = constraint.map(_.getRange)
 
-  def getSimpleName = selectedName.getSimpleNameOpt.getOrElse(s"ERROR: ${toString}")
+  def getSimpleName = selectedName.getSimpleNameOption.getOrElse(s"ERROR: ${toString}")
 }
 
 object VSubtypeIndication {
@@ -992,10 +989,10 @@ object VIndexConstraint {
 case class VExplicitRange(l: VSimpleExp, d: RangeD.Ty, r: VSimpleExp) {
   def getRange: VRangeV = VRangeV(l.asVal, d, r.asVal)
 
-  def toI(defInfo: DefInfo): Discrete_range = d match {
+  def toI(defInfo: DefInfo): IDiscrete_range = d match {
     case RangeD.`to` =>
-      VHDL_dis_to(l.toIExp(defInfo), r.toIExp(defInfo))
-    case RangeD.`downto` => VHDL_dis_downto(l.toIExp(defInfo), r.toIExp(defInfo))
+      IVhdl_dis_to(l.toIExp(defInfo), r.toIExp(defInfo))
+    case RangeD.`downto` => IVhdl_dis_downto(l.toIExp(defInfo), r.toIExp(defInfo))
     case RangeD.`unkown` => handler(s"${toString}")
   }
 }
@@ -1124,7 +1121,7 @@ object VTerm {
 //********************************************************************************************************************//
 
 object VUnaryOperator extends Enumeration {
-  type Ty = Value
+  type VUnaryOperator = Value
   val abs = Value("[abs]")
   val not = Value("[not]")
   val neg = Value("[-:]")
@@ -1136,12 +1133,12 @@ sealed trait VArithmeticOperator
 
 object VAddingOperator extends Enumeration with VArithmeticOperator {
   // TODO VHDL overloads this, should make it homomorphic
-  type Ty = Value
+  type VAddingOperator = Value
   val plus = Value("[+]")
   val minus = Value("[-]")
   val ampersand = Value("[&]")
 
-  def apply(ctx: Adding_operatorContext): Ty = {
+  def apply(ctx: Adding_operatorContext): VAddingOperator.Value = {
     if (ctx.PLUS() != null) plus
     else if (ctx.MINUS() != null) minus
     else if (ctx.AMPERSAND() != null) ampersand
@@ -1173,7 +1170,7 @@ object VDoubleStarOperator extends Enumeration with VArithmeticOperator {
 
 //********************************************************************************************************************//
 
-case class VSimpleExp(termSign: Option[String], term: VTerm, ops: List[VAddingOperator.Ty], others: List[VTerm]) {
+case class VSimpleExp(termSign: Option[String], term: VTerm, ops: List[VAddingOperator.Value], others: List[VTerm]) {
 
   def refine__tl_trl(tKind: ExpKind, srcIExp: IExpression): IExpression = {
     require(tKind.isV && srcIExp.expKind == ExpScalarKind)
