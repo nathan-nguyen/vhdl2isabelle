@@ -19,7 +19,7 @@ case class IEnv_sp(signalList: List[Signal], portList: List[Port], spnlList: Lis
   }
 }
 
-case class IEnv_v(variableList: List[IVariable], vnlList: List[Vnl]) {
+case class IEnv_v(variableList: List[IVariable], vnlList: List[IVl_Vnl]) {
   override def toString: String = {
     val separatorString = if (variableList.map(_.as_list).size > 0 && vnlList.map(_.as_list).size > 0) "@" else ""
     s"""${variableList.map(_.as_list).mkString("@")}${separatorString}${vnlList.map(_.as_list) mkString ("@")}""".stripMargin

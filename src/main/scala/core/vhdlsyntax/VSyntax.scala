@@ -841,7 +841,7 @@ object VIfStatement {
 
 case class VCaseStatAlt(choices: VChoices, seqOfStats: VSequenceOfStatements) {
   def toI(defInfo: DefInfo): Ssc_when = {
-    val exps = choices.choiceList.map(_.getSimplExp.toIExp(defInfo))
+    val exps = choices.vChoiceList.map(_.getSimpleExpression.toIExp(defInfo))
     val sstList = seqOfStats.sequentialStatementList.map(_.toI(defInfo))
     Ssc_when(IChoices(exps), sstList)
   }
@@ -866,7 +866,7 @@ case class VCaseStatement(labelColon: Option[String],
     // TODO: may need to ensure default case only deal with one "choice"
     val lastCase = caseStatAltList.last
     val (when_complexList: List[Ssc_when], defaultList: List[ISeq_stmt_complex]) =
-      lastCase.choices.choiceList.head match {
+      lastCase.choices.vChoiceList.head match {
         case VChoiceOthers => {
           val initCases = caseStatAltList.init
           (initCases.map(_.toI(defInfo)), lastCase.seqOfStats.sequentialStatementList.map(_.toI(defInfo)))

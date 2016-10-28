@@ -18,42 +18,42 @@ object V2IUtils {
   // Change valType to correct one (character/std_logic/std_ulogic)
   def refine__valType(idef: IDef, tobeRefined: IExpression): IExpression = {
     tobeRefined match {
-      case ec: IExp_baseTypeConstant => idef.getExpKind match {
-        case ExpScalarKind => IExp_baseTypeConstant(idef.getVType.asInstanceOf[VBaseType], ec.const, idef.getExpKind)
+      case ec: IExpression_constantBaseType => idef.getExpKind match {
+        case ExpScalarKind => IExpression_constantBaseType(idef.getVType.asInstanceOf[VBaseType], ec.iConst, idef.getExpKind)
         case vk: ExpVectorKind => {
           require(tobeRefined.expKind.isV, s"${tobeRefined.expKind}:\t${tobeRefined}")
           vk match {
-            case ExpVectorKindTo => ec.const match {
+            case ExpVectorKindTo => ec.iConst match {
               case s: IConstS => handler(s"${s}")
               case c: IConstCustomized => handler(s"${c}")
-              case l: IConstL => IExp_baseTypeConstant(idef.getVType.asInstanceOf[VBaseType], ec.const, idef.getExpKind)
+              case l: IConstL => IExpression_constantBaseType(idef.getVType.asInstanceOf[VBaseType], ec.iConst, idef.getExpKind)
               case rl: IConstRL => {
                 val valType = idef.getVType.asInstanceOf[VVectorType]
                 rl match {
                   case IConstRL_raw(_, iConstList) => {
-                    IExp_baseTypeConstant(valType, IConstL_raw(valType, iConstList), idef.getExpKind)
+                    IExpression_constantBaseType(valType, IConstL_raw(valType, iConstList), idef.getExpKind)
                   }
                   case IConstRL_gen(_, length, rawVal) => {
-                    IExp_baseTypeConstant(valType, IConstL_gen(valType, length, rawVal), idef.getExpKind)
+                    IExpression_constantBaseType(valType, IConstL_gen(valType, length, rawVal), idef.getExpKind)
                   }
                 }
               }
             }
-            case ExpVectorKindDownTo => ec.const match {
+            case ExpVectorKindDownTo => ec.iConst match {
               case s: IConstS => handler(s"${s}")
               case c: IConstCustomized => handler(s"${c}")
               case l: IConstL => {
                 val valType = idef.getVType.asInstanceOf[VVectorType]
                 l match {
                   case IConstL_raw(_, iConstList) => {
-                    IExp_baseTypeConstant(idef.getVType.asInstanceOf[VBaseType], IConstRL_raw(valType, iConstList), idef.getExpKind)
+                    IExpression_constantBaseType(idef.getVType.asInstanceOf[VBaseType], IConstRL_raw(valType, iConstList), idef.getExpKind)
                   }
                   case IConstL_gen(_, length, rawVal) => {
-                    IExp_baseTypeConstant(idef.getVType.asInstanceOf[VBaseType], IConstRL_gen(valType, length, rawVal), idef.getExpKind)
+                    IExpression_constantBaseType(idef.getVType.asInstanceOf[VBaseType], IConstRL_gen(valType, length, rawVal), idef.getExpKind)
                   }
                 }
               }
-              case rl: IConstRL => IExp_baseTypeConstant(idef.getVType.asInstanceOf[VBaseType], rl, idef.getExpKind)
+              case rl: IConstRL => IExpression_constantBaseType(idef.getVType.asInstanceOf[VBaseType], rl, idef.getExpKind)
             }
           }
         }
@@ -81,14 +81,14 @@ object V2IUtils {
   def exp__Crhs(lhs_def: IDef, rhsExp: IExpression): Crhs = {
     // [HC] This itself does little, only to change the valType
     // [HC] "valType" is reliable, however may change to "scalarized"
-    def refine__sv_inner(e: IExp_baseTypeConstant, valType: VBaseType): IExp_baseTypeConstant = {
+    def refine__sv_inner(e: IExpression_constantBaseType, valType: VBaseType): IExpression_constantBaseType = {
       val newValType = valType.asInstanceOf[VVectorType].scalarize
-      IExp_baseTypeConstant(newValType, e.const, e.expKind)
+      IExpression_constantBaseType(newValType, e.iConst, e.expKind)
     }
 
     if (lhs_def.getExpKind.isV && rhsExp.expKind == ExpScalarKind) {
       val exp: IExpression = rhsExp match {
-        case exp_con: IExp_baseTypeConstant => {
+        case exp_con: IExpression_constantBaseType => {
           val valType = lhs_def.getVType.asInstanceOf[VBaseType]
           refine__sv_inner(exp_con, valType)
         }
@@ -98,7 +98,7 @@ object V2IUtils {
     } else if ((lhs_def.getExpKind.isV && rhsExp.expKind.isV)
       || (lhs_def.getExpKind == ExpScalarKind && rhsExp.expKind == ExpScalarKind)) {
       val exp: IExpression = rhsExp match {
-        case exp_con: IExp_baseTypeConstant => {
+        case exp_con: IExpression_constantBaseType => {
           refine__valType(lhs_def, rhsExp)
         }
         case _ => rhsExp

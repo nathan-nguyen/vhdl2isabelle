@@ -25,7 +25,7 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     */
 
   type V_PTy = IVariable
-  type Vnl_PTy = Vnl
+  type Vnl_PTy = IVl_Vnl
   type S_PTy = Signal
   type P_PTy = Port
   type SPnl_PTy = ISpl_Spnl
@@ -116,9 +116,9 @@ final class DefInfo(defInfo: Option[DefInfo]) {
 
   def getDefOpt(nList: List[String]): Option[IDef] = getSPDefOpt(nList).orElse(getVDefOpt(nList))
 
-  def vnl_flatten(vnl: Vnl): List[V_PTy] = vnl.vlList flatMap {
-    case vnl: Vnl => vnl_flatten(vnl)
-    case Vl_v(v) => List(v)
+  def vnl_flatten(vnl: IVl_Vnl): List[V_PTy] = vnl.vlList flatMap {
+    case vnl: IVl_Vnl => vnl_flatten(vnl)
+    case IVl_Vl_v(v) => List(v)
   }
 
   def spnl_flatten(spnl: ISpl_Spnl): (List[S_PTy], List[P_PTy]) = {
@@ -149,7 +149,7 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     v_map += (id -> d)
   }
 
-  def +=(id: String, d: Vnl): Unit = {
+  def +=(id: String, d: IVl_Vnl): Unit = {
     vnl_raw += d
     val vList = vnl_flatten(d)
     v_map ++= vList.map(_.name).zip(vList)

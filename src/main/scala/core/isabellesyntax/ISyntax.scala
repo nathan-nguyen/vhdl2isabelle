@@ -60,17 +60,25 @@ case class IConstRecord_gen(valType: VRecordType) extends IConstRecord
 
 sealed abstract class IConstArray extends IConstCustomized
 
-sealed abstract class IConstArrayL extends IConstArray
+sealed abstract class IConstArrayTo extends IConstArray
 
-case class IConstArrayL_gen(valType: VArrayType, length: Int, const_original: IConst) extends IConstArrayL {
+case class IConstArrayTo_generate(valType: VArrayType, length: Int, const_original: IConst) extends IConstArrayTo {
   val iVarChar = IConstS("val_c", s"(CHR '${10}')")
   override def toString = s"(val_list (vec_gen ${length} ${const_original}))"
 }
 
-sealed abstract class IConstArrayRL extends IConstArray
+case class IConstArrayTo_initialValue(iVal: IVal) extends IConstArrayTo {
+  override def toString = iVal.toString
+}
 
-case class IConstArrayRL_gen(valType: VArrayType, length: Int, const_original: IConst) extends IConstArrayRL {
+sealed abstract class IConstArrayDownTo extends IConstArray
+
+case class IConstArrayDownTo_generate(valType: VArrayType, length: Int, const_original: IConst) extends IConstArrayDownTo {
   override def toString = s"(val_rlist (vec_gen ${length} IConstArrayRL_gen))"
+}
+
+case class IConstArrayDownTo_initialValue(iVal: IVal) extends IConstArrayDownTo {
+  override def toString = iVal.toString
 }
 
 //********************************************************************************************************************//
@@ -124,10 +132,10 @@ sealed abstract class IExpression {
   }
 
   override def toString = this match {
-    case IExp_baseTypeConstant(baseType, const, _) => s"""(exp_con (${IType(baseType)}, ${const}))"""
+    case IExpression_constantBaseType(baseType, const, _) => s"""(exp_con (${IType(baseType)}, ${const}))"""
 
-    case IExp_recordTypeConstant(recordType, const, _) => handler(s"${recordType}")
-    case IExp_arrayTypeConstant(arrayType, const, _) => s"""(exp_con (vhdl_array, ${const}))"""
+    case IExpression_constantRecordType(recordType, const, _) => handler(s"${recordType}")
+    case IExpression_constantArrayType(arrayType, const, _) => s"""(exp_con (vhdl_array, ${const}))"""
 
     case IExpression_Variable(iVariable, _) => s"""(exp_var ${iVariable.getName})"""
     case IExpression_Vl(iVl, _) => s"""(exp_r (rhsl_of_vl ${iVl.getName}))"""
@@ -162,17 +170,17 @@ sealed abstract class IExpression {
 
 }
 
-sealed abstract class IExp_constant extends IExpression {
-  val const: IConst
+sealed abstract class IExpression_constant extends IExpression {
+  val iConst: IConst
 }
 
-case class IExp_baseTypeConstant(baseType: VBaseType, const: IConst, expKind: ExpKind) extends IExp_constant
+case class IExpression_constantBaseType(baseType: VBaseType, iConst: IConst, expKind: ExpKind) extends IExpression_constant
 
-sealed abstract class IExp_customizedTypeConstant extends IExp_constant
+sealed abstract class IExpression_constantCustomizedType extends IExpression_constant
 
-case class IExp_recordTypeConstant(recordType : VRecordType, const: IConst, expKind: ExpKind) extends IExp_customizedTypeConstant
+case class IExpression_constantRecordType(recordType : VRecordType, iConst: IConst, expKind: ExpKind) extends IExpression_constantCustomizedType
 
-case class IExp_arrayTypeConstant(arrayType : VArrayType, const: IConst, expKind: ExpKind) extends IExp_customizedTypeConstant
+case class IExpression_constantArrayType(arrayType : VArrayType, iConst: IConst, expKind: ExpKind) extends IExpression_constantCustomizedType
 
 // For storing identifiers
 // Different from Isabelle, it must be a defined "variable"
@@ -190,17 +198,17 @@ case class IUnaryExpression(op: VUnaryOperator.Value, e: IExpression) extends IE
   val expKind: ExpKind = e.expKind
 }
 
-case class IBinaryLogicalExpression(e1: IExpression, op: VLogicOp.Ty, e2: IExpression) extends IExpression {
+case class IBinaryLogicalExpression(e1: IExpression, op: VLogicalOperator.Value, e2: IExpression) extends IExpression {
   require(e1.expKind == e2.expKind)
   val expKind: ExpKind = e1.expKind
 }
 
-case class IBinaryRelationalExpression(e1: IExpression, op: VRelationOp.Ty, e2: IExpression) extends IExpression {
+case class IBinaryRelationalExpression(e1: IExpression, op: VRelationalOperator.Value, e2: IExpression) extends IExpression {
   require(e1.expKind == e2.expKind, s"\n${e1}, ${e1.expKind}\n${e2}, ${e2.expKind}")
   val expKind: ExpKind = ExpScalarKind
 }
 
-case class IBinaryShiftingExpression(e1: IExpression, op: VShiftOp.Ty, e2: IExpression) extends IExpression {
+case class IBinaryShiftingExpression(e1: IExpression, op: VShiftOperator.Value, e2: IExpression) extends IExpression {
   require(e1.expKind == e2.expKind)
   val expKind: ExpKind = e1.expKind
 }
@@ -209,12 +217,12 @@ case class IBinaryShiftingExpression(e1: IExpression, op: VShiftOp.Ty, e2: IExpr
 
 sealed abstract class IBinaryArithmeticExpression extends IExpression
 
-case class IBinaryArithmeticFactorExpression(e1: IExpression, op: VMultiplyingOperator.Ty, e2: IExpression) extends IBinaryArithmeticExpression {
+case class IBinaryArithmeticFactorExpression(e1: IExpression, op: VMultiplyingOperator.Value, e2: IExpression) extends IBinaryArithmeticExpression {
   require(e1.expKind == e2.expKind)
   val expKind: ExpKind = e1.expKind
 }
 
-case class IBinaryArithmeticPrimaryExpression(e1: IExpression, op: VDoubleStarOperator.Ty, e2: IExpression) extends IBinaryArithmeticExpression {
+case class IBinaryArithmeticPrimaryExpression(e1: IExpression, op: VDoubleStarOperator.Value, e2: IExpression) extends IBinaryArithmeticExpression {
   require(e1.expKind == e2.expKind)
   val expKind: ExpKind = e1.expKind
 }
@@ -253,6 +261,59 @@ case class IExp_trl(e: IExpression) extends IExpression {
 case class IExp_vl_rhs(v: V_IDef, sn: VSelectedName, expKind: ExpKind) extends IExpression
 
 case class IExp_spl_rhs(sp: SP_IDef, sn: VSelectedName, expKind: ExpKind) extends IExpression
+
+//********************************************************************************************************************//
+
+sealed abstract class IVal {
+
+  override def toString = this match {
+    case IVal_Val_i(i) => s"(val_i ${i})"
+    case iVal_Val_r: IVal_Val_r => ???
+    case iVal_Val_c: IVal_Val_c => ???
+    case iVal_Val_b: IVal_Val_b => ???
+    case iVal_Val_null: IVal_Val_null => "val_null"
+    case IVal_Val_array(length, vExpression) => s"(vec_gen ${length} ${IVal(vExpression)})"
+    case IVal_Val_list(iValList) => s"(val_list ${iValList.map(_.toListString).mkString("@")})"
+    case IVal_Val_rlist(iValList) => s"(val_rlist ${iValList.map(_.toListString).mkString("@")})"
+  }
+
+  def toListString = this match {
+    case iVal_Val_i: IVal_Val_i => s"[${iVal_Val_i}]"
+    case iVal_Val_r: IVal_Val_r => s"[${iVal_Val_r}]"
+    case iVal_Val_c: IVal_Val_c => s"[${iVal_Val_c}]"
+    case iVal_Val_b: IVal_Val_b => s"[${iVal_Val_b}]"
+    case iVal_Val_null: IVal_Val_null => s"[${iVal_Val_null}]"
+    case iVal_Val_array: IVal_Val_array => s"(${iVal_Val_array})"
+    case _ => ???
+  }
+}
+
+object IVal {
+  def apply(vExpression: VExpression): IVal = vExpression.getLiteral match {
+    case Some(vLiteral) => vLiteral match {
+      case VIntegerLiteral(s) => IVal_Val_i(s.toInt)
+      case _ => ???
+    }
+    case None => ???
+  }
+}
+
+case class IVal_Val_i(i: Int) extends IVal
+
+case class IVal_Val_r() extends IVal
+
+case class IVal_Val_c() extends IVal
+
+case class IVal_Val_b() extends IVal
+
+case class IVal_Val_null() extends IVal
+
+// [TN] This type does not exist in Isabelle
+case class IVal_Val_array(length: Int, vExpression: VExpression) extends IVal
+
+case class IVal_Val_list(iValList: List[IVal]) extends IVal
+
+case class IVal_Val_rlist(iValList: List[IVal]) extends IVal
 
 //********************************************************************************************************************//
 

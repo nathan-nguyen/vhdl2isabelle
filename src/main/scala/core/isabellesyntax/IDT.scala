@@ -9,7 +9,7 @@ import core.vhdlsyntax._
 
 
 // [HC] It's only used for IDef generation
-final case class MetaData(itemId: String, valType: VTypeDefinition, initVal: IExpression)
+final case class MetaData(itemId: String, valType: VTypeDefinition, iExpression: IExpression)
 
 //********************************************************************************************************************//
 
@@ -34,33 +34,33 @@ case class IVariable(name: String, valType: VBaseType, iExp: IExpression) extend
 sealed trait IVl extends V_IDef {
 
   override def toString = this match {
-    case Vl_v(iVariable) => s"(vl_v ${iVariable})"
-    case Vnl(id, vlList) => s"(vnl ('''', ${vlList.ISABELLE}))"
+    case IVl_Vl_v(iVariable) => s"(vl_v ${iVariable})"
+    case IVl_Vnl(id, vlList) => s"(vnl ('''', ${vlList.ISABELLE}))"
   }
 
   def as_list: String = this match {
-    case Vl_v(iVariable) => iVariable.name
-    case Vnl(id, _) => s"(vlist_of_vl ${id})"
+    case IVl_Vl_v(iVariable) => iVariable.name
+    case IVl_Vnl(id, _) => s"(vlist_of_vl ${id})"
   }
 
   def as_definition: String = this match {
     // "variable", this case should never be called
-    case Vl_v(v) => v.as_definition
+    case IVl_Vl_v(v) => v.as_definition
     // becomes "vl"
-    case Vnl(id, _) => {
+    case IVl_Vnl(id, _) => {
       s"""definition ${id}:: \"vl\" where
           |\"${id} ≡ ${toString}\"""".stripMargin
     }
   }
 
   override def getName = this match {
-    case Vl_v(v) => v.name
-    case Vnl(id, vlList) => id
+    case IVl_Vl_v(v) => v.name
+    case IVl_Vnl(id, vlList) => id
   }
 
   override def getExpKind: ExpKind = this match {
-    case Vl_v(v) => v.getExpKind
-    case Vnl(id, vlList) => ExpUnknownKind
+    case IVl_Vl_v(v) => v.getExpKind
+    case IVl_Vnl(id, vlList) => ExpUnknownKind
   }
 
 
@@ -70,9 +70,9 @@ sealed trait IVl extends V_IDef {
       case h :: t => cur match {
         case Some(vl) => vl match {
           // vl_v contains
-          case vl_v: Vl_v => Some(vl)
+          case vl_v: IVl_Vl_v => Some(vl)
           // vnl not sure, recursive
-          case vnl: Vnl => aux(t, vnl.vlList.find(_.getName == h))
+          case vnl: IVl_Vnl => aux(t, vnl.vlList.find(_.getName == h))
         }
         // no
         case None => None
@@ -81,28 +81,28 @@ sealed trait IVl extends V_IDef {
       case Nil => cur
     }
     aux(nList, Some(this)) match {
-      case Some(Vl_v(v)) => Option(v)
+      case Some(IVl_Vl_v(v)) => Option(v)
       case other => other
     }
   }
 }
 
-case class Vl_v(iVariable: IVariable) extends IVl
+case class IVl_Vl_v(iVariable: IVariable) extends IVl
 
 
-case class Vnl(id: String, vlList: List[IVl]) extends IVl
+case class IVl_Vnl(id: String, vlList: List[IVl]) extends IVl
 
-object Vnl {
+object IVl_Vnl {
   // FIXME: this gen is TOO specific!
   // NOTE: currently valType is the EXACTLY type from VHDL without prefix!!!
-  def gen(id: String, dataList: List[MetaData])(implicit s: DummyImplicit): Vnl = {
+  def gen(id: String, dataList: List[MetaData])(implicit s: DummyImplicit): IVl_Vnl = {
     val vlList = for {
       data <- dataList
     } yield {
       val itemId = s"${id}_${data.itemId}"
-      Vl_v(IVariable(itemId, data.valType.asInstanceOf[VBaseType], data.initVal))
+      IVl_Vl_v(IVariable(itemId, data.valType.asInstanceOf[VBaseType], data.iExpression))
     }
-    Vnl(id, vlList)
+    IVl_Vnl(id, vlList)
   }
 }
 
@@ -121,8 +121,8 @@ sealed trait IDef {
     case s: Signal => s.signalType
     case p: Port => p.portType
     case vl: IVl => vl match {
-        case vl_v: Vl_v => vl_v.iVariable.valType
-      case vnl: Vnl => handler(s"${vnl}")
+        case vl_v: IVl_Vl_v => vl_v.iVariable.valType
+      case vnl: IVl_Vnl => handler(s"${vnl}")
     }
     case spl: ISpl => spl match {
       case spl_s: ISPl_s => spl_s.iSignal.signalType
@@ -219,7 +219,7 @@ object ISpl_Spnl {
       data <- dataList
     } yield {
       val itemId = s"${id}_${data.itemId}"
-      ISPl_s(Signal(itemId, data.valType.asInstanceOf[VBaseType], data.initVal, signalKind))
+      ISPl_s(Signal(itemId, data.valType.asInstanceOf[VBaseType], data.iExpression, signalKind))
     }
     ISpl_Spnl(id, splList)
   }
@@ -230,9 +230,9 @@ object ISpl_Spnl {
     } yield {
       val itemId = s"${id}_${data.itemId}"
       data.valType match {
-        case baseType : VBaseType => ISpl_p(Port_baseType(itemId, baseType, data.initVal, portMode, portConnection))
-        case recordType : VRecordType => ISpl_p(Port_recordType(itemId, recordType, data.initVal, portMode, portConnection, typeInfo))
-        case arrayType : VArrayType => ISpl_p(Port_arrayType(itemId, arrayType, data.initVal, portMode, portConnection, typeInfo))
+        case baseType : VBaseType => ISpl_p(Port_baseType(itemId, baseType, data.iExpression, portMode, portConnection))
+        case recordType : VRecordType => ISpl_p(Port_recordType(itemId, recordType, data.iExpression, portMode, portConnection, typeInfo))
+        case arrayType : VArrayType => ISpl_p(Port_arrayType(itemId, arrayType, data.iExpression, portMode, portConnection, typeInfo))
         case subtype: VSubtype => handler(s"${data.valType}")
       }
     }

@@ -33,20 +33,6 @@ package object core {
 
   def handler(msg: String) = throw VIErrorMsg(msg)
 
-  object RangeD extends Enumeration {
-    type Ty = Value
-    val to = Value("TO")
-    val downto = Value("DOWNTO")
-    val unkown = Value("XXX")
-  }
-
-  case class VRangeV(l: String, rangeD: RangeD.Ty, r: String)
-
-  def defaultRangeV(msg: String): VRangeV = {
-    logger.warn(s"defaultRange: ${msg}")
-    VRangeV(unknownString, RangeD.unkown, unknownString)
-  }
-
   def handleExpKindMismatch(e1: IExpression, e2: IExpression, msg: String) = {
     logger.error(s"""expKindMismatch: ${msg}\n${e1.expKind}\t"${e1}"\n${e2.expKind}\t"${e2}"""")
   }

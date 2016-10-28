@@ -7,7 +7,6 @@ import core.vhdlsyntax._
   * Created by Thanh Nam Nguyen on 21/10/16.
   */
 sealed abstract class IType {
-
 }
 
 object IType extends Enumeration{
@@ -30,7 +29,7 @@ object IType extends Enumeration{
       case scalaType : VScalarType => getScalarType(typeDefinition.s)
       case vectorType : VVectorType => IArray
       case arrayType : VArrayType => IArray
-      case _ : VCustomizedType => ???
+      case _ => ???
     }
   }
 
