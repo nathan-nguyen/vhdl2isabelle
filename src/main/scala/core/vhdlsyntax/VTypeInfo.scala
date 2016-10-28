@@ -91,9 +91,9 @@ case class VScalarType(s: String) extends VBaseType {
     IExpression_constantBaseType(this, iconstS, ExpScalarKind)
   }
 
-  def getInitialValue(expOption: Option[VExpression])(defInfo: DefInfo): IExpression = expOption match {
-    case Some(exp) => {
-      val refined = exp.toIExp(defInfo) match {
+  def getInitialValue(vExpressionOption: Option[VExpression])(defInfo: DefInfo): IExpression = vExpressionOption match {
+    case Some(vExpression) => {
+      val refined = vExpression.toIExp(defInfo) match {
         case iExpression: IExpression_constantBaseType => IExpression_constantBaseType(this, iExpression.iConst, ExpScalarKind)
         case o => o
       }
@@ -119,7 +119,7 @@ case class VVectorType(s: String) extends VBaseType {
       case Some(vExpression) => {
         val literalS = vExpression.getLiteralS
         val scalarType = scalarize
-        literalS.num2Exp(scalarType, vExplicitRange)
+        literalS.arrayLiteralToExpression(scalarType, vExplicitRange.vDirection)
       }
       case None => guessInitialValue(vExplicitRange)
     }
@@ -332,9 +332,17 @@ case class VArrayType(s: String) extends VCompositeType {
     val constrainedArrayDefinition = typeInfo.arrayTypeDeclarationMap(this)
 
     val arrayRange = constrainedArrayDefinition.indexConstraint.getExplicitRange
+    var startIndex: Int  = arrayRange.left.getStringValue.toInt
+    var multiplyIndex: Int = 1
     val arrayLength = arrayRange.vDirection match {
-      case VDirection.`to` => arrayRange.right.getStringValue.toInt - arrayRange.left.getStringValue.toInt + 1;
-      case VDirection.`downto` => arrayRange.left.getStringValue.toInt - arrayRange.right.getStringValue.toInt + 1
+      case VDirection.`to` => {
+        multiplyIndex = 1
+        arrayRange.right.getStringValue.toInt - arrayRange.left.getStringValue.toInt + 1
+      };
+      case VDirection.`downto` => {
+        multiplyIndex = -1
+        arrayRange.left.getStringValue.toInt - arrayRange.right.getStringValue.toInt + 1
+      }
     }
 
     vExpressionOption match{
@@ -345,6 +353,7 @@ case class VArrayType(s: String) extends VCompositeType {
           case Some(vAggregate) => {
             var elementCount = 0;
             val iValList = new ListBuffer[IVal]
+            val iArrayAttributeMap = mutable.Map.empty[String, Int]
             for (elementAssociation <- vAggregate.vElementAssociationList) {
               val vChoiceList = elementAssociation.choices match {
                 case Some(vChoices) => vChoices.vChoiceList
@@ -353,11 +362,13 @@ case class VArrayType(s: String) extends VCompositeType {
               for (vChoice <- vChoiceList){
                 if (!vChoice.getId.equals("others")) {
                   iValList += IVal(elementAssociation.vExpression)
+                  iArrayAttributeMap += (vChoice.getId -> (startIndex + elementCount * multiplyIndex))
                   elementCount += 1;
                 }
                 else iValList += IVal_Val_array((arrayLength - elementCount), elementAssociation.vExpression)
               }
             }
+            IdentifierMap.iArrayVariableMap += id -> iArrayAttributeMap
             arrayRange.vDirection match {
               case VDirection.to => IExpression_constantArrayType(this, IConstArrayTo_initialValue(IVal_Val_list(iValList.toList)), ExpArrayKindTo)
               case VDirection.downto => IExpression_constantArrayType(this, IConstArrayDownTo_initialValue(IVal_Val_rlist(iValList.toList)), ExpArrayKindDownTo)

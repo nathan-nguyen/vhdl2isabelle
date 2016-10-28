@@ -229,14 +229,12 @@ case class IBinaryArithmeticPrimaryExpression(e1: IExpression, op: VDoubleStarOp
 
 case class IBinaryArithmeticTermExpression(e1: IExpression, op: VAddingOperator.Value, e2: IExpression) extends IBinaryArithmeticExpression {
   require(e1.expKind == e2.expKind, s"\n${e1}, ${e1.expKind}, \n${e2}, ${e2.expKind}")
-  // if (e1.expKind != e2.expKind) handleExpKindMismatch(e1, e2, s"${toString}")
   val expKind: ExpKind = e1.expKind
 }
 
 //********************************************************************************************************************//
 
-case class IExp_nth(e: IExpression, nthExp: IExpression) extends IExpression {
-  require(e.expKind.isV && nthExp.expKind == ExpScalarKind)
+case class IExp_nth(iExpression: IExpression, nthExp: IExpression) extends IExpression {
   val expKind: ExpKind = ExpScalarKind
 }
 
@@ -273,8 +271,8 @@ sealed abstract class IVal {
     case iVal_Val_b: IVal_Val_b => ???
     case iVal_Val_null: IVal_Val_null => "val_null"
     case IVal_Val_array(length, vExpression) => s"(vec_gen ${length} ${IVal(vExpression)})"
-    case IVal_Val_list(iValList) => s"(val_list ${iValList.map(_.toListString).mkString("@")})"
-    case IVal_Val_rlist(iValList) => s"(val_rlist ${iValList.map(_.toListString).mkString("@")})"
+    case IVal_Val_list(iValList) => s"(val_list (${iValList.map(_.toListString).mkString("@")}))"
+    case IVal_Val_rlist(iValList) => s"(val_rlist (${iValList.map(_.toListString).mkString("@")}))"
   }
 
   def toListString = this match {
