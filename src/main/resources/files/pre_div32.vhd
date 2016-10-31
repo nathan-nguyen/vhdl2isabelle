@@ -48,5 +48,16 @@ architecture PRE of PRE is
     grlib_async_reset_enable => 0,
     others => 0);
 
+-----------------------------------------------------------------------------
+-- VHDL Default functions
+-- rising_edge
+-----------------------------------------------------------------------------
+
+  function rising_edge(clk : std_ulogic) return boolean is
+    begin
+      return clk = '1';
+    end function rising_edge;
+
 begin
+
 end;

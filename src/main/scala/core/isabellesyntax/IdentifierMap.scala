@@ -36,7 +36,7 @@ object IdentifierMap {
     }
   }
 
-  val iArrayVariableMap = mutable.Map.empty[String, mutable.lMap[String, Int]]
+  val iArrayVariableMap = mutable.Map.empty[String, mutable.Map[String, Int]]
   def getArrayIndex(id: String, attribute: String): Int = iArrayVariableMap(id)(attribute)
 
 }

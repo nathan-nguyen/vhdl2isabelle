@@ -212,19 +212,6 @@ case class Rl_vl(vl: IVl) extends Rhsl
 //case class Rnl(rhslList: List[Rhsl]) extends Rhsl
 
 //********************************************************************************************************************//
-sealed abstract class Crhs {
-  override def toString = this match {
-    case Crhs_e(asmt_rhs) => s"(crhs_e ${asmt_rhs})"
-    case Crhs_r(rhsl) => s"(crhs_r ${rhsl})"
-  }
-}
-
-
-case class Crhs_e(asmt_rhs: IAsmt_rhs) extends Crhs
-
-case class Crhs_r(rhsl: Rhsl) extends Crhs
-
-//********************************************************************************************************************//
 sealed abstract class IV_clhs {
   override def toString = this match {
     case IV_clhs_Clhs_v(iV_lhs) => s"(clhs_v ${iV_lhs})"

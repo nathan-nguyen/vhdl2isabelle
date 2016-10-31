@@ -161,13 +161,6 @@ sealed abstract class IExpression {
     case IExp_spl_rhs(spl, selectedName, _) => s"""(exp_of_spl ${selectedName.isa_sp})"""
   }
 
-  def crhs_e_rhse: Crhs_e = Crhs_e(IAsmt_rhs_Rhs_e(this))
-
-  def crhs_e_rhso: Crhs_e = Crhs_e(IAsmt_rhs_Rhs_o(this))
-
-  // Implemented outside
-  def crhs_r(defInfo: DefInfo): Crhs_r = throw VIError
-
 }
 
 sealed abstract class IExpression_constant extends IExpression {

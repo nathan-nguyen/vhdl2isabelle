@@ -77,36 +77,6 @@ object V2IUtils {
     }
   }
 
-  // NOTE: [HC] We don't deal with "OTHERS" directly, but check the type mismatch and then change it
-  def exp__Crhs(lhs_def: IDef, rhsExp: IExpression): Crhs = {
-    // [HC] This itself does little, only to change the valType
-    // [HC] "valType" is reliable, however may change to "scalarized"
-    def refine__sv_inner(e: IExpression_constantBaseType, valType: VBaseType): IExpression_constantBaseType = {
-      val newValType = valType.asInstanceOf[VVectorType].scalarize
-      IExpression_constantBaseType(newValType, e.iConst, e.expKind)
-    }
-
-    if (lhs_def.getExpKind.isV && rhsExp.expKind == ExpScalarKind) {
-      val exp: IExpression = rhsExp match {
-        case exp_con: IExpression_constantBaseType => {
-          val valType = lhs_def.getVType.asInstanceOf[VBaseType]
-          refine__sv_inner(exp_con, valType)
-        }
-        case _ => rhsExp
-      }
-      exp.crhs_e_rhso
-    } else if ((lhs_def.getExpKind.isV && rhsExp.expKind.isV)
-      || (lhs_def.getExpKind == ExpScalarKind && rhsExp.expKind == ExpScalarKind)) {
-      val exp: IExpression = rhsExp match {
-        case exp_con: IExpression_constantBaseType => {
-          refine__valType(lhs_def, rhsExp)
-        }
-        case _ => rhsExp
-      }
-      exp.crhs_e_rhse
-    } else handler(s"${rhsExp}")
-  }
-
   def getIdList(ctx: Identifier_listContext): List[String] = {
     val ids = for {
       id <- ctx.identifier()

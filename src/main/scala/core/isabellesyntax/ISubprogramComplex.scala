@@ -66,8 +66,9 @@ object ISubprogramComplex {
     val interfaceElementList = subprogramSpecification.getInterfaceElementList()
     for (interfaceElement <- interfaceElementList){
       interfaceElement match {
-        case interfaceConstantDeclaration : VInterfaceConstantDeclaration => for (id <- interfaceConstantDeclaration.idList) parameterList += IParameter(name + "_" + id, IDirection.IDirectionIn, interfaceConstantDeclaration.subtypeIndication)(defInfo)
-        case interfaceVariableDeclaration : VInterfaceVariableDeclaration => for (id <- interfaceVariableDeclaration.idList) parameterList += IParameter(name + "_" + id, IDirection(interfaceVariableDeclaration.signalMode), interfaceVariableDeclaration.subtypeIndication)(defInfo)
+        case interfaceConstantDeclaration : VInterfaceConstantDeclaration => for (id <- interfaceConstantDeclaration.idList) parameterList += IParameter(s"${name}_${id}", IDirection.IDirectionIn, interfaceConstantDeclaration.vSubtypeIndication)(defInfo)
+        case interfaceVariableDeclaration : VInterfaceVariableDeclaration => for (id <- interfaceVariableDeclaration.idList) parameterList += IParameter(s"${name}_${id}", IDirection(interfaceVariableDeclaration.signalMode), interfaceVariableDeclaration.vSubtypeIndication)(defInfo)
+        case interfaceSignalDeclaration : VInterfaceSignalDeclaration => ???
         case _ => ???
       }
     }

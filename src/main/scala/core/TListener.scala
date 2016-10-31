@@ -412,7 +412,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
     val genericListInfo = VGenericList(ctx)
     for (interfaceConstantDeclaration <- genericListInfo.interfaceConstantDeclarationList){
       for (id <- interfaceConstantDeclaration.idList){
-        genIVariable(id, interfaceConstantDeclaration.vExp, interfaceConstantDeclaration.subtypeIndication)
+        genIVariable(id, interfaceConstantDeclaration.vExp, interfaceConstantDeclaration.vSubtypeIndication)
       }
     }
   }
@@ -1042,7 +1042,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
     for (interfaceElement <- subprogramSpecification.getInterfaceElementList()){
       val interfaceDeclaration = interfaceElement.asInstanceOf[VInterfaceDeclaration]
       for (id <- interfaceDeclaration.idList)
-        genIVariable(subprogramSpecification.designator.id + "_" + id, None, interfaceDeclaration.subtypeIndication)
+        genIVariable(subprogramSpecification.designator.id + "_" + id, None, interfaceDeclaration.vSubtypeIndication)
     }
   }
 

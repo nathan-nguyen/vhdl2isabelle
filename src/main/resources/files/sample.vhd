@@ -60,6 +60,11 @@ end;
 
 architecture rtl of iu3 is
 
+  function rising_edge(clk : std_ulogic) return boolean is
+    begin
+      return clk = '1';
+    end function rising_edge;
+
   procedure change_tbuf(tracebuf_2p: in boolean; tbuf: out integer; tbuf_in: in integer) is
     begin
       if (TRACEBUF_2P) then

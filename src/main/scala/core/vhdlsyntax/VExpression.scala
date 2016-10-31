@@ -762,9 +762,7 @@ sealed abstract class VNamePart {
       val vExpression = vNameFunctionCallOrIndexedPart.getVExpression
       val nthExpression = vExpression.getLiteral match {
         case Some(VIntegerLiteral(s)) => vExpression.toIExp(defInfo)
-        case Some(VLiteralEnumId(s)) => {
-          VIntegerLiteral(IdentifierMap.iArrayVariableMap(vSelectedName.id)(s).toString).toIExp(defInfo)
-        }
+        case Some(VLiteralEnumId(s)) => VIntegerLiteral(IdentifierMap.iArrayVariableMap(vSelectedName.id)(s).toString).toIExp(defInfo)
         case _ => ???
       }
       IExp_nth(iExpression, nthExpression)

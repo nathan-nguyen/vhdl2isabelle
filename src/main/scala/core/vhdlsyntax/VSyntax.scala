@@ -51,7 +51,7 @@ object VSignalDeclaration {
 
 sealed abstract class VInterfaceDeclaration extends VInterfaceElement {
   val idList: List[String]
-  val subtypeIndication: VSubtypeIndication
+  val vSubtypeIndication: VSubtypeIndication
 }
 
 object VInterfaceDeclaration {
@@ -65,7 +65,7 @@ object VInterfaceDeclaration {
   }
 }
 
-case class VInterfaceConstantDeclaration(idList: List[String], subtypeIndication: VSubtypeIndication, vExp: Option[VExpression]) extends VInterfaceDeclaration
+case class VInterfaceConstantDeclaration(idList: List[String], vSubtypeIndication: VSubtypeIndication, vExp: Option[VExpression]) extends VInterfaceDeclaration
 
 object VInterfaceConstantDeclaration {
   def apply(ctx: Interface_constant_declarationContext): VInterfaceConstantDeclaration = {
@@ -76,7 +76,7 @@ object VInterfaceConstantDeclaration {
   }
 }
 
-case class VInterfaceSignalDeclaration(idList: List[String], subtypeIndication: VSubtypeIndication, vExpressionOption: Option[VExpression]) extends VInterfaceDeclaration
+case class VInterfaceSignalDeclaration(idList: List[String], vSubtypeIndication: VSubtypeIndication, vExpressionOption: Option[VExpression]) extends VInterfaceDeclaration
 
 object VInterfaceSignalDeclaration {
   def apply(ctx: Interface_signal_declarationContext): VInterfaceSignalDeclaration = {
@@ -87,7 +87,7 @@ object VInterfaceSignalDeclaration {
   }
 }
 
-case class VInterfaceVariableDeclaration(idList: List[String], signalMode: VSignalMode.Value, subtypeIndication: VSubtypeIndication, vExpressionOption: Option[VExpression]) extends VInterfaceDeclaration
+case class VInterfaceVariableDeclaration(idList: List[String], signalMode: VSignalMode.Value, vSubtypeIndication: VSubtypeIndication, vExpressionOption: Option[VExpression]) extends VInterfaceDeclaration
 
 object VInterfaceVariableDeclaration {
   def apply(ctx: Interface_variable_declarationContext): VInterfaceVariableDeclaration = {
@@ -99,19 +99,19 @@ object VInterfaceVariableDeclaration {
   }
 }
 
-case class VInterfaceFileDeclaration(idList: List[String], subtypeIndication: VSubtypeIndication) extends VInterfaceDeclaration
+case class VInterfaceFileDeclaration(idList: List[String], vSubtypeIndication: VSubtypeIndication) extends VInterfaceDeclaration
 
 object VInterfaceFileDeclaration {
   def apply(ctx: Interface_file_declarationContext): VInterfaceFileDeclaration = ???
 }
 
-case class VInterfaceTerminalDeclaration(idList: List[String], subtypeIndication: VSubtypeIndication) extends VInterfaceDeclaration
+case class VInterfaceTerminalDeclaration(idList: List[String], vSubtypeIndication: VSubtypeIndication) extends VInterfaceDeclaration
 
 object VInterfaceTerminalDeclaration {
   def apply(ctx: Interface_terminal_declarationContext): VInterfaceTerminalDeclaration = ???
 }
 
-case class VInterfaceQuantityDeclaration (idList: List[String], subtypeIndication: VSubtypeIndication) extends VInterfaceDeclaration
+case class VInterfaceQuantityDeclaration (idList: List[String], vSubtypeIndication: VSubtypeIndication) extends VInterfaceDeclaration
 
 object VInterfaceQuantityDeclaration {
   def apply(ctx: Interface_quantity_declarationContext): VInterfaceQuantityDeclaration = ???
