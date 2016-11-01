@@ -18,15 +18,15 @@ object V2IUtils {
   // Change valType to correct one (character/std_logic/std_ulogic)
   def refine__valType(idef: IDef, tobeRefined: IExpression): IExpression = {
     tobeRefined match {
-      case ec: IExpression_constantBaseType => idef.getExpKind match {
-        case ExpScalarKind => IExpression_constantBaseType(idef.getVType.asInstanceOf[VBaseType], ec.iConst, idef.getExpKind)
-        case vk: ExpVectorKind => {
+      case iExpression_constantBaseType: IExpression_constantBaseType => idef.getExpKind match {
+        case ExpScalarKind => IExpression_constantBaseType(idef.getVType.asInstanceOf[VBaseType], iExpression_constantBaseType.iConst, idef.getExpKind)
+        case expVectorKind: ExpVectorKind => {
           require(tobeRefined.expKind.isV, s"${tobeRefined.expKind}:\t${tobeRefined}")
-          vk match {
-            case ExpVectorKindTo => ec.iConst match {
+          expVectorKind match {
+            case ExpVectorKindTo => iExpression_constantBaseType.iConst match {
               case s: IConstS => handler(s"${s}")
               case c: IConstCustomized => handler(s"${c}")
-              case l: IConstL => IExpression_constantBaseType(idef.getVType.asInstanceOf[VBaseType], ec.iConst, idef.getExpKind)
+              case l: IConstL => IExpression_constantBaseType(idef.getVType.asInstanceOf[VBaseType], iExpression_constantBaseType.iConst, idef.getExpKind)
               case rl: IConstRL => {
                 val valType = idef.getVType.asInstanceOf[VVectorType]
                 rl match {
@@ -39,7 +39,7 @@ object V2IUtils {
                 }
               }
             }
-            case ExpVectorKindDownTo => ec.iConst match {
+            case ExpVectorKindDownTo => iExpression_constantBaseType.iConst match {
               case s: IConstS => handler(s"${s}")
               case c: IConstCustomized => handler(s"${c}")
               case l: IConstL => {
@@ -57,21 +57,19 @@ object V2IUtils {
             }
           }
         }
-        case expCustomizedKind : ExpCustomizedKind => handler (s"${ec}")
-        case ExpUnknownKind => handler(s"${ec}")
+        case expCustomizedKind : ExpCustomizedKind => handler (s"${iExpression_constantBaseType}")
+        case ExpUnknownKind => handler(s"${iExpression_constantBaseType}")
       }
       case _ => tobeRefined
     }
   }
 
   def refine__valType(trusted: IExpression, tobeRefined: IExpression): IExpression = {
-    val idef = Try(trusted.getIDef)
-    idef match {
-      case Success(idefV) => {
-        refine__valType(idefV, tobeRefined)
-      }
+    val iDef = Try(trusted.getIDef)
+    iDef match {
+      case Success(idefV) => refine__valType(idefV, tobeRefined)
       case Failure(e) => {
-        logger.warn(s"trusted? ${trusted}")
+        //logger.warn(s"trusted? ${trusted}")
         tobeRefined
       }
     }

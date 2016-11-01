@@ -234,7 +234,7 @@ case class VRecordType(s: String) extends VCompositeType {
   def getInitialValue(typeInfo: VTypeInfo, vExpressionOption: Option[VExpression])(defInfo: DefInfo): List[MetaData] = {
     val iVals: Seq[MetaData] = vExpressionOption match {
       case Some(vExpression) => {
-        vExpression.getPrimary match {
+        vExpression.getVPrimaryOption match {
           case Some(vAggregate: VAggregate) => {
             val recordInfo = typeInfo.recordTypeDeclarationMap(this)
             val aggregateIdExpMap = vAggregate.getAssoc
@@ -249,7 +249,7 @@ case class VRecordType(s: String) extends VCompositeType {
                     st.getInitialValue(Option(itemExp))(defInfo)
                   }
                   case vt: VVectorType => {
-                    itemExp.getAggregate match {
+                    itemExp.getVAggregateOption match {
                       case Some(itemAggregate) => {
                         val (fieldName, innerExp) = itemAggregate.getFirstMap
                         if (fieldName == "others") {
@@ -257,7 +257,7 @@ case class VRecordType(s: String) extends VCompositeType {
                             case Some(vExplicitRange) => vExplicitRange
                             case None => ???
                           }
-                          val numericVal = innerExp.getPrimary
+                          val numericVal = innerExp.getVPrimaryOption
                           numericVal match {
                             case Some(p) => {
                               val rawVal = p.getStringValue
@@ -349,7 +349,7 @@ case class VArrayType(s: String) extends VCompositeType {
       case Some(vExpression) => {
         val vSubtypeIndication = typeInfo.arrayTypeDeclarationMap(this).vSubtypeIndication
         val typeDefinition = VTypeDefinition(vSubtypeIndication.getSimpleName)
-        vExpression.getAggregate match {
+        vExpression.getVAggregateOption match {
           case Some(vAggregate) => {
             var elementCount = 0;
             val iValList = new ListBuffer[IVal]

@@ -280,7 +280,7 @@ sealed abstract class IVal {
 }
 
 object IVal {
-  def apply(vExpression: VExpression): IVal = vExpression.getLiteral match {
+  def apply(vExpression: VExpression): IVal = vExpression.getVLiteralOption match {
     case Some(vLiteral) => vLiteral match {
       case VIntegerLiteral(s) => IVal_Val_i(s.toInt)
       case _ => ???

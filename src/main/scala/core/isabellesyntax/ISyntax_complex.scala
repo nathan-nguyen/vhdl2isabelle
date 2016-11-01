@@ -3,6 +3,8 @@ package core.isabellesyntax
 import core._
 import core.vhdlsyntax._
 
+import scala.collection.mutable.ListBuffer
+
 /**
   * Created by Thanh Nam Nguyen on 25/10/16.
   */
@@ -23,6 +25,32 @@ sealed abstract class ISeq_stmt_complex {
   }
 }
 
+object ISeq_stmt_complex {
+  def apply(vSequentialStatementList: List[VSequentialStatement])(defInfo: DefInfo): List[ISeq_stmt_complex] = {
+    val iSeq_stmt_complexList = new ListBuffer[ISeq_stmt_complex]
+    for (vSequentialStatement <- vSequentialStatementList){
+      IdentifierMap.startNewITemporaryVariableMap()
+      vSequentialStatement match {
+        case vReturnStatement: VReturnStatement => {
+          val vNamePartNameFunctionCallOrIndexedPartsList = vReturnStatement.vExpression.getVNamePartNameFunctionCallOrIndexedPartsList
+          IdentifierMap.traverseVNamePartNameFunctionCallOrIndexedPartsList(vNamePartNameFunctionCallOrIndexedPartsList)
+          iSeq_stmt_complexList ++= IdentifierMap.generateTemporarySequentialStatement(defInfo)
+          iSeq_stmt_complexList += vSequentialStatement.toI(defInfo)
+        }
+        case vIfStatement: VIfStatement => {
+          val vNamePartNameFunctionCallOrIndexedPartsList = vIfStatement.ifConditionVExpression.getVNamePartNameFunctionCallOrIndexedPartsList
+          IdentifierMap.traverseVExpressionList(vIfStatement.getAllConditionVExpression)
+          iSeq_stmt_complexList ++= IdentifierMap.generateTemporarySequentialStatement(defInfo)
+          iSeq_stmt_complexList += vSequentialStatement.toI(defInfo)
+        }
+        case _ => iSeq_stmt_complexList += vSequentialStatement.toI(defInfo)
+      }
+    }
+    iSeq_stmt_complexList.toList
+  }
+
+}
+
 case class ISeq_stmt_complex_Ssc_sa(name: String, iSp_clhs: ISp_clhs, iAsmt_rhs: IAsmt_rhs) extends ISeq_stmt_complex
 
 case class ISeq_stmt_complex_Ssc_va(name: String, iV_clhs: IV_clhs, iAsmt_rhs: IAsmt_rhs) extends ISeq_stmt_complex
@@ -35,7 +63,7 @@ case class ISeq_stmt_complex_Ssc_while(name: String, cond: IExpression, bodySeq_
 
 case class ISeq_stmt_complex_Ssc_for(name: String, cond: IExpression, discrete_range: IDiscrete_range, seq_stmt_complexList: List[ISeq_stmt_complex]) extends ISeq_stmt_complex
 
-case class ISeq_stmt_complex_Ssc_fn(name: String, iV_clhs: IV_lhs, iSubproccall_complex: ISubproccall_complex) extends ISeq_stmt_complex
+case class ISeq_stmt_complex_Ssc_fn(name: String, iV_clhs: IV_clhs, iSubproccall_complex: ISubproccall_complex) extends ISeq_stmt_complex
 
 case class ISeq_stmt_complex_Ssc_rt(name: String, iAsmt_rhs: IAsmt_rhs) extends ISeq_stmt_complex
 
@@ -62,7 +90,29 @@ object ISubproccall_complex {
       }
     } yield iAsmt_rhs
 
-    val returnType = IdentifierMap.getSubprogramReturnType(iName)
-    ISubproccall_complex(iName, iAsmt_rhsList, returnType)
+    ISubproccall_complex(iName, iAsmt_rhsList, IType.IEmptyType)
+  }
+
+  def apply(functionName:String, vActualPartList: List[VActualPart], iType: IType.Value)(defInfo: DefInfo): ISubproccall_complex ={
+    val iAsmt_rhsList =
+      if (vActualPartList.size == 1 && vActualPartList.head.isInstanceOf[VActualPartNameAndDesignator]){
+        val vActualPart = vActualPartList.head
+        val iTemporaryVariableName = IdentifierMap.getITemporaryVariableName(List(vActualPart, vActualPart))
+        val iDef = defInfo.getVDef(VSelectedName(iTemporaryVariableName, Nil))
+        List(IAsmt_rhs(IExpression_Variable(iDef.asInstanceOf[IVariable], iDef.getExpKind)))
+      }
+      else if (vActualPartList.size == 2 && vActualPartList.head.equals(vActualPartList.tail.head)) {
+        // The vActualPartList of temporary variable is changed to distinguish with its container
+        // If both share the vActualPartList, we cannot distinguish
+        val vActualPart = vActualPartList.head
+        List(IAsmt_rhs(vActualPart.vActualDesignator.getVExpression.toIExp(defInfo)))
+      }
+      else {
+        for {
+          vActualPart <- vActualPartList
+          iAsmt_rhs = IAsmt_rhs(vActualPart.vActualDesignator.getVExpression.toIExp(defInfo))
+        } yield iAsmt_rhs
+      }
+    ISubproccall_complex(functionName, iAsmt_rhsList, iType)
   }
 }

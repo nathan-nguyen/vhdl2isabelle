@@ -39,12 +39,9 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def exitSensitivity_list(ctx: Sensitivity_listContext): Unit = {}
 
   override def enterVariable_declaration(ctx: Variable_declarationContext): Unit = {
-    val variableDeclaration = VVariableDeclaration(ctx)
-    for {
-      id <- variableDeclaration.idList
-    } yield {
-      genIVariable(id, variableDeclaration.vExp, variableDeclaration.subtypeInd)
-    }
+    val vVariableDeclaration = VVariableDeclaration(ctx)
+    for (id <- vVariableDeclaration.idList)
+      generateIVariable(id, vVariableDeclaration.vExpressionOption, vVariableDeclaration.vSubtypeIndication)
   }
 
   override def exitGenerate_statement(ctx: Generate_statementContext): Unit = {
@@ -127,12 +124,9 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def exitSelected_waveforms(ctx: Selected_waveformsContext): Unit = {}
 
   override def exitConstant_declaration(ctx: Constant_declarationContext): Unit = {
-    val constantDeclaration = VConstantDeclaration(ctx)
-    for {
-      id <- constantDeclaration.idList
-    } {
-      genIVariable(id, constantDeclaration.vExp, constantDeclaration.subtypeIndication)
-    }
+    val vConstantDeclaration = VConstantDeclaration(ctx)
+    for (id <- vConstantDeclaration.idList)
+      generateIVariable(id, vConstantDeclaration.vExpressionOption, vConstantDeclaration.vSubtypeIndication)
   }
 
   override def exitAssertion_statement(ctx: Assertion_statementContext): Unit = {}
@@ -318,7 +312,10 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def enterNature_element_declaration(ctx: Nature_element_declarationContext): Unit = {}
 
-  override def enterDesign_file(ctx: Design_fileContext): Unit = {}
+  override def enterDesign_file(ctx: Design_fileContext): Unit = {
+    // TODO: Remove this line
+    IdentifierMap.tListener = this
+  }
 
   override def enterEntity_class_entry_list(ctx: Entity_class_entry_listContext): Unit = {}
 
@@ -412,7 +409,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
     val genericListInfo = VGenericList(ctx)
     for (interfaceConstantDeclaration <- genericListInfo.interfaceConstantDeclarationList){
       for (id <- interfaceConstantDeclaration.idList){
-        genIVariable(id, interfaceConstantDeclaration.vExp, interfaceConstantDeclaration.vSubtypeIndication)
+        generateIVariable(id, interfaceConstantDeclaration.vExp, interfaceConstantDeclaration.vSubtypeIndication)
       }
     }
   }
@@ -587,10 +584,8 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def enterInterface_variable_declaration(ctx: Interface_variable_declarationContext): Unit = {}
 
   override def exitDesign_file(ctx: Design_fileContext): Unit = {
-    if (vInfo.isDefined) {
-      val iEnv = IEnv(defInfo)
-      entity = IEntity(definedEntities.head, iEnv, IResFn(), conc_stmt_complexes.toList)
-    }
+    if (vInfo.isDefined)
+      entity = IEntity(definedEntities.head, IEnv(defInfo), IResFn(), conc_stmt_complexes.toList)
   }
 
   override def exitBreak_statement(ctx: Break_statementContext): Unit = {}
@@ -968,10 +963,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def exitAlias_indication(ctx: Alias_indicationContext): Unit = {}
 
-  override def exitScalar_type_definition(ctx: Scalar_type_definitionContext): Unit = {
-    val scalarTypeDef = VScalarTypeDef(ctx)
-    // TODO
-  }
+  override def exitScalar_type_definition(ctx: Scalar_type_definitionContext): Unit = {}
 
   override def exitRange(ctx: RangeContext): Unit = {}
 
@@ -994,12 +986,8 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def exitConcurrent_signal_assignment_statement(ctx: Concurrent_signal_assignment_statementContext): Unit = {
     val concurrentSignalAssign = VConcurrentSignalAssignmentStatement(ctx)
     concurrentSignalAssign match {
-      case csa@VConcurrentSignalAssignmentStatementConditional(labelColon, _, condSignAssign) => {
-        conc_stmt_complexes += csa.toI(defInfo)
-        //        logger.info(s"${csa.toI(defInfo)}")
-      }
-      case VConcurrentSignalAssignmentStatementSelected(_, _, selectSignalAssign) => {
-      }
+      case csa@VConcurrentSignalAssignmentStatementConditional(labelColon, _, condSignAssign) => conc_stmt_complexes += csa.toI(defInfo)
+      case VConcurrentSignalAssignmentStatementSelected(_, _, selectSignalAssign) =>
     }
   }
 
@@ -1042,7 +1030,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
     for (interfaceElement <- subprogramSpecification.getInterfaceElementList()){
       val interfaceDeclaration = interfaceElement.asInstanceOf[VInterfaceDeclaration]
       for (id <- interfaceDeclaration.idList)
-        genIVariable(subprogramSpecification.designator.id + "_" + id, None, interfaceDeclaration.vSubtypeIndication)
+        generateIVariable(s"${subprogramSpecification.designator.id}_${id}", None, interfaceDeclaration.vSubtypeIndication)
     }
   }
 

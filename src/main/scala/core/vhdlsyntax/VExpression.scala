@@ -5,6 +5,7 @@ import core.isabellesyntax._
 import sg.edu.ntu.vhdl2isabelle.VHDLParser._
 
 import scala.collection.JavaConversions._
+import scala.collection.mutable.ListBuffer
 
 /**
   * Created by Hongxu Chen.
@@ -84,17 +85,12 @@ sealed abstract class VLiteral extends VPrimary {
 
 object VLiteral {
   def apply(ctx: LiteralContext): VLiteral = {
-    if (ctx.NULL() != null) {
-      VLiteralNull
-    } else if (ctx.BIT_STRING_LITERAL() != null) {
-      VLiteralBitS(ctx.getText)
-    } else if (ctx.STRING_LITERAL() != null) {
-      VLiteralS(ctx.getText)
-    } else if (ctx.enumeration_literal() != null) {
-      VLiteralEnum(ctx.enumeration_literal())
-    } else if (ctx.numeric_literal() != null) {
-      VNumericLiteral(ctx.numeric_literal())
-    } else throw VIError
+    if (ctx.NULL() != null) VLiteralNull
+    else if (ctx.BIT_STRING_LITERAL() != null) VLiteralBitS(ctx.getText)
+    else if (ctx.STRING_LITERAL() != null) VLiteralS(ctx.getText)
+    else if (ctx.enumeration_literal() != null) VLiteralEnum(ctx.enumeration_literal())
+    else if (ctx.numeric_literal() != null) VNumericLiteral(ctx.numeric_literal())
+    else throw VIError
   }
 }
 
@@ -537,6 +533,11 @@ sealed trait VPrimary {
     case _ => None
   }
 
+  def getVNameParts: Option[VNameParts] = this match {
+    case vNameParts: VNameParts => Some(vNameParts)
+    case _ => None
+  }
+
 }
 
 object VPrimary {
@@ -596,7 +597,7 @@ object VName {
 }
 
 
-case class VSelectedName(id: String, suffixList: List[VSuffix]) extends VName {
+case class VSelectedName(var id: String, suffixList: List[VSuffix]) extends VName {
 
   override def getVSelectedName(defInfo: DefInfo) = (this, None)
 
@@ -630,6 +631,10 @@ case class VSelectedName(id: String, suffixList: List[VSuffix]) extends VName {
     }
   }
 
+  def setId(id: String): Unit ={
+    this.id = id
+  }
+
 }
 
 object VSelectedName {
@@ -640,69 +645,51 @@ object VSelectedName {
   }
 }
 
-sealed abstract class VAttrDesignator
+sealed abstract class VAttributeDesignator
 
-object VAttrDesignator {
-  def apply(ctx: Attribute_designatorContext): VAttrDesignator = {
-    val id = ctx.identifier()
-    val range = ctx.RANGE()
-    val rrange = ctx.REVERSE_RANGE()
-    val across = ctx.ACROSS()
-    val through = ctx.THROUGH()
-    val reference = ctx.REFERENCE()
-    val tolerance = ctx.TOLERANCE()
-    if (id != null) {
-      VAttrDesignatorId(id.getText)
-    } else if (range != null) {
-      VAttrDesignatorR
-    } else if (rrange != null) {
-      VAttrDesignatorRR
-    } else if (across != null) {
-      VAttrDesignatorA
-    } else if (through != null) {
-      VAttrDesignatorTh
-    } else if (reference != null) {
-      VAttrDesignatorRef
-    } else if (tolerance != null) {
-      VAttrDesignatorT
-    } else throw VIError
+object VAttributeDesignator {
+  def apply(ctx: Attribute_designatorContext): VAttributeDesignator = {
+    if (ctx.identifier() != null) VAttributeDesignatorIdentifier(ctx.identifier().getText)
+    else if (ctx.RANGE() != null) VAttributeDesignatorRange
+    else if (ctx.REVERSE_RANGE() != null) VAttributeDesignatorReverseRange
+    else if (ctx.ACROSS() != null) VAttributeDesignatorAcross
+    else if (ctx.THROUGH() != null) VAttributeDesignatorThrough
+    else if (ctx.REFERENCE() != null) VAttributeDesignatorReference
+    else if (ctx.TOLERANCE() != null) VAttributeDesignatorTolerance
+    else throw VIError
   }
 }
 
-case class VAttrDesignatorId(id: String) extends VAttrDesignator
+case class VAttributeDesignatorIdentifier(id: String) extends VAttributeDesignator
 
-object VAttrDesignatorR extends VAttrDesignator
+object VAttributeDesignatorRange extends VAttributeDesignator
 
-object VAttrDesignatorRR extends VAttrDesignator
+object VAttributeDesignatorReverseRange extends VAttributeDesignator
 
-object VAttrDesignatorA extends VAttrDesignator
+object VAttributeDesignatorAcross extends VAttributeDesignator
 
-object VAttrDesignatorTh extends VAttrDesignator
+object VAttributeDesignatorThrough extends VAttributeDesignator
 
-object VAttrDesignatorRef extends VAttrDesignator
+object VAttributeDesignatorReference extends VAttributeDesignator
 
-object VAttrDesignatorT extends VAttrDesignator
+object VAttributeDesignatorTolerance extends VAttributeDesignator
 
-case class VNameAttributePart(attrDesignator: VAttrDesignator, exprList: List[VExpression])
+case class VNameAttributePart(attrDesignator: VAttributeDesignator, exprList: List[VExpression])
 
 object VNameAttributePart {
   def apply(ctx: Name_attribute_partContext): VNameAttributePart = {
-    val attrDesignator = VAttrDesignator(ctx.attribute_designator())
+    val attrDesignator = VAttributeDesignator(ctx.attribute_designator())
     val exps = ctx.expression().map(VExpression(_)).toList
     VNameAttributePart(attrDesignator, exps)
   }
 }
 
-case class VNameFunctionCallOrIndexedPart(assocListOpt: Option[VAssociationList]) {
-  def getVExpression: VExpression = assocListOpt match {
-    case Some(al) => {
-      val elem = al.vAssociationElementList.head.actualPart
-      val designator = elem match {
-        case VActualPartD(d) => d
-        case VActualPartN(sn, d) => d
-      }
-      designator match {
-        case VActualDesignatorExpression(vExp) => vExp
+case class VNameFunctionCallOrIndexedPart(vAssociationListOption: Option[VAssociationList]) {
+  def getVExpression: VExpression = vAssociationListOption match {
+    case Some(vAssociationList) => {
+      val vActualPart = vAssociationList.vAssociationElementList.head.actualPart
+      vActualPart.vActualDesignator match {
+        case VActualDesignatorExpression(vExpression) => vExpression
         case VActualDesignatorOpen => ???
       }
     }
@@ -710,6 +697,17 @@ case class VNameFunctionCallOrIndexedPart(assocListOpt: Option[VAssociationList]
   }
 
   def toI_rhs(defInfo: DefInfo): IExpression = getVExpression.toIExp(defInfo)
+
+  def getVActualPartList: List[VActualPart] = vAssociationListOption match {
+    case Some(vAssociationList) => {
+      for {
+        vAssociationElement <- vAssociationList.vAssociationElementList
+        vActualPart = vAssociationElement.actualPart
+      } yield vActualPart
+    }
+    case None => ???
+  }
+
 }
 
 object VNameFunctionCallOrIndexedPart {
@@ -742,8 +740,8 @@ object VNameSlicePart {
 sealed abstract class VNamePart {
   def toILhs(defInfo: DefInfo): (VSelectedName, Option[IDiscrete_range]) = this match {
     case VNamePartNameAttributePart(selectedName, nameAttrPart) => ???
-    case VNamePartNameFunctionCallOrIndexedPart(selectedName, nameFnCallOrIndexPart) => {
-      val literal = nameFnCallOrIndexPart.getVExpression.getLiteral
+    case VNamePartNameFunctionCallOrIndexedPart(selectedName, vNameFunctionCallOrIndexedPart) => {
+      val literal = vNameFunctionCallOrIndexedPart.getVExpression.getVLiteralOption
       val range = literal match {
         case Some(l) => Some(l.to_IDiscreteRange(defInfo))
         case None => None
@@ -756,17 +754,6 @@ sealed abstract class VNamePart {
   }
 
   def toI_rhs(defInfo: DefInfo): IExpression = this match {
-    case VNamePartNameAttributePart(selectedName, nameAttrPart) => ???
-    case VNamePartNameFunctionCallOrIndexedPart(vSelectedName, vNameFunctionCallOrIndexedPart) => {
-      val iExpression = vSelectedName.toIRhs(defInfo)
-      val vExpression = vNameFunctionCallOrIndexedPart.getVExpression
-      val nthExpression = vExpression.getLiteral match {
-        case Some(VIntegerLiteral(s)) => vExpression.toIExp(defInfo)
-        case Some(VLiteralEnumId(s)) => VIntegerLiteral(IdentifierMap.iArrayVariableMap(vSelectedName.id)(s).toString).toIExp(defInfo)
-        case _ => ???
-      }
-      IExp_nth(iExpression, nthExpression)
-    }
     case vNamePartSlice@VNamePartNameSlicePart(selectedName, nameSlicePart) => {
       val iExpression = selectedName.toIRhs(defInfo)
       // [HC] Not checked type, trust VHDL semantics
@@ -774,19 +761,17 @@ sealed abstract class VNamePart {
       // [HC] Always
       IExp_sl(iExpression, e1, e2)
     }
+    case _ => ???
   }
 }
 
 object VNamePart {
   def apply(ctx: Name_partContext): VNamePart = {
     val vSelectedName = VSelectedName(ctx.selected_name())
-    if (ctx.name_attribute_part() != null) {
-      VNamePartNameAttributePart(vSelectedName, VNameAttributePart(ctx.name_attribute_part()))
-    } else if (ctx.name_function_call_or_indexed_part() != null) {
-      VNamePartNameFunctionCallOrIndexedPart(vSelectedName, VNameFunctionCallOrIndexedPart(ctx.name_function_call_or_indexed_part()))
-    } else if (ctx.name_slice_part() != null) {
-      VNamePartNameSlicePart(vSelectedName, VNameSlicePart(ctx.name_slice_part()))
-    } else throw VIError
+    if (ctx.name_attribute_part() != null) VNamePartNameAttributePart(vSelectedName, VNameAttributePart(ctx.name_attribute_part()))
+    else if (ctx.name_function_call_or_indexed_part() != null) VNamePartNameFunctionCallOrIndexedPart(vSelectedName, VNameFunctionCallOrIndexedPart(ctx.name_function_call_or_indexed_part()))
+    else if (ctx.name_slice_part() != null) VNamePartNameSlicePart(vSelectedName, VNameSlicePart(ctx.name_slice_part()))
+    else throw VIError
   }
 }
 
@@ -795,23 +780,44 @@ case class VNamePartNameAttributePart(vSelectedName: VSelectedName,
 
 case class VNamePartNameFunctionCallOrIndexedPart(vSelectedName: VSelectedName,
                                                   vNameFunctionCallOrIndexedPart: VNameFunctionCallOrIndexedPart) extends VNamePart {
+  def getVExpressionList = vNameFunctionCallOrIndexedPart.getVActualPartList.map(_.vActualDesignator.getVExpression)
+
+  override def toI_rhs(defInfo: DefInfo): IExpression = {
+    IdentifierMap.iFunctionMap.get(vSelectedName.id) match {
+      case Some(iFunction) => {
+        val temporaryVariableName = IdentifierMap.getITemporaryVariableName(vNameFunctionCallOrIndexedPart.getVActualPartList)
+        val iDef = defInfo.getDef(VSelectedName(temporaryVariableName, Nil))
+        IExpression_Variable(iDef.asInstanceOf[IVariable], iDef.getExpKind)
+      }
+      case None => {
+        val iExpression = vSelectedName.toIRhs(defInfo)
+        val vExpression = vNameFunctionCallOrIndexedPart.getVExpression
+        val nthExpression = vExpression.getVLiteralOption match {
+          case Some(VIntegerLiteral(s)) => vExpression.toIExp(defInfo)
+          case Some(VLiteralEnumId(s)) => VIntegerLiteral(IdentifierMap.getArrayIndex(vSelectedName.id, s).toString).toIExp(defInfo)
+          case _ => ???
+        }
+        IExp_nth(iExpression, nthExpression)
+      }
+    }
+  }
 }
 
 case class VNamePartNameSlicePart(vSelectedName: VSelectedName,
                                   vNameSlicePart: VNameSlicePart) extends VNamePart
 
 
-case class VNameParts(namePartList: List[VNamePart]) extends VName {
-  require(namePartList.nonEmpty, "VNameParts")
+case class VNameParts(vNamePartList: List[VNamePart]) extends VName {
+  require(vNamePartList.nonEmpty, "VNameParts")
 
   override def getVSelectedName(defInfo: DefInfo): (VSelectedName, Option[IDiscrete_range]) = {
     // TODO: Currently we only deal with head of namePartList
-    namePartList.head.toILhs(defInfo)
+    vNamePartList.head.toILhs(defInfo)
   }
 
   override def toIRhs(defInfo: DefInfo): IExpression = {
     // TODO: Currently we only deal with head of namePartList
-    namePartList.head.toI_rhs(defInfo)
+    vNamePartList.head.toI_rhs(defInfo)
   }
 }
 
@@ -1015,7 +1021,7 @@ object VFactor {
   }
 }
 
-case class VPrimaryFactor(vPrimary: VPrimary, primaryOption: Option[VPrimary]) extends VFactor
+case class VPrimaryFactor(vPrimary: VPrimary, vPrimaryOption: Option[VPrimary]) extends VFactor
 
 case class VAbsFactor(primary: VPrimary) extends VFactor
 
@@ -1283,8 +1289,8 @@ object VShiftExpression {
 }
 
 case class VRelation(vShiftExpression: VShiftExpression, op: Option[VRelationalOperator.Value], other: Option[VShiftExpression]) {
-  // FIXME type refinement should be made here (perhaps ALL other toIExp)
-  // TODO however we are not sure which should be trusted!!
+  // FIXME [HC] Type refinement should be made here (perhaps ALL other toIExp)
+  // TODO [HC] However we are not sure which should be trusted!
   def toIExp(defInfo: DefInfo): IExpression = (op, other) match {
     case (Some(opV), Some(otherV)) => {
       val (lhs, rhs) = (vShiftExpression.toIExp(defInfo), otherV.toIExp(defInfo))
@@ -1297,48 +1303,72 @@ case class VRelation(vShiftExpression: VShiftExpression, op: Option[VRelationalO
 
 object VRelation {
   def apply(ctx: RelationContext): VRelation = {
-    val shift_expressionList = for {
+    val vShiftExpressionsList = for {
       shift_expression <- ctx.shift_expression()
     } yield VShiftExpression(shift_expression)
     val op = Option(ctx.relational_operator()).map(VRelationalOperator(_))
-    val other = shift_expressionList.lift(1)
-    VRelation(shift_expressionList.head, op, other)
+    val other = vShiftExpressionsList.lift(1)
+    VRelation(vShiftExpressionsList.head, op, other)
   }
 }
 
-case class VExpression(vRelation: VRelation, ops: List[VLogicalOperator.Value], others: List[VRelation]) {
+case class VExpression(vRelation: VRelation, vLogicalOperatorList: List[VLogicalOperator.Value], others: List[VRelation]) {
 
   def toIExp(defInfo: DefInfo): IExpression = {
-    ops.zip(others).foldLeft(vRelation.toIExp(defInfo)) {
+    vLogicalOperatorList.zip(others).foldLeft(vRelation.toIExp(defInfo)) {
       case (acc, (op, curRelation)) => IBinaryLogicalExpression(acc, op, curRelation.toIExp(defInfo))
     }
   }
 
   def eval = toString
 
-  def getPrimary: Option[VPrimary] = {
-    val simplExp = vRelation.vShiftExpression.vSimpleExpression
-    simplExp.vTerm.vFactor match {
+  def getVPrimaryOption: Option[VPrimary] = {
+    val vSimpleExpression = vRelation.vShiftExpression.vSimpleExpression
+    vSimpleExpression.vTerm.vFactor match {
       case VPrimaryFactor(primary, primaryOption) => Some(primary)
       case _ => None
     }
   }
 
-  def getAggregate: Option[VAggregate] = {
+  def getVAggregateOption: Option[VAggregate] = {
     for {
-      primary <- getPrimary
+      primary <- getVPrimaryOption
       aggregate <- primary.getAggregate
     } yield aggregate
   }
 
-  def getLiteral: Option[VLiteral] = {
+  def getVLiteralOption: Option[VLiteral] = {
     for {
-      primary <- getPrimary
+      primary <- getVPrimaryOption
       literal <- primary.getLiteral
     } yield literal
   }
 
-  def getLiteralS: VLiteralS = getLiteral match {
+  // [TN] Might need to merge vRelation: VRelation with others: List[VRelation]
+  def getVNamePartNameFunctionCallOrIndexedPartsList: List[VNamePartNameFunctionCallOrIndexedPart] = {
+    val vNamePartNameFunctionCallOrIndexedPartListBuffer = new ListBuffer[VNamePartNameFunctionCallOrIndexedPart]
+
+    val vSimpleExpression = vRelation.vShiftExpression.vSimpleExpression
+    val vFactorList = List(vSimpleExpression.vTerm.vFactor) ++ vSimpleExpression.others.map(_.vFactor)
+
+    for (vFactor <- vFactorList) {
+      vFactor match {
+        case VPrimaryFactor(VNameParts(vNamePartList), vPrimaryOption) =>  {
+          for (vNamePart <- vNamePartList) {
+            vNamePart match {
+              case vNamePartNameFunctionCallOrIndexedPart: VNamePartNameFunctionCallOrIndexedPart =>
+                vNamePartNameFunctionCallOrIndexedPartListBuffer += vNamePartNameFunctionCallOrIndexedPart
+              case _ => None
+            }
+          }
+        }
+        case _ => None
+      }
+    }
+    vNamePartNameFunctionCallOrIndexedPartListBuffer.toList
+  }
+
+  def getLiteralS: VLiteralS = getVLiteralOption match {
     case Some(l) => l match {
       case ls: VLiteralS => ls
       case _ => throw VIError
@@ -1348,7 +1378,7 @@ case class VExpression(vRelation: VRelation, ops: List[VLogicalOperator.Value], 
 
   // For rhs (exp)
   def rhs_IDef(defInfo: DefInfo): IDef = {
-    val literal = getLiteral match {
+    val literal = getVLiteralOption match {
       case Some(l) => l
       case None => handler(s"${toString}")
     }

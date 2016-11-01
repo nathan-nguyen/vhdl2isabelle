@@ -60,35 +60,53 @@ end;
 
 architecture rtl of iu3 is
 
-  function rising_edge(clk : std_ulogic) return boolean is
-    begin
-      return clk = '1';
-    end function rising_edge;
+function rising_edge(clk : std_ulogic) return boolean is
+  begin
+    return clk = '1';
+  end function rising_edge;
 
-  procedure change_tbuf(tracebuf_2p: in boolean; tbuf: out integer; tbuf_in: in integer) is
-    begin
-      if (TRACEBUF_2P) then
-        tbuf := (tbuf-64);
-      else
-        tbuf := tbuf_in;
-      end if;
-    end procedure change_tbuf;
+--function get_tbuf(tracebuf_2p: boolean; tbuf: integer) return integer is
+--  begin
+--    if (TRACEBUF_2P) then
+--      return(tbuf-64);
+--    else
+--      return(tbuf);
+--    end if;
+--  end function get_tbuf;
+
+--function get_tbuf(clk: std_ulogic; tbuf: integer) return integer is
+--  begin
+--    if (rising_edge(clk)) then
+--      return(tbuf-64);
+--    else
+--      return(tbuf);
+--    end if;
+--  end function get_tbuf;
+
+function two_parameter(param1: integer; param2: integer) return integer is
+  begin
+    return param1;
+  end function two_parameter;
+
+function return_constant(number: integer) return integer is
+  begin
+    return number + 1;
+  end function return_constant;
+
+function return_constant_complex(number: integer) return integer is
+  begin
+    return return_constant(1) + 2 + return_constant(3) + 4 + return_constant(return_constant(5)) +
+    two_parameter(6 + return_constant(7), 8 +  return_constant(return_constant(9))) + 10 +
+    return_constant(return_constant(return_constant(return_constant(11)))) + two_parameter(return_constant(12), return_constant(13));
+  end function return_constant_complex;
 
 
-  --CONSTANT addr : std_logic_vector(9 downto 0) := (others => '0');
+--function return_clk_rising_edge(clk: std_ulogic) return boolean is
+--  begin
+--    return rising_edge(clk);
+--  end function return_clk_rising_edge;
 
-  function get_tbuf(tracebuf_2p: boolean; tbuf: integer) return integer is
-    begin
-      change_tbuf(true, tbuf, tbuf);
-      if (TRACEBUF_2P) then
-        return(tbuf-64);
-      else
-        return(tbuf);
-      end if;
-    end function get_tbuf;
-
-
-  --constant functionCallConst : integer := 1 + get_tbuf(true, tbuf);
+--constant functionCallConst : integer := 1 + get_tbuf(true, tbuf);
 
 
 begin

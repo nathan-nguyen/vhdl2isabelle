@@ -68,6 +68,12 @@ constant GRLIB_CONFIG_ARRAY : grlib_config_array_type := (
   others => 0);
 constant RESET_ALL : boolean := GRLIB_CONFIG_ARRAY(grlib_sync_reset_enable_all) = 1;
 
+(V2I-016) Function call and temporary variables
+Example:
+return return_constant(1) + 2 + return_constant(3) + 4 + return_constant(return_constant(5)) +
+    two_parameter(6 + return_constant(7), 8 +  return_constant(return_constant(9))) + 10 +
+    return_constant(return_constant(return_constant(return_constant(11)))) + two_parameter(return_constant(12), return_constant(13));
+
 /*********************************************************************************************************************/
 /***************************************************  NOT FIXED  *****************************************************/
 /*********************************************************************************************************************/
@@ -80,8 +86,8 @@ constant RESET_ALL : boolean := GRLIB_CONFIG_ARRAY(grlib_sync_reset_enable_all) 
 
 (V2I-012) Remove IdentifierMap.isParsingSubprogram and remove IdentifierMap.subprogramName
 
-(V2I-016)
-
 (V2I-017)
 
 (V2I-018)
+
+(V2I-019)

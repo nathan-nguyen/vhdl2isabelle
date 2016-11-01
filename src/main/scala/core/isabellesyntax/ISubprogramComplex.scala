@@ -58,31 +58,31 @@ sealed abstract class ISubprogramComplex {
 }
 
 object ISubprogramComplex {
-  def apply (subprogramBody: VSubprogramBody)(defInfo: DefInfo): ISubprogramComplex = {
-    val subprogramSpecification = subprogramBody.subprogramSpecification
-    val name = subprogramBody.getDesignator.id
+  def apply(vSubprogramBody: VSubprogramBody)(defInfo: DefInfo): ISubprogramComplex = {
+    val vSubprogramSpecification = vSubprogramBody.subprogramSpecification
+    val name = vSubprogramBody.getDesignator.id
     val parameterList = new ListBuffer[IParameter]()
 
-    val interfaceElementList = subprogramSpecification.getInterfaceElementList()
+    val interfaceElementList = vSubprogramSpecification.getInterfaceElementList()
     for (interfaceElement <- interfaceElementList){
       interfaceElement match {
         case interfaceConstantDeclaration : VInterfaceConstantDeclaration => for (id <- interfaceConstantDeclaration.idList) parameterList += IParameter(s"${name}_${id}", IDirection.IDirectionIn, interfaceConstantDeclaration.vSubtypeIndication)(defInfo)
         case interfaceVariableDeclaration : VInterfaceVariableDeclaration => for (id <- interfaceVariableDeclaration.idList) parameterList += IParameter(s"${name}_${id}", IDirection(interfaceVariableDeclaration.signalMode), interfaceVariableDeclaration.vSubtypeIndication)(defInfo)
-        case interfaceSignalDeclaration : VInterfaceSignalDeclaration => ???
         case _ => ???
       }
     }
     IdentifierMap.startParsingSubprogram(name)
-    val iSeq_stmt_complexList = subprogramBody.subprogramStatementPart.sequentialStatementList.map(sequentialStatement => sequentialStatement.toI(defInfo))
+    val iSeq_stmt_complexList = ISeq_stmt_complex(vSubprogramBody.vSubprogramStatementPart.vSequentialStatementList)(defInfo)
     IdentifierMap.finishParsingSubprogram
 
-    subprogramSpecification match {
-      case functionSpecification: VFunctionSpecification => {
-        val iFunction = IFunction(name, parameterList.toList, iSeq_stmt_complexList, IType(functionSpecification.subtypeIndication), List.empty)
+    vSubprogramSpecification match {
+      case vFunctionSpecification: VFunctionSpecification => {
+        val iFunction = IFunction(name, parameterList.toList, iSeq_stmt_complexList, IType(vFunctionSpecification.vSubtypeIndication), List.empty)
         IdentifierMap.iFunctionMap += name -> iFunction
+        IdentifierMap.vFunctionMap += name -> vFunctionSpecification
         iFunction
       }
-      case procedureSpecification: VProcedureSpecification => {
+      case vProcedureSpecification: VProcedureSpecification => {
         val iProcedure = IProcedure(name, parameterList.toList, iSeq_stmt_complexList, List.empty)
         IdentifierMap.iProcedureMap += name -> iProcedure
         iProcedure

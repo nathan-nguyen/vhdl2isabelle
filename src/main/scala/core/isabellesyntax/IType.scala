@@ -44,4 +44,5 @@ object IType extends Enumeration{
       case "natural" => INatural
     }
   }
+
 }

@@ -20,33 +20,33 @@ abstract class Keeper(vInfo: Option[VInfo]) {
 
   val definedEntities = mutable.ArrayBuffer.empty[String]
 
-  def genIVariable(id: String, vExpressionOption: Option[VExpression], vSubtypeIndication: VSubtypeIndication): Unit = {
-    val valType = VTypeDefinition(vSubtypeIndication.getSimpleName)
-    valType match {
-      case baseType: VBaseType => {
-        val iExpression = baseType match {
-          case scalarType: VScalarType => scalarType.getInitialValue(vExpressionOption)(defInfo)
-          case vectorType: VVectorType => vSubtypeIndication.getExplicitRangeOption match {
-            case Some(vExplicitRange) => vectorType.getInitialValue(vExplicitRange, vExpressionOption)
+  def generateIVariable(id: String, vExpressionOption: Option[VExpression], vSubtypeIndication: VSubtypeIndication): Unit = {
+    val vTypeDefinition = VTypeDefinition(vSubtypeIndication.getSimpleName)
+    vTypeDefinition match {
+      case vBaseType: VBaseType => {
+        val iExpression = vBaseType match {
+          case vScalarType: VScalarType => vScalarType.getInitialValue(vExpressionOption)(defInfo)
+          case vVectorType: VVectorType => vSubtypeIndication.getExplicitRangeOption match {
+            case Some(vExplicitRange) => vVectorType.getInitialValue(vExplicitRange, vExpressionOption)
             case None => ???
           }
         }
-        val iVariable = IVariable(id, baseType, iExpression)
+        val iVariable = IVariable(id, vBaseType, iExpression)
         defInfo += (id, iVariable)
       }
-      case ct : VCustomizedType => ct match{
-        case subtype : VSubtype => {
-          val vSubtypeIndication = typeInfo.subtypeDeclarationMap(subtype)
+      case vCustomizedType : VCustomizedType => vCustomizedType match{
+        case vSubtype : VSubtype => {
+          val vSubtypeIndication = typeInfo.subtypeDeclarationMap(vSubtype)
           generateIDefinition(id, vExpressionOption, vSubtypeIndication, defInfo, typeInfo) match{
             case iVariable : IVariable => defInfo += (id, iVariable)
             case iVl_Vnl : IVl_Vnl => defInfo += (id, iVl_Vnl)
             case _ => throw VIError
           }
         }
-        case recordType : VRecordType => {
-          val initVals = recordType.getInitialValue(typeInfo, vExpressionOption)(defInfo)
-          val vnl = IVl_Vnl.gen(id, initVals)
-          defInfo +=(id, vnl)
+        case vRecordType : VRecordType => {
+          val initVals = vRecordType.getInitialValue(typeInfo, vExpressionOption)(defInfo)
+          val iVl_Vnl = IVl_Vnl.gen(id, initVals)
+          defInfo +=(id, iVl_Vnl)
         }
         case vArrayType : VArrayType => {
           val vSubtypeIndication = typeInfo.arrayTypeDeclarationMap(vArrayType).vSubtypeIndication
@@ -115,26 +115,26 @@ abstract class Keeper(vInfo: Option[VInfo]) {
   }
 
   // [TN] This method is called when trying to get subtype definition
-  def generateIDefinition(id: String, expOption: Option[VExpression], subtypeIndication: VSubtypeIndication, defInfo: DefInfo, typeInfo: VTypeInfo) : V_IDef = {
-    val valType = VTypeDefinition(subtypeIndication.getSimpleName)
-    valType match {
-      case baseType: VBaseType => {
-        val initVal = baseType match {
-          case scalarType: VScalarType => scalarType.getInitialValue(expOption)(defInfo)
-          case vectorType: VVectorType => subtypeIndication.getExplicitRangeOption match {
-            case Some(vExplicitRange) => vectorType.getInitialValue(vExplicitRange, expOption)
+  def generateIDefinition(id: String, vExpressionOption: Option[VExpression], subtypeIndication: VSubtypeIndication, defInfo: DefInfo, vTypeInfo: VTypeInfo) : V_IDef = {
+    val vTypeDefinition = VTypeDefinition(subtypeIndication.getSimpleName)
+    vTypeDefinition match {
+      case vBaseType: VBaseType => {
+        val iExpression = vBaseType match {
+          case vScalarType: VScalarType => vScalarType.getInitialValue(vExpressionOption)(defInfo)
+          case vVectorType: VVectorType => subtypeIndication.getExplicitRangeOption match {
+            case Some(vExplicitRange) => vVectorType.getInitialValue(vExplicitRange, vExpressionOption)
             case None => ???
           }
         }
-        IVariable(id, baseType, initVal)
+        IVariable(id, vBaseType, iExpression)
       }
       case vCustomizedType : VCustomizedType => vCustomizedType match{
         case subtype : VSubtype => {
-          val subtypeIndication = typeInfo.subtypeDeclarationMap(subtype)
-          generateIDefinition(id, expOption, subtypeIndication, defInfo, typeInfo)
+          val subtypeIndication = vTypeInfo.subtypeDeclarationMap(subtype)
+          generateIDefinition(id, vExpressionOption, subtypeIndication, defInfo, vTypeInfo)
         }
         case vRecordType : VRecordType => {
-          val initVals = vRecordType.getInitialValue(typeInfo, expOption)(defInfo)
+          val initVals = vRecordType.getInitialValue(vTypeInfo, vExpressionOption)(defInfo)
           IVl_Vnl.gen(id, initVals)
         }
         case vArrayType : VArrayType => handler(s"${vArrayType}")

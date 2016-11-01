@@ -20,14 +20,14 @@ object VLabelColon {
 
 import core.V2IUtils._
 
-case class VConstantDeclaration(idList: List[String], subtypeIndication: VSubtypeIndication, vExp: Option[VExpression]) extends VBlockDeclarativeItem with VProceduralDeclarativeItem
+case class VConstantDeclaration(idList: List[String], vSubtypeIndication: VSubtypeIndication, vExpressionOption: Option[VExpression]) extends VBlockDeclarativeItem with VProceduralDeclarativeItem
 
 object VConstantDeclaration {
   def apply(ctx: Constant_declarationContext): VConstantDeclaration = {
     val idList = getIdList(ctx.identifier_list())
-    val subtypeIndication = VSubtypeIndication(ctx.subtype_indication())
-    val vExp = Option(ctx.expression()).map(VExpression(_))
-    VConstantDeclaration(idList, subtypeIndication, vExp)
+    val vSubtypeIndication = VSubtypeIndication(ctx.subtype_indication())
+    val vExpressionOption = Option(ctx.expression()).map(VExpression(_))
+    VConstantDeclaration(idList, vSubtypeIndication, vExpressionOption)
   }
 }
 
@@ -396,15 +396,15 @@ case class VConcurrentSignalAssignmentStatementSelected(labelColon: Option[Strin
 //********************************************************************************************************************//
 
 case class VVariableDeclaration(shared: Boolean, idList: List[String],
-                                subtypeInd: VSubtypeIndication, vExp: Option[VExpression]) extends VBlockDeclarativeItem with VProceduralDeclarativeItem
+                                vSubtypeIndication: VSubtypeIndication, vExpressionOption: Option[VExpression]) extends VBlockDeclarativeItem with VProceduralDeclarativeItem
 
 object VVariableDeclaration {
   def apply(ctx: Variable_declarationContext): VVariableDeclaration = {
     val shared = ctx.SHARED() != null
     val idList = getIdList(ctx.identifier_list())
     val subtypeInd = VSubtypeIndication(ctx.subtype_indication())
-    val vExp = Option(ctx.expression()).map(VExpression(_))
-    VVariableDeclaration(shared, idList, subtypeInd, vExp)
+    val vExpressionOption = Option(ctx.expression()).map(VExpression(_))
+    VVariableDeclaration(shared, idList, subtypeInd, vExpressionOption)
   }
 }
 
@@ -482,7 +482,7 @@ object VProcedureSpecification {
   }
 }
 
-case class VFunctionSpecification(subtypeIndication : VSubtypeIndication, designator: VDesignator, formalParameterList : VFormalParameterList) extends VSubprogramSpecification
+case class VFunctionSpecification(vSubtypeIndication : VSubtypeIndication, designator: VDesignator, formalParameterList : VFormalParameterList) extends VSubprogramSpecification
 
 object VFunctionSpecification {
   def apply(ctx: Function_specificationContext): VFunctionSpecification = {
@@ -495,7 +495,7 @@ object VFunctionSpecification {
 
 //********************************************************************************************************************//
 
-case class VSubprogramStatementPart(sequentialStatementList: List[VSequentialStatement])
+case class VSubprogramStatementPart(vSequentialStatementList: List[VSequentialStatement])
 
 object VSubprogramStatementPart {
   def apply(ctx: Subprogram_statement_partContext): VSubprogramStatementPart ={
@@ -503,7 +503,7 @@ object VSubprogramStatementPart {
   }
 }
 
-case class VSubprogramBody(subprogramSpecification: VSubprogramSpecification, subprogramStatementPart: VSubprogramStatementPart) extends VBlockDeclarativeItem with VProceduralDeclarativeItem {
+case class VSubprogramBody(subprogramSpecification: VSubprogramSpecification, vSubprogramStatementPart: VSubprogramStatementPart) extends VBlockDeclarativeItem with VProceduralDeclarativeItem {
   def getDesignator : VDesignator = {
     subprogramSpecification match {
       case functionSpecification: VFunctionSpecification => functionSpecification.designator
@@ -787,25 +787,27 @@ object VSequenceOfStatements {
 }
 
 case class VIfStatement(labelColon: Option[String],
-                        ifVCond: VExpression,
-                        ifSeqOfStats: VSequenceOfStatements,
-                        elifConds: List[VExpression],
-                        elifSeqofStats: List[VSequenceOfStatements],
-                        elseSeqOfStats: Option[VSequenceOfStatements],
+                        ifConditionVExpression: VExpression,
+                        ifVSequenceOfStatements: VSequenceOfStatements,
+                        elsifConditionsVExpressionList: List[VExpression],
+                        elsifVSequenceOfStatementsList: List[VSequenceOfStatements],
+                        elseSequenceOfStatementsOption: Option[VSequenceOfStatements],
                         vId: Option[String]) extends VSequentialStatement {
 
   override def toI(defInfo: DefInfo): ISeq_stmt_complex = {
     import VIfStatement._
     val name = labelColon.orElse(vId).getOrElse(defaultId)
-    val ifCond = ifVCond.toIExp(defInfo)
-    val if_stmt_complexList = seq_stmt_complex_list(ifSeqOfStats)(defInfo)
-    val elif_complexList = elif_complex_list(elifConds, elifSeqofStats)(defInfo)
-    val else_stmt_complexList = elseSeqOfStats match {
+    val ifConditionIExpression = ifConditionVExpression.toIExp(defInfo)
+    val if_stmt_complexList = seq_stmt_complex_list(ifVSequenceOfStatements)(defInfo)
+    val elif_complexList = elsif_complex_list(elsifConditionsVExpressionList, elsifVSequenceOfStatementsList)(defInfo)
+    val else_stmt_complexList = elseSequenceOfStatementsOption match {
       case Some(s) => seq_stmt_complex_list(s)(defInfo)
       case None => List.empty
     }
-    ISeq_stmt_complex_Ssc_if(name, ifCond, if_stmt_complexList, elif_complexList, else_stmt_complexList)
+    ISeq_stmt_complex_Ssc_if(name, ifConditionIExpression, if_stmt_complexList, elif_complexList, else_stmt_complexList)
   }
+
+  def getAllConditionVExpression: List[VExpression] = List(ifConditionVExpression) ++ elsifConditionsVExpressionList
 }
 
 object VIfStatement {
@@ -828,7 +830,7 @@ object VIfStatement {
     seqOfStats.sequentialStatementList.map(_.toI(defInfo))
   }
 
-  def elif_complex_list(cl: List[VExpression], sl: List[VSequenceOfStatements])(defInfo: DefInfo): List[Ssc_elif] = {
+  def elsif_complex_list(cl: List[VExpression], sl: List[VSequenceOfStatements])(defInfo: DefInfo): List[Ssc_elif] = {
     val ssll = sl.map(s => seq_stmt_complex_list(s)(defInfo))
     cl.zip(ssll).map {
       case (exp, ssl) => Ssc_elif(exp.toIExp(defInfo), ssl)
@@ -947,9 +949,9 @@ object VExitStatement {
   }
 }
 
-case class VReturnStatement(expression: VExpression) extends VSequentialStatement {
+case class VReturnStatement(vExpression: VExpression) extends VSequentialStatement {
   override def toI(defInfo: DefInfo): ISeq_stmt_complex = {
-    ISeq_stmt_complex_Ssc_rt("", IAsmt_rhs_Rhs_e(expression.toIExp(defInfo)))
+    ISeq_stmt_complex_Ssc_rt("", IAsmt_rhs(vExpression.toIExp(defInfo)))
   }
 }
 
@@ -1029,9 +1031,9 @@ object VProcedureCallStatement {
 
 //********************************************************************************************************************//
 
-case class VProcessStatementPart(sequentialStatementList: List[VSequentialStatement]) {
+case class VProcessStatementPart(vSequentialStatementList: List[VSequentialStatement]) {
   def toI(defInfo: DefInfo): List[ISeq_stmt_complex] = {
-    sequentialStatementList.map(_.toI(defInfo))
+    ISeq_stmt_complex(vSequentialStatementList)(defInfo)
   }
 }
 
@@ -1112,13 +1114,17 @@ case class VFormalPartI(id: String) extends VFormalPart
 
 case class VFormalPartR(id: String, explicitRange: VExplicitRange) extends VFormalPart
 
-sealed abstract class VActualDesignator
+sealed abstract class VActualDesignator {
+  def getVExpression: VExpression = this match {
+    case VActualDesignatorExpression(vExpression) => vExpression
+    case VActualDesignatorOpen => ???
+  }
+}
 
 object VActualDesignator {
   def apply(ctx: Actual_designatorContext): VActualDesignator = {
-    val expression = ctx.expression()
-    if (expression != null) {
-      VActualDesignatorExpression(VExpression(expression))
+    if (ctx.expression() != null) {
+      VActualDesignatorExpression(VExpression(ctx.expression()))
     } else {
       VActualDesignatorOpen
     }
@@ -1135,19 +1141,15 @@ sealed abstract class VActualPart {
 
 object VActualPart {
   def apply(ctx: Actual_partContext): VActualPart = {
-    val name = ctx.name()
     val actualDesignator = VActualDesignator(ctx.actual_designator())
-    if (name != null) {
-      VActualPartN(VName(name), actualDesignator)
-    } else {
-      VActualPartD(actualDesignator)
-    }
+    if (ctx.name() != null) VActualPartNameAndDesignator(VName(ctx.name()), actualDesignator)
+    else VActualPartDesignatorOnly(actualDesignator)
   }
 }
 
-case class VActualPartN(name: VName, vActualDesignator: VActualDesignator) extends VActualPart
+case class VActualPartNameAndDesignator(vName: VName, vActualDesignator: VActualDesignator) extends VActualPart
 
-case class VActualPartD(vActualDesignator: VActualDesignator) extends VActualPart
+case class VActualPartDesignatorOnly(vActualDesignator: VActualDesignator) extends VActualPart
 
 case class VAssociationElement(formalPart: Option[VFormalPart], actualPart: VActualPart)
 
