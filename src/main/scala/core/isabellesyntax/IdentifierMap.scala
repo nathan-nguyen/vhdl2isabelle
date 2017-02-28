@@ -1,6 +1,6 @@
 package core.isabellesyntax
 
-import core.{DefInfo, Keeper}
+import core._
 import core.vhdlsyntax._
 
 import scala.collection.mutable
@@ -15,10 +15,20 @@ object IdentifierMap {
   val vFunctionMap = mutable.Map.empty[String, VFunctionSpecification]
 
   var tListener: Keeper = _
+  var typeInfo: VTypeInfo = _
 
   // TODO: Not an appropriate implementation
   var subprogramName = ""
   var isParsingSubprogram = false
+
+  def isValidDefinition(name: String): Boolean ={
+    try {
+      tListener.defInfo.getDef(name)
+      true
+    } catch {
+      case e: Exception => false
+    }
+  }
 
   def startParsingSubprogram(subprogramName: String) = {
     isParsingSubprogram = true
@@ -44,8 +54,12 @@ object IdentifierMap {
 
 //********************************************************************************************************************//
 
-  val iArrayVariableMap = mutable.Map.empty[String, mutable.Map[String, Int]]
-  def getArrayIndex(id: String, attribute: String): Int = iArrayVariableMap(id)(attribute)
+  // [TN] This maps name of array with name of elements and the corresponding index
+  val iArrayVariableMap = mutable.Map.empty[String, mutable.Map[String, String]]
+  def getArrayIndex(id: String, attribute: String): Option[String] = {
+    if (iArrayVariableMap.contains(id)) iArrayVariableMap(id).get(attribute)
+    else None
+  }
 
 
 //********************************************************************************************************************//
@@ -56,7 +70,7 @@ object IdentifierMap {
 
   def updateITemporaryVariableValue(functionName: String, parameterList: List[VActualPart]){
     val iType = iFunctionMap(functionName).returnType
-    val temporaryVariableName = s"return_${iType}_${iTemporaryVariableIndex}"
+    val temporaryVariableName = s"tmp_${functionName}_${iType}_${iTemporaryVariableIndex}"
     generateTemporaryVariable(temporaryVariableName, functionName)
     iTemporaryVariableIndex += 1
     iTemporaryVariableMap += parameterList -> (functionName, temporaryVariableName)
@@ -66,7 +80,7 @@ object IdentifierMap {
   def getITemporaryVariableName(vActualPartList: List[VActualPart]): String = iTemporaryVariableMap(vActualPartList)._2
 
   def startNewITemporaryVariableMap(): Unit = {
-    iTemporaryVariableIndex = 0;
+    iTemporaryVariableIndex = 0
     iTemporaryVariableMap.clear
     iTemporaryVariableQueue.clear
   }
@@ -96,21 +110,29 @@ object IdentifierMap {
   }
 
   def traverseVNamePartNameFunctionCallOrIndexedPart(vNamePartNameFunctionCallOrIndexedPart: VNamePartNameFunctionCallOrIndexedPart): Unit = {
-    val functionName = vNamePartNameFunctionCallOrIndexedPart.vSelectedName.getSimpleName
-    val vActualPartList = vNamePartNameFunctionCallOrIndexedPart.vNameFunctionCallOrIndexedPart.getVActualPartList
+    try {
+      val functionName = vNamePartNameFunctionCallOrIndexedPart.vSelectedName.getSimpleName
+      val vActualPartList = vNamePartNameFunctionCallOrIndexedPart.vNameFunctionCallOrIndexedPart.getVActualPartList
 
-    for (vActualPart <- vActualPartList) {
-      vActualPart match {
-        case vActualPartNameAndDesignator: VActualPartNameAndDesignator => {
-          traverseVActualPart(vActualPart)
-          // Mark the inside temporary variable by double the size of vActualPartList
-          // This helps to distinguish inside temporary variable with its container
-          IdentifierMap.updateITemporaryVariableValue(vActualPartNameAndDesignator.vName.getSimpleName, List(vActualPart, vActualPart))
+      for (vActualPart <- vActualPartList) {
+        vActualPart match {
+          case vActualPartNameAndDesignator: VActualPartNameAndDesignator => {
+            traverseVActualPart(vActualPart)
+            // Mark the inside temporary variable by double the size of vActualPartList
+            // This helps to distinguish inside temporary variable with its container
+            IdentifierMap.updateITemporaryVariableValue(vActualPartNameAndDesignator.vName.getSimpleName, List(vActualPart, vActualPart))
+          }
+          case _ => traverseVActualPart(vActualPart)
         }
-        case _ => traverseVActualPart(vActualPart)
+      }
+      IdentifierMap.updateITemporaryVariableValue(functionName, vActualPartList)
+    }
+    catch {
+      case e: Exception => {
+        // ISSUE (V2I-027)
+        logger.warn(s"${e}")
       }
     }
-    IdentifierMap.updateITemporaryVariableValue(functionName, vActualPartList)
   }
 
   def traverseVActualPart(vActualPart: VActualPart): Unit = {
@@ -134,5 +156,6 @@ object IdentifierMap {
 
 //********************************************************************************************************************//
 
+  def containsDef(name: String) = tListener.defInfo.containsDef(name)
 
 }

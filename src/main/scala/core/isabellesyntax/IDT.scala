@@ -9,7 +9,7 @@ import core.vhdlsyntax._
 
 
 // [HC] It's only used for IDef generation
-final case class MetaData(itemId: String, valType: VTypeDefinition, iExpression: IExpression)
+final case class MetaData(itemId: String, vTypeDefinition: VVariableType, iExpression: IExpression)
 
 //********************************************************************************************************************//
 
@@ -36,11 +36,13 @@ sealed trait IVl extends V_IDef {
   override def toString = this match {
     case IVl_Vl_v(iVariable) => s"(vl_v ${iVariable})"
     case IVl_Vnl(id, vlList) => s"(vnl ('''', ${vlList.ISABELLE}))"
+    case IVl_Vl_m(iVl,iExpression) => ???
   }
 
   def as_list: String = this match {
     case IVl_Vl_v(iVariable) => iVariable.name
     case IVl_Vnl(id, _) => s"(vlist_of_vl ${id})"
+    case IVl_Vl_m(_,_) => ???
   }
 
   def as_definition: String = this match {
@@ -51,36 +53,40 @@ sealed trait IVl extends V_IDef {
       s"""definition ${id}:: \"vl\" where
           |\"${id} ≡ ${toString}\"""".stripMargin
     }
+    case IVl_Vl_m(_,_) => ???
   }
 
   override def getName = this match {
     case IVl_Vl_v(v) => v.name
     case IVl_Vnl(id, vlList) => id
+    case IVl_Vl_m(_,_) => ???
   }
 
   override def getExpKind: ExpKind = this match {
     case IVl_Vl_v(v) => v.getExpKind
     case IVl_Vnl(id, vlList) => ExpUnknownKind
+    case IVl_Vl_m(_,_) => ???
   }
 
 
   // [HC] It may return a "variable" or a "vl" (which is vnl-generated)
-  def get(nList: List[String]): Option[V_IDef] = {
-    def aux(l: List[String], cur: Option[IVl]): Option[IVl] = l match {
-      case h :: t => cur match {
+  def get(subprogramName: String, nameList: List[String]): Option[V_IDef] = {
+    def aux(list: List[String], iVlOption: Option[IVl]): Option[IVl] = list match {
+      case h :: t => iVlOption match {
         case Some(vl) => vl match {
-          // vl_v contains
+          // [HC] vl_v contains
           case vl_v: IVl_Vl_v => Some(vl)
-          // vnl not sure, recursive
-          case vnl: IVl_Vnl => aux(t, vnl.vlList.find(_.getName == h))
+          // [HC] vnl not sure, recursive
+          case vnl: IVl_Vnl => aux(t, vnl.vlList.find(_.getName == s"${subprogramName}${h}"))
+          case _ => ???
         }
-        // no
+        // [HC] No
         case None => None
       }
-      // no more recursive
-      case Nil => cur
+      // [HC] No more recursive
+      case Nil => iVlOption
     }
-    aux(nList, Some(this)) match {
+    aux(nameList, Some(this)) match {
       case Some(IVl_Vl_v(v)) => Option(v)
       case other => other
     }
@@ -89,20 +95,30 @@ sealed trait IVl extends V_IDef {
 
 case class IVl_Vl_v(iVariable: IVariable) extends IVl
 
-
 case class IVl_Vnl(id: String, vlList: List[IVl]) extends IVl
 
+case class IVl_Vl_m(iVl: IVl, iExpression: IExpression) extends IVl
+
 object IVl_Vnl {
-  // FIXME: this gen is TOO specific!
-  // NOTE: currently valType is the EXACTLY type from VHDL without prefix!!!
-  def gen(id: String, dataList: List[MetaData])(implicit s: DummyImplicit): IVl_Vnl = {
-    val vlList = for {
+  def generate(id: String, dataList: List[MetaData])(typeInfo: VTypeInfo, defInfo: DefInfo): IVl_Vnl = {
+    val iVlList = for {
       data <- dataList
     } yield {
       val itemId = s"${id}_${data.itemId}"
-      IVl_Vl_v(IVariable(itemId, data.valType.asInstanceOf[VBaseType], data.iExpression))
+      // [TN] VRecordType and VArrayType should have vExpressionOption
+      // Currently not able to initialize VRecordType and VArrayType with initial values
+      data.vTypeDefinition match {
+        case vBaseType: VBaseType => IVl_Vl_v(IVariable(itemId, data.vTypeDefinition.asInstanceOf[VBaseType], data.iExpression))
+        case vRecordType: VRecordType => IVl_Vnl.generate(itemId, vRecordType.getInitialValue(typeInfo, None)(defInfo))(typeInfo, defInfo)
+        case vArrayType: VArrayType => vArrayType.getInitialValue(itemId, typeInfo, None)(defInfo) match {
+          case iVariable : IVariable => IVl_Vl_v(iVariable)
+          case iVl_Vnl : IVl_Vnl => iVl_Vnl
+          case _ => throw handler(s"${vArrayType}")
+        }
+        case _ => handler(s"${data.vTypeDefinition}")
+      }
     }
-    IVl_Vnl(id, vlList)
+    IVl_Vnl(id, iVlList)
   }
 }
 
@@ -116,13 +132,14 @@ sealed trait IDef {
   // [HC] Only the "final" classes have name
   def getName: String
 
-  def getVType: VTypeDefinition = this match {
+  def getVType: VVariableType = this match {
     case v: IVariable => v.valType
     case s: Signal => s.signalType
     case p: Port => p.portType
     case vl: IVl => vl match {
-        case vl_v: IVl_Vl_v => vl_v.iVariable.valType
+      case vl_v: IVl_Vl_v => vl_v.iVariable.valType
       case vnl: IVl_Vnl => handler(s"${vnl}")
+      case _ => ???
     }
     case spl: ISpl => spl match {
       case spl_s: ISPl_s => spl_s.iSignal.signalType
@@ -141,15 +158,8 @@ sealed abstract class ISpl extends SP_IDef {
 
   override def toString = this match {
     case ISPl_s(s) => s"  spl_s ${s}"
-    case ISpl_p(p) => p match {
-      case pbt : Port_baseType => s"(spl_p ${p})"
-      case pct : Port_recordType => s"(spnl ${p})"
-      case pat : Port_arrayType => s"(spl_p ${p})"
-    }
-    case spnl@ISpl_Spnl(id, splList) => {
-      if (spnl.isNested) s"${splList.ISABELLE}"
-      else s"(spnl ('''', ${splList.ISABELLE}))"
-    }
+    case ISpl_p(p) => s"(spl_p ${p})"
+    case spnl@ISpl_Spnl(id, splList) => s"(spnl ('''', ${splList.ISABELLE}))"
   }
 
   override def as_definition: String = this match {
@@ -181,28 +191,26 @@ sealed abstract class ISpl extends SP_IDef {
     case ISpl_Spnl(id, splList) => ExpUnknownKind
   }
 
-  /**
-    * return "signal", "port" or "spl" ("spnl" generated)
-    */
-  def get(nList: List[String]): Option[SP_IDef] = {
-    def aux(l: List[String], cur: Option[ISpl]): Option[ISpl] = l match {
-      case h :: t => cur match {
+
+  // [HC] Return "signal", "port" or "spl" ("spnl" generated)
+  def get(subprogramName: String, nameList: List[String]): Option[SP_IDef] = {
+    def aux(list: List[String], iVlOption: Option[ISpl]): Option[ISpl] = list match {
+      case h :: t => iVlOption match {
         case Some(spl) => spl match {
           case _: ISPl_s => Some(spl)
           case _: ISpl_p => Some(spl)
-          case spnl: ISpl_Spnl => aux(t, spnl.splList.find(_.getName == h))
+          case spnl: ISpl_Spnl => aux(t, spnl.splList.find(_.getName == s"${subprogramName}${h}"))
         }
         case None => None
       }
-      case Nil => cur
+      case Nil => iVlOption
     }
-    aux(nList, Some(this)) match {
+    aux(nameList, Some(this)) match {
       case Some(ISPl_s(spl_s)) => Some(spl_s)
       case Some(ISpl_p(spl_p)) => Some(spl_p)
       case other => other
     }
   }
-
 }
 
 case class ISPl_s(iSignal: Signal) extends ISpl
@@ -219,21 +227,23 @@ object ISpl_Spnl {
       data <- dataList
     } yield {
       val itemId = s"${id}_${data.itemId}"
-      ISPl_s(Signal(itemId, data.valType.asInstanceOf[VBaseType], data.iExpression, signalKind))
+      ISPl_s(Signal(itemId, data.vTypeDefinition.asInstanceOf[VBaseType], data.iExpression, signalKind))
     }
     ISpl_Spnl(id, splList)
   }
 
-  def apply(id: String, dataList: List[MetaData], portMode: PortMode.Value, portConnection: PortConnection.Value, typeInfo : VTypeInfo): ISpl_Spnl = {
+  def apply(id: String, dataList: List[MetaData], portMode: PortMode.Value, portConnection: PortConnection.Value)(typeInfo: VTypeInfo, defInfo: DefInfo): ISpl_Spnl = {
     val splList = for {
       data <- dataList
     } yield {
       val itemId = s"${id}_${data.itemId}"
-      data.valType match {
+      // [TN] VRecordType and VArrayType should have vExpressionOption
+      // Currently not able to initialize VRecordType and VArrayType with initial values
+      data.vTypeDefinition match {
         case baseType : VBaseType => ISpl_p(Port_baseType(itemId, baseType, data.iExpression, portMode, portConnection))
-        case recordType : VRecordType => ISpl_p(Port_recordType(itemId, recordType, data.iExpression, portMode, portConnection, typeInfo))
-        case arrayType : VArrayType => ISpl_p(Port_arrayType(itemId, arrayType, data.iExpression, portMode, portConnection, typeInfo))
-        case subtype: VSubtype => handler(s"${data.valType}")
+        case vRecordType: VRecordType => ISpl_Spnl(itemId, vRecordType.getInitialValue(typeInfo, None)(defInfo), portMode, portConnection)(typeInfo, defInfo)
+        case arrayType : VArrayType => ISpl_p(Port_baseType(itemId, arrayType.getElementType(typeInfo).asInstanceOf[VBaseType], data.iExpression, portMode, portConnection))
+        case subtype: VSubtype => handler(s"${data.vTypeDefinition}")
       }
     }
     ISpl_Spnl(id, splList)
@@ -279,7 +289,7 @@ object PortConnection extends Enumeration {
 
 sealed abstract class Port extends SP_IDef {
   val id: String
-  val portType : VTypeDefinition
+  val portType : VVariableType
   val iExp: IExpression
 
   def as_definition: String = {
@@ -296,21 +306,6 @@ sealed abstract class Port extends SP_IDef {
 
 case class Port_baseType(id: String, portType: VBaseType, iExp: IExpression, mode: PortMode.Value, conn: PortConnection.Value) extends Port {
   override def toString = s"(''${id}'', ${IType(portType)}, ${mode}, ${conn}, ${iExp})"
-}
-
-sealed abstract class Port_customizedType extends Port
-
-case class Port_recordType(id: String, portType: VRecordType, iExp: IExpression, portMode: PortMode.Value, portConnection: PortConnection.Value, typeInfo : VTypeInfo) extends Port_customizedType {
-  override def toString = {
-    val initVals = portType.guessInitVals(typeInfo)
-    val iSpnl_nested = ISpl_Spnl(id, initVals, portMode, portConnection, typeInfo)
-    iSpnl_nested.isNested = true
-    s"(''${id}'', ${iSpnl_nested})"
-  }
-}
-
-case class Port_arrayType(id: String, portType: VArrayType, iExp: IExpression, portMode: PortMode.Value, portConnection: PortConnection.Value, typeInfo : VTypeInfo) extends Port_customizedType {
-  override def toString = s"(''${id}'', ${IType(portType)}, ${portMode}, ${portConnection}, ${iExp})"
 }
 
 //********************************************************************************************************************//

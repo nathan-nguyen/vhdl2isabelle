@@ -15,7 +15,10 @@ case class IEnv_sp(signalList: List[Signal], portList: List[Port], spnlList: Lis
     val spnlListNotEmpty    = spnlList.map(_.as_list).size    > 0
     val firstSeparator     = if (signalListNotEmpty && (portListNotEmpty || spnlListNotEmpty)) "@" else ""
     val secondSeparator    = if ((signalListNotEmpty || spnlListNotEmpty) && spnlListNotEmpty) "@" else ""
-    s"""${signalList.map(_.as_list).mkString("@")}${firstSeparator}${portList.map(_.as_list).mkString("@")}${secondSeparator}${spnlList.map(_.as_list).mkString("@")}""".stripMargin
+    if (signalListNotEmpty || portListNotEmpty || spnlListNotEmpty) {
+      s"""${signalList.map(_.as_list).mkString("@")}${firstSeparator}${portList.map(_.as_list).mkString("@")}${secondSeparator}${spnlList.map(_.as_list).mkString("@")}""".stripMargin
+    }
+    else s"[]"
   }
 }
 
@@ -65,7 +68,8 @@ sealed abstract class ISp_clhs {
 }
 
 object ISp_clhs {
-  def apply(iDef: IDef, selectedName: VSelectedName, discreteRangeOption: Option[IDiscrete_range]): ISp_clhs = iDef match {
+  def apply(iDef: IDef, selectedName: VSelectedName,
+            discreteRangeOption: Option[IDiscrete_range]): ISp_clhs = iDef match {
     case signal: Signal => {
       val sp_s = SP_s(signal, selectedName)
       val sp_lhs = discreteRangeOption match {
@@ -160,7 +164,8 @@ sealed abstract class Seq_stmt {
   override def toString = this match {
     case Sst_sa(id, sP_lhs, asmt_rhs) => s"(sst_sa ${id} ${sP_lhs} ${asmt_rhs})"
     case Sst_va(id, v_lhs, asmt_rhs) => s"(sst_va ${id} ${v_lhs} ${asmt_rhs})"
-    case Sst_if(id, cond, then_seq_stmtList, else_seq_stmtList) => s"(sst_if ${id} ${cond} ${then_seq_stmtList} ${else_seq_stmtList})"
+    case Sst_if(id, cond, then_seq_stmtList, else_seq_stmtList) =>
+      s"(sst_if ${id} ${cond} ${then_seq_stmtList} ${else_seq_stmtList})"
     case Sst_l(id, cond, body_seq_stmtList) => s"(sst_l ${id} ${cond} ${body_seq_stmtList})"
     case Sst_n(id, cond) => s"(sst_n ${id} ${cond})"
     case Sst_e(id, cond) => s"(sst_e ${id} ${cond})"
@@ -220,7 +225,8 @@ sealed abstract class IV_clhs {
 }
 
 object IV_clhs {
-  def apply (iDef: IDef, selectedName: VSelectedName, discreteRangeOption: Option[IDiscrete_range]): IV_clhs = iDef match {
+  def apply (iDef: IDef, selectedName: VSelectedName,
+             discreteRangeOption: Option[IDiscrete_range]): IV_clhs = iDef match {
     case iVariable: IVariable => {
       val iV_lhs = discreteRangeOption match {
         case None => IV_lhs_Lhs_v(iVariable, selectedName)
@@ -230,6 +236,11 @@ object IV_clhs {
     }
     case iVl: IVl => IV_clhs_Clhs_vr(iVl)
     case _ => handler(s"${iDef}")
+  }
+
+  def apply (selectedName: VSelectedName, recordArrayIndex: IExpression,
+             selectedNameSuffix: VSelectedName, discreteRangeOptionSuffix: Option[IDiscrete_range]): IV_clhs =  {
+    IV_clhs_Clhs_v(IV_lhs_Lhs_var(selectedName, recordArrayIndex, selectedNameSuffix))
   }
 }
 
@@ -258,7 +269,7 @@ sealed abstract class Gen_type {
   }
 }
 
-// TODO test definition in isabelle
+// TODO [HC] Test definition in Isabelle
 case class For_gen(exp: IExpression, discrete_range: IDiscrete_range) extends Gen_type
 
 case class If_gen(exp: IExpression) extends Gen_type
@@ -292,7 +303,8 @@ sealed abstract class IConc_stmt_complex {
 case class IConc_stmt_complex_Csc_ps(name: String, iSensitivilist: Option[ISensitiveList],
                                      seq_stmt_complexList: List[ISeq_stmt_complex]) extends IConc_stmt_complex
 
-case class IConc_stmt_complex_Csc_ca(name: String, sp_clhs: ISp_clhs, casmt_rhsList: List[As_when], iAsmt_rhs: IAsmt_rhs) extends IConc_stmt_complex
+case class IConc_stmt_complex_Csc_ca(name: String, sp_clhs: ISp_clhs, casmt_rhsList: List[As_when],
+                                     iAsmt_rhs: IAsmt_rhs) extends IConc_stmt_complex
 
 case class IConc_stmt_complex_Csc_gen(name: String, gen_type: Gen_type,
                                       conc_stmt_complexList: List[IConc_stmt_complex]) extends IConc_stmt_complex

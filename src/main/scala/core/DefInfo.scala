@@ -24,17 +24,13 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     * signal (scalar), port (scalar), spnl (record)
     */
 
-  type V_PTy = IVariable
   type Vnl_PTy = IVl_Vnl
-  type S_PTy = Signal
-  type P_PTy = Port
-  type SPnl_PTy = ISpl_Spnl
 
   val v_raw = mutable.ListBuffer.empty[IVariable]
   val vnl_raw = mutable.ListBuffer.empty[Vnl_PTy]
-  val s_raw = mutable.ListBuffer.empty[S_PTy]
-  val p_raw = mutable.ListBuffer.empty[P_PTy]
-  val spnl_raw = mutable.ListBuffer.empty[SPnl_PTy]
+  val s_raw = mutable.ListBuffer.empty[Signal]
+  val p_raw = mutable.ListBuffer.empty[Port]
+  val spnl_raw = mutable.ListBuffer.empty[ISpl_Spnl]
 
   //  for Env
   val v_map = mutable.Map.empty[String, IVariable]
@@ -52,6 +48,11 @@ final class DefInfo(defInfo: Option[DefInfo]) {
 
   def getDef(n: String): IDef = getDefOpt(List(n)).getOrElse(handler(s"${n}"))
 
+  def containsDef(n: String) = getDefOpt(List(n)) match {
+    case Some(_) => true
+    case None => false
+  }
+
   def getDef(selectedName: VSelectedName): IDef = {
     val nList = selectedName.suffixList.scanLeft(selectedName.id)((acc, cur) => s"${acc}_${cur.s}")
     getDefOpt(nList).getOrElse(handler(s"${selectedName}"))
@@ -67,11 +68,10 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     getVDefOpt(nList).getOrElse(handler(s"${selectedName}"))
   }
 
-  def getSPDefOpt(nList: List[String]): Option[SP_IDef] = {
-    val h = nList.head
+  def getSPDefOpt(h: String, nList: List[String]): Option[SP_IDef] = {
     (s_raw.find(_.id == h), p_raw.find(_.id == h)) match {
       case (None, None) => spnl_raw.find(_.id == h) match {
-        case Some(spl) => spl.get(nList.tail)
+        case Some(spl) => spl.get("",nList.tail)
         case None => None
       }
       case (s@Some(ss), None) => s
@@ -80,54 +80,69 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     }
   }
 
+  def getSPDefOpt(nList: List[String]): Option[SP_IDef] = {
+    val h = nList.head
+    if (IdentifierMap.isParsingSubprogram){
+      val subprogramName = s"${IdentifierMap.subprogramName}_"
+      val h_rename = s"${subprogramName}${h}"
+      (s_raw.find(_.id == h_rename), p_raw.find(_.id == h_rename)) match {
+        case (s@Some(ss), None) => s
+        case (None, p@Some(sp)) => p
+        case (None, None) => spnl_raw.find(_.id == h_rename) match {
+          case Some(spl) => spl.get(subprogramName, nList.tail)
+          case None => getSPDefOpt(h, nList)
+        }
+        case (_, _) => handler(s"${nList}")
+      }
+    } else {
+      getSPDefOpt(h, nList)
+    }
+  }
+
+  def getVDefOpt(h: String, nList: List[String]): Option[V_IDef] = {
+    v_raw.find(_.name == h) match {
+      case v@Some(sv) => v
+      case None => vnl_raw.find(_.id == h) match {
+        case Some(vl) => vl.get("",nList.tail)
+        case None => None
+      }
+    }
+  }
+
   def getVDefOpt(nList: List[String]): Option[V_IDef] = {
     /** [TN] This hack allows looking for local variable definition in subprogram call
-      * Because all the local variables are rename: subprogram_name + "_" + local_variable_name
+      * Because all the local variables are renamed: subprogram_name + "_" + local_variable_name
       * This function might not work with nested vl because the only used values are head and tail
     */
     val h = nList.head
     if (IdentifierMap.isParsingSubprogram){
-      val h_rename = IdentifierMap.subprogramName + "_" + h
+      val subprogramName =  s"${IdentifierMap.subprogramName}_"
+      val h_rename = s"${subprogramName}${h}"
       v_raw.find(_.name == h_rename) match {
         case v@Some(sv) => v
         case None => vnl_raw.find(_.id == h_rename) match {
-          case Some(vl) => vl.get(nList.tail)
-          case None => {
-            v_raw.find(_.name == h) match {
-              case v@Some(sv) => v
-              case None => vnl_raw.find(_.id == h) match {
-                case Some(vl) => vl.get(nList.tail)
-                case None => None
-              }
-            }
-          }
+          case Some(vl) => vl.get(subprogramName, nList.tail)
+          case None => getVDefOpt(h, nList)
         }
       }
-    } else {
-      v_raw.find(_.name == h) match {
-        case v@Some(sv) => v
-        case None => vnl_raw.find(_.id == h) match {
-          case Some(vl) => vl.get(nList.tail)
-          case None => None
-        }
-      }
-    }
+    } else getVDefOpt(h, nList)
   }
 
-  def getDefOpt(nList: List[String]): Option[IDef] = getSPDefOpt(nList).orElse(getVDefOpt(nList))
+  def getDefOpt(nList: List[String]): Option[IDef] = getVDefOpt(nList).orElse(getSPDefOpt(nList))
 
-  def vnl_flatten(vnl: IVl_Vnl): List[V_PTy] = vnl.vlList flatMap {
-    case vnl: IVl_Vnl => vnl_flatten(vnl)
+  def vnl_flatten(vnl: IVl_Vnl): List[IVariable] = vnl.vlList flatMap {
+    case iVl_Vnl: IVl_Vnl => vnl_flatten(iVl_Vnl)
     case IVl_Vl_v(v) => List(v)
+    case _ => ???
   }
 
-  def spnl_flatten(spnl: ISpl_Spnl): (List[S_PTy], List[P_PTy]) = {
-    def aux(sPnl: ISpl_Spnl): List[(S_PTy, P_PTy)] = spnl.splList flatMap {
+  def iSpl_Spnl_flatten(iSpl_Spnl: ISpl_Spnl): (List[Signal], List[Port]) = {
+    def aux(sPnl: ISpl_Spnl): List[(Signal, Port)] = sPnl.splList flatMap {
       case ISPl_s(s) => List((s, null))
       case ISpl_p(p) => List((null, p))
-      case spnl_list: ISpl_Spnl => aux(spnl_list)
+      case iSpl_Spnl: ISpl_Spnl => aux(iSpl_Spnl)
     }
-    val (signalList, portList) = aux(spnl).unzip
+    val (signalList, portList) = aux(iSpl_Spnl).unzip
     (signalList.filter(_ != null), portList.filter(_ != null))
   }
 
@@ -165,9 +180,9 @@ final class DefInfo(defInfo: Option[DefInfo]) {
     p_map += (id -> d)
   }
 
-  def +=(id: String, d: ISpl_Spnl): Unit = {
-    spnl_raw += d
-    val (sl, pl) = spnl_flatten(d)
+  def +=(id: String, iSpl_Spnl: ISpl_Spnl): Unit = {
+    spnl_raw += iSpl_Spnl
+    val (sl, pl) = iSpl_Spnl_flatten(iSpl_Spnl)
     s_map ++= sl.map(_.id).zip(sl)
     p_map ++= pl.map(_.id).zip(pl)
   }

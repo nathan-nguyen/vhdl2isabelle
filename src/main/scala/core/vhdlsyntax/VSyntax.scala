@@ -151,31 +151,47 @@ object VSignalMode extends Enumeration {
 
 abstract class VTarget {
 
-  def getInfo(defInfo: DefInfo): (VSelectedName, Option[IDiscrete_range]) = this match {
+  def getInfo(defInfo: DefInfo): List[(VSelectedName, Option[IDiscrete_range])] = this match {
     case name: VName => name.getVSelectedName(defInfo)
     case aggregate: VAggregate => handler(s"${toString}")
   }
 
   def lhs_V_IDef(defInfo: DefInfo): V_IDef = {
-    val (selectedName, _) = getInfo(defInfo)
+    val (selectedName, _) = getInfo(defInfo).head
     defInfo.getVDef(selectedName)
   }
 
   def lhs_SP_IDef(defInfo: DefInfo): SP_IDef = {
-    val (selectedName, _) = getInfo(defInfo)
+    val (selectedName, _) = getInfo(defInfo).head
     defInfo.getSPDef(selectedName)
   }
 
   def toISp_clhs(defInfo: DefInfo): ISp_clhs = {
-    val (selectedName, discreteRangeOption) = getInfo(defInfo)
+    val (selectedName, discreteRangeOption) = getInfo(defInfo).head
     val iDef = defInfo.getSPDef(selectedName)
     ISp_clhs(iDef, selectedName, discreteRangeOption)
   }
 
   def toIV_clhs(defInfo: DefInfo): IV_clhs = {
-    val (selectedName, discreteRangeOption) = getInfo(defInfo)
-    val iDef = defInfo.getVDef(selectedName)
-    IV_clhs(iDef, selectedName, discreteRangeOption)
+    val info = getInfo(defInfo)
+    if (info.size == 1) {
+      val (selectedName, discreteRangeOption) = info.head
+      val iDef = defInfo.getVDef(selectedName)
+      IV_clhs(iDef, selectedName, discreteRangeOption)
+    }
+    else if (info.size == 2) {
+      // [TN] In this case, the discreteRangeOption is probably DOWNTO type of a single integer (record array index)
+      // Therefore, we only need a single expression for Record Array Index
+      val (selectedName, discreteRangeOption) = info.head
+      val recordArrayIndex = discreteRangeOption match {
+        case Some(IVhdl_dis_to(l,r)) => l
+        case Some(IVhdl_dis_downto(l,r)) => l
+        case None => throw VIError
+      }
+      val (selectedNameSuffix, discreteRangeOptionSuffix) = info.tail.head
+      IV_clhs(selectedName, recordArrayIndex, selectedNameSuffix, discreteRangeOptionSuffix)
+    }
+    else handler(s"${info}")
   }
 
 }
@@ -190,55 +206,52 @@ object VTarget {
 
 //********************************************************************************************************************//
 
-sealed abstract class VDelay
+sealed abstract class VDelayMechanism
 
-object VDelay {
-  def apply(ctx: Delay_mechanismContext): VDelay = {
+object VDelayMechanism {
+  def apply(ctx: Delay_mechanismContext): VDelayMechanism = {
     val transport = ctx.TRANSPORT()
     val inertial = ctx.INERTIAL()
-    if (transport != null) {
-      VDelayT
-    } else if (inertial != null) {
-      val exp = Option(ctx.expression()).map(VExpression(_))
-      VDelayE(exp)
-    } else throw VIError
+
+    if (transport != null) VDelayMechanismTransport
+    else if (inertial != null) VDelayMechanismInertial(Option(ctx.expression()).map(VExpression(_)))
+    else throw VIError
   }
 }
 
-object VDelayT extends VDelay
+object VDelayMechanismTransport extends VDelayMechanism
 
-case class VDelayE(vExp: Option[VExpression]) extends VDelay
+case class VDelayMechanismInertial(vExp: Option[VExpression]) extends VDelayMechanism
 
-case class VOpts(guarded: Boolean, delay: Option[VDelay])
+case class VOpts(guarded: Boolean, delay: Option[VDelayMechanism])
 
 object VOpts {
   def apply(ctx: OptsContext): VOpts = {
     val guarded = ctx.GUARDED() != null
-    val delay = Option(ctx.delay_mechanism()).map(VDelay(_))
+    val delay = Option(ctx.delay_mechanism()).map(VDelayMechanism(_))
     VOpts(guarded, delay)
   }
 }
 
 //********************************************************************************************************************//
-/**
-  * 2nd exp is "after", not useful?
-  */
-case class VWaveFormElem(exp: VExpression, expOption: Option[VExpression])
 
-object VWaveFormElem {
-  def apply(ctx: Waveform_elementContext): VWaveFormElem = {
+// [HC] 2nd exp is "after", not useful?
+case class VWaveFormElement(exp: VExpression, expOption: Option[VExpression])
+
+object VWaveFormElement {
+  def apply(ctx: Waveform_elementContext): VWaveFormElement = {
     val exprs = ctx.expression().map(VExpression(_))
     val exp = exprs.head
     val expOption = exprs.lift(1)
-    VWaveFormElem(exp, expOption)
+    VWaveFormElement(exp, expOption)
   }
 }
 
 sealed abstract class VWaveForm {
 
   def getSpecialVExp: VExpression = this match {
-    case e: VWaveFormE => e.elems.head.exp
-    case VWaveFormU => handler(s"${VWaveFormU}")
+    case e: VWaveFormElementList => e.waveFormElementList.head.exp
+    case VWaveFormUnaffected => handler(s"${VWaveFormUnaffected}")
   }
 
   def getSpecialIExp(defInfo: DefInfo): IExpression = getSpecialVExp.toIExp(defInfo)
@@ -246,24 +259,21 @@ sealed abstract class VWaveForm {
 
 object VWaveForm {
   def apply(ctx: WaveformContext): VWaveForm = {
-    val unaffected = ctx.UNAFFECTED()
-    val waveFormElemList = ctx.waveform_element()
-    if (unaffected != null) {
-      VWaveFormU
-    } else if (waveFormElemList != null) {
-      VWaveFormE(waveFormElemList.map(VWaveFormElem(_)).toList)
-    } else throw VIError
+    val waveFormElementList = ctx.waveform_element()
+    if (ctx.UNAFFECTED() != null) VWaveFormUnaffected
+    else if (waveFormElementList != null) VWaveFormElementList(waveFormElementList.map(VWaveFormElement(_)).toList)
+    else throw VIError
   }
 }
 
-case class VWaveFormE(elems: List[VWaveFormElem]) extends VWaveForm {
-  require(elems.nonEmpty, "VWaveFormE")
+case class VWaveFormElementList(waveFormElementList: List[VWaveFormElement]) extends VWaveForm {
+  require(waveFormElementList.nonEmpty, "VWaveFormElementList")
 }
 
-case object VWaveFormU extends VWaveForm
+case object VWaveFormUnaffected extends VWaveForm
 
 case class VCondWaveForms(whenWaveForm: VWaveForm, cond: Option[VExpression], elseCond: Option[VCondWaveForms]) {
-  // NOTE: isar definition has many limitations, but may be enough
+  // NOTE: Isabelle definition has many limitations, but may be enough
   def toI(defInfo: DefInfo)(lhs_idef:IDef): (List[As_when], IAsmt_rhs) = {
     // whenWaveForm => as_whenList.head.crhs, cond => as_whenList.head.IExp
     // elseCond build the as_whenList(1) (last one)
@@ -522,12 +532,12 @@ object VSubprogramBody {
 
 //********************************************************************************************************************//
 
-case class VTypeDeclaration(id: String, vTypeDef: Option[VTypeDef]) extends VBlockDeclarativeItem with VProceduralDeclarativeItem
+case class VTypeDeclaration(id: String, vTypeDef: Option[VTypeDefinition]) extends VBlockDeclarativeItem with VProceduralDeclarativeItem
 
 object VTypeDeclaration {
   def apply(ctx: Type_declarationContext): VTypeDeclaration = {
     val id = ctx.identifier().getText
-    val typeDef = Option(ctx.type_definition()).map(VTypeDef(_))
+    val typeDef = Option(ctx.type_definition()).map(VTypeDefinition(_))
     VTypeDeclaration(id, typeDef)
   }
 }
@@ -741,7 +751,7 @@ object VReportStatement {
   }
 }
 
-case class VSignalAssignmentStatement(labelColon: Option[String], target: VTarget, delay: Option[VDelay], waveForm: VWaveForm) extends VSequentialStatement {
+case class VSignalAssignmentStatement(labelColon: Option[String], target: VTarget, delay: Option[VDelayMechanism], waveForm: VWaveForm) extends VSequentialStatement {
   override def toI(defInfo: DefInfo): ISeq_stmt_complex = {
     val id = labelColon.getOrElse(defaultId)
     val s_clhs = target.toISp_clhs(defInfo)
@@ -754,7 +764,7 @@ object VSignalAssignmentStatement {
   def apply(ctx: Signal_assignment_statementContext): VSignalAssignmentStatement = {
     val labelColon = Option(ctx.label_colon()).map(_.identifier().getText)
     val target = VTarget(ctx.target())
-    val delay = Option(ctx.delay_mechanism()).map(VDelay(_))
+    val delay = Option(ctx.delay_mechanism()).map(VDelayMechanism(_))
     val waveForm = VWaveForm(ctx.waveform())
     VSignalAssignmentStatement(labelColon, target, delay, waveForm)
   }
@@ -764,7 +774,13 @@ case class VVariableAssignmentStatement(labelColon: Option[String], target: VTar
   override def toI(defInfo: DefInfo): ISeq_stmt_complex = {
     val id = labelColon.getOrElse(defaultId)
     val iV_clhs = target.toIV_clhs(defInfo)
-    ISeq_stmt_complex_Ssc_va(id, iV_clhs, IAsmt_rhs(vExpression.toIExp(defInfo)))
+    vExpression.getVAggregateOption match {
+      case Some(vAggregate) => vAggregate.getFirstMap._1 match {
+        case "others" => ISeq_stmt_complex_Ssc_va(id, iV_clhs, IAsmt_rhs_Rhs_o(vExpression.toIExp(defInfo)))
+        case _ => ISeq_stmt_complex_Ssc_va(id, iV_clhs, IAsmt_rhs(vExpression.toIExp(defInfo)))
+      }
+      case None => ISeq_stmt_complex_Ssc_va(id, iV_clhs, IAsmt_rhs(vExpression.toIExp(defInfo)))
+    }
   }
 }
 
@@ -798,10 +814,10 @@ case class VIfStatement(labelColon: Option[String],
     import VIfStatement._
     val name = labelColon.orElse(vId).getOrElse(defaultId)
     val ifConditionIExpression = ifConditionVExpression.toIExp(defInfo)
-    val if_stmt_complexList = seq_stmt_complex_list(ifVSequenceOfStatements)(defInfo)
+    val if_stmt_complexList = toISeq_stmt_complexList(ifVSequenceOfStatements)(defInfo)
     val elif_complexList = elsif_complex_list(elsifConditionsVExpressionList, elsifVSequenceOfStatementsList)(defInfo)
     val else_stmt_complexList = elseSequenceOfStatementsOption match {
-      case Some(s) => seq_stmt_complex_list(s)(defInfo)
+      case Some(s) => toISeq_stmt_complexList(s)(defInfo)
       case None => List.empty
     }
     ISeq_stmt_complex_Ssc_if(name, ifConditionIExpression, if_stmt_complexList, elif_complexList, else_stmt_complexList)
@@ -826,12 +842,14 @@ object VIfStatement {
     VIfStatement(labelColon, ifCond, ifSeqOfStats, elifConds, elifSeqOfStatsList, elseSeqOfStats, id)
   }
 
-  def seq_stmt_complex_list(seqOfStats: VSequenceOfStatements)(defInfo: DefInfo): List[ISeq_stmt_complex] = {
-    seqOfStats.sequentialStatementList.map(_.toI(defInfo))
+  def toISeq_stmt_complexList(vSequenceOfStatements: VSequenceOfStatements)(defInfo: DefInfo): List[ISeq_stmt_complex] = {
+    // [TN] Direct translation: vSequenceOfStatements.sequentialStatementList.map(_.toI(defInfo))
+    // [TN] Because we might need to insert some temporary VVariableAssignmentStatement, direct translation should not be used
+    ISeq_stmt_complex(vSequenceOfStatements.sequentialStatementList)(defInfo)
   }
 
   def elsif_complex_list(cl: List[VExpression], sl: List[VSequenceOfStatements])(defInfo: DefInfo): List[Ssc_elif] = {
-    val ssll = sl.map(s => seq_stmt_complex_list(s)(defInfo))
+    val ssll = sl.map(s => toISeq_stmt_complexList(s)(defInfo))
     cl.zip(ssll).map {
       case (exp, ssl) => Ssc_elif(exp.toIExp(defInfo), ssl)
     }
@@ -841,40 +859,40 @@ object VIfStatement {
 
 //********************************************************************************************************************//
 
-case class VCaseStatAlt(choices: VChoices, seqOfStats: VSequenceOfStatements) {
+case class VCaseStatementAlternative(choices: VChoices, vSequenceOfStatements: VSequenceOfStatements) {
   def toI(defInfo: DefInfo): Ssc_when = {
-    val exps = choices.vChoiceList.map(_.getSimpleExpression.toIExp(defInfo))
-    val sstList = seqOfStats.sequentialStatementList.map(_.toI(defInfo))
-    Ssc_when(IChoices(exps), sstList)
+    val iExpressionList = choices.vChoiceList.map(_.getSimpleExpression.toIExp(defInfo))
+    val iSeq_stmt_complexeList = ISeq_stmt_complex(vSequenceOfStatements.sequentialStatementList)(defInfo)
+    Ssc_when(IChoices(iExpressionList), iSeq_stmt_complexeList)
   }
 }
 
-object VCaseStatAlt {
-  def apply(ctx: Case_statement_alternativeContext): VCaseStatAlt = {
-    val choices = VChoices(ctx.choices())
-    val seqOfStats = VSequenceOfStatements(ctx.sequence_of_statements())
-    VCaseStatAlt(choices, seqOfStats)
+object VCaseStatementAlternative {
+  def apply(ctx: Case_statement_alternativeContext): VCaseStatementAlternative = {
+    val vChoices = VChoices(ctx.choices())
+    val vSequenceOfStatements = VSequenceOfStatements(ctx.sequence_of_statements())
+    VCaseStatementAlternative(vChoices, vSequenceOfStatements)
   }
 }
 
 case class VCaseStatement(labelColon: Option[String],
-                          exp: VExpression, caseStatAltList: List[VCaseStatAlt],
+                          vExpression: VExpression, vCaseStatementAlternativeList: List[VCaseStatementAlternative],
                           vId: Option[String]) extends VSequentialStatement {
-  require(caseStatAltList.nonEmpty, "caseStatAltList")
+  require(vCaseStatementAlternativeList.nonEmpty, "caseStatementAlternativeList")
 
   override def toI(defInfo: DefInfo): ISeq_stmt_complex = {
     val id = labelColon.orElse(vId).getOrElse(defaultId)
-    val cond = exp.toIExp(defInfo)
-    // TODO: may need to ensure default case only deal with one "choice"
-    val lastCase = caseStatAltList.last
+    val cond = vExpression.toIExp(defInfo)
+    // TODO: [HC] May need to ensure default case only deal with one "choice"
+    val lastCase = vCaseStatementAlternativeList.last
     val (when_complexList: List[Ssc_when], defaultList: List[ISeq_stmt_complex]) =
       lastCase.choices.vChoiceList.head match {
         case VChoiceOthers => {
-          val initCases = caseStatAltList.init
-          (initCases.map(_.toI(defInfo)), lastCase.seqOfStats.sequentialStatementList.map(_.toI(defInfo)))
+          val initCases = vCaseStatementAlternativeList.init
+          (initCases.map(_.toI(defInfo)), lastCase.vSequenceOfStatements.sequentialStatementList.map(_.toI(defInfo)))
         }
         case _ => {
-          (caseStatAltList.map(_.toI(defInfo)), List.empty)
+          (vCaseStatementAlternativeList.map(_.toI(defInfo)), List.empty)
         }
       }
     val refined: List[Ssc_when] = when_complexList.map { w =>
@@ -889,26 +907,38 @@ case class VCaseStatement(labelColon: Option[String],
 object VCaseStatement {
   def apply(ctx: Case_statementContext): VCaseStatement = {
     val labelColon = Option(ctx.label_colon()).map(_.identifier().getText)
-    val exp = VExpression(ctx.expression())
-    val caseStatAltList = ctx.case_statement_alternative().map(VCaseStatAlt(_)).toList
+    val vExpression = VExpression(ctx.expression())
+    val caseStatAltList = ctx.case_statement_alternative().map(VCaseStatementAlternative(_)).toList
     val id = Option(ctx.identifier()).map(_.getText)
-    VCaseStatement(labelColon, exp, caseStatAltList, id)
+    VCaseStatement(labelColon, vExpression, caseStatAltList, id)
 
   }
 }
 
 //********************************************************************************************************************//
 
-sealed abstract class VIterScheme
+sealed abstract class VIterationScheme
 
-case class VIterSchemeW(cond: VExpression) extends VIterScheme
+object VIterationScheme {
+  def apply(ctx: Iteration_schemeContext): VIterationScheme = {
+    if (ctx.WHILE() != null) VIterationSchemeWhile(VExpression(ctx.condition().expression()))
+    else if (ctx.FOR() != null) VIterationSchemeFor(VParameterSpecification(ctx.parameter_specification()))
+    else throw VIError
+  }
+}
 
-case class VIterSchemeFor(paramSpec: VParameterSpecification) extends VIterScheme
+case class VIterationSchemeFor(paramSpec: VParameterSpecification) extends VIterationScheme
 
-case class VIterSchemeWhile(cond: VExpression) extends VIterScheme
+case class VIterationSchemeWhile(conditionVExpression: VExpression) extends VIterationScheme
 
-case class VLoopStatement(labelColon: Option[String], seqOfStats: VSequenceOfStatements, id: Option[String]) extends VSequentialStatement {
-  override def toI(defInfo: DefInfo): ISeq_stmt_complex = ???
+case class VLoopStatement(labelColon: Option[String], vIterationSchemeOption: Option[VIterationScheme], vSequenceOfStatements: VSequenceOfStatements, id: Option[String]) extends VSequentialStatement {
+  override def toI(defInfo: DefInfo): ISeq_stmt_complex =  {
+    val iSeq_stmt_complexList = vSequenceOfStatements.sequentialStatementList.map(_.toI(defInfo))
+    vIterationSchemeOption match {
+      case Some(vIterationSchemeWhile: VIterationSchemeWhile) => ISeq_stmt_complex_Ssc_while("", vIterationSchemeWhile.conditionVExpression.toIExp(defInfo) , iSeq_stmt_complexList)
+      case _ => ???
+    }
+  }
 }
 
 object VLoopStatement {
@@ -916,7 +946,11 @@ object VLoopStatement {
     val labelColon = Option(ctx.label_colon()).map(_.identifier().getText)
     val seqOfStats = VSequenceOfStatements(ctx.sequence_of_statements())
     val id = Option(ctx.identifier()).map(_.getText)
-    VLoopStatement(labelColon, seqOfStats, id)
+    val vIterationSchemeOption =
+      if (ctx.iteration_scheme() != null) Some(VIterationScheme(ctx.iteration_scheme()))
+      else None
+
+    VLoopStatement(labelColon, vIterationSchemeOption, seqOfStats, id)
   }
 }
 
@@ -1055,7 +1089,7 @@ object VProcessDeclarativePart {
 
 case class VProcessStatement(labelColon: Option[String],
                              p1: Boolean,
-                             sensitivitylist: Option[VSensitiveList],
+                             sensitivityList: Option[VSensitiveList],
                              is: Boolean,
                              procDeclPart: VProcessDeclarativePart,
                              processStatementPart: VProcessStatementPart,
@@ -1064,7 +1098,7 @@ case class VProcessStatement(labelColon: Option[String],
   override def toI(defInfo: DefInfo): IConc_stmt_complex_Csc_ps = {
     // [HC] guess
     val id = labelColon.orElse(identifier).getOrElse(defaultId)
-    val iSensitiveList = sensitivitylist.map(_.toI(defInfo))
+    val iSensitiveList = sensitivityList.map(_.toI(defInfo))
     // [HC] don't care about processDeclarativePart
     // [HC] processStatementPart => seq_stmt_complexList
     val seq_stmt_complexList: List[ISeq_stmt_complex] = processStatementPart.toI(defInfo)

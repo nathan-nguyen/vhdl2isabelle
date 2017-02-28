@@ -74,20 +74,105 @@ return return_constant(1) + 2 + return_constant(3) + 4 + return_constant(return_
     two_parameter(6 + return_constant(7), 8 +  return_constant(return_constant(9))) + 10 +
     return_constant(return_constant(return_constant(return_constant(11)))) + two_parameter(return_constant(12), return_constant(13));
 
+(V2I-017) IAsmt_rhs_Rhs_e in Variable Assignment Statement
+
+(V2I-018) Range in vector type or array type could be not integer
+
+(V2I-019) VVectorType now able to get initial values as literal
+Example:
+constant vector_const   : std_logic_vector(5 downto 0) := "000001";
+
+(V2I-020) Array of Record is added
+Example:
+type watchpoint_register is record
+  addr    : std_logic_vector(31 downto 2);  -- watchpoint address
+  mask    : std_logic_vector(31 downto 2);  -- watchpoint mask
+  exec    : std_ulogic;                     -- trap on instruction
+  load    : std_ulogic;                     -- trap on load
+  store   : std_ulogic;                     -- trap on store
+end record;
+
+type watchpoint_registers is array (0 to 3) of watchpoint_register;
+
+(V2I-021) Array of Record is accessible
+Example:
+vwpr(0).addr
+
+(V2I-022) Bug with env_sp when Signal List is empty, Port List is empty, Spnl List is empty
+Fix to env_sp = []
+
+(V2I-023) Fixed bug (V2I-016) with Variable Assignment Statement
+Examples:
+tmp := plus(a,b) + plus(b,c);
+
+(V2I-028) Fixed bug when generating exp_nth : right hand side variable are not renamed
+Examples: In diagread procedure
+data(31 downto 2) := wpr(i).addr;
+
+(V2I-029) Fixed bug when using a global signal inside function/procedure, the signal name is renamed
+Examples: In diagread procedure
+data := rfo.data1(31 downto 0);
+rfo is rename to diagread_rfo which is wrong
+
+(V2I-009) std_logic_vec_gen and std_ulogic_vec_gen are replaced with vec_gen
+
+(V2I-030) Fixed bug when trying to generate temporary variable for VNotFactor
+Examples:
+res := not is_x(d);
+
+
 /*********************************************************************************************************************/
 /***************************************************  NOT FIXED  *****************************************************/
 /*********************************************************************************************************************/
 
-(V2I-006) TODO : multidimensional array declaration is not implemented including: Unconstrained Array and ConstrainedArray with multiple ranges
-
-(V2I-009) Replace std_logic_vec_gen with vec_gen
+(V2I-006) Multidimensional array declarations are not implemented including: Unconstrained Array and ConstrainedArray with multiple ranges
 
 (V2I-011) Remove VSelectedName in IV_lhs
 
 (V2I-012) Remove IdentifierMap.isParsingSubprogram and remove IdentifierMap.subprogramName
 
-(V2I-017)
+(V2I-024) CRITICAL : Some functions return std_logic_vector type not fixed size. Therefore cannot initialize the value of return variable
+Examples:
+function conv_std_logic_vector(i : integer; w : integer) return std_logic_vector is
+variable tmp : std_logic_vector(w-1 downto 0);
+begin
+  tmp := std_logic_vector(to_unsigned(i, w));
+  return(tmp);
+end;
 
-(V2I-018)
+(*) Current solution: Consider the initial value for unfixed size return variable as an empty list
 
-(V2I-019)
+(V2I-025) CRITICAL : Vector variables are declared with size or initial value that get from function
+Examples:
+constant CWPMAX : std_logic_vector(NWINLOG2-1 downto 0) := conv_std_logic_vector(NWIN-1, NWINLOG2);
+
+(V2I-026) CRITICAL : Built-in functions are incorrect
+Examples:
+function to_unsigned(i : integer; w : integer) return integer is
+  begin
+    return 0;
+  end function to_unsigned;
+function std_logic_vector(i : integer) return std_logic_vector is
+variable tmp : std_logic_vector(i downto 0);
+  begin
+    return tmp;
+  end function std_logic_vector;
+function is_x ( s : std_ulogic_vector ) return boolean is
+  begin
+    return false;
+  end;
+function to_integer( v : std_logic_vector) return integer is
+  begin
+    return 0;
+  end;
+function unsigned( v: std_logic_vector) return std_logic_vector is
+  begin
+    return v;
+  end;
+
+(V2I-027) HIGH PRIORITY: Bug when trying to generate temporary variables in VVariableAssignmentStatement
+function traverseVNamePartNameFunctionCallOrIndexedPart in IdentifierMap.scala
+Temporary fix by using try/catch
+Examples:
+if FPEN then s.ef := dbg.ddata(12); end if;
+This kind of statement "s.ef := dbg.ddata(12) should not be into the temporary variable generation

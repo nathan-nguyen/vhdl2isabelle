@@ -40,14 +40,15 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def enterVariable_declaration(ctx: Variable_declarationContext): Unit = {
     val vVariableDeclaration = VVariableDeclaration(ctx)
-    for (id <- vVariableDeclaration.idList)
-      generateIVariable(id, vVariableDeclaration.vExpressionOption, vVariableDeclaration.vSubtypeIndication)
+    for (id <- vVariableDeclaration.idList) {
+      if (IdentifierMap.isParsingSubprogram) generateIVariable(s"${IdentifierMap.subprogramName}_${id}", vVariableDeclaration.vExpressionOption, vVariableDeclaration.vSubtypeIndication)
+      else generateIVariable(id, vVariableDeclaration.vExpressionOption, vVariableDeclaration.vSubtypeIndication)
+    }
   }
 
   override def exitGenerate_statement(ctx: Generate_statementContext): Unit = {
     val genStat = VGenerateStatement(ctx)
     conc_stmt_complexes += genStat.toI(defInfo)
-    //    logger.info(s"${genStat.toI(defInfo)}")
   }
 
   override def exitEntity_declarative_item(ctx: Entity_declarative_itemContext): Unit = {}
@@ -112,11 +113,11 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def exitTerm(ctx: TermContext): Unit = {}
 
   override def enterArray_type_definition(ctx: Array_type_definitionContext): Unit = {
-    val arrayTypeDef = VArrayTypeDef(ctx) match {
-      case uad : VUnconstrainedArrayDefinition => handler(s"${uad}")
-      case cad : VConstrainedArrayDefinition => {
+    VArrayTypeDefinition(ctx) match {
+      case vUnconstrainedArrayDefinition : VUnconstrainedArrayDefinition => handler(s"${vUnconstrainedArrayDefinition}")
+      case vConstrainedArrayDefinition : VConstrainedArrayDefinition => {
         val arrayTypeDeclarationId = ctx.getParent.getParent.getParent.asInstanceOf[Type_declarationContext].identifier().getText
-        typeInfo += (VArrayType(arrayTypeDeclarationId), cad)
+        typeInfo += (VArrayType(arrayTypeDeclarationId), vConstrainedArrayDefinition)
       }
     }
   }
@@ -348,10 +349,10 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def exitConfiguration_declarative_item(ctx: Configuration_declarative_itemContext): Unit = {}
 
   override def enterSubtype_declaration(ctx: Subtype_declarationContext): Unit = {
-    val subtypeDeclaration = VSubtypeDeclaration(ctx)
-    val identifier = subtypeDeclaration.id
-    val subtypeIndication = subtypeDeclaration.subtypeInd
-    typeInfo += (VSubtype(identifier), subtypeIndication)
+    val vSubtypeDeclaration = VSubtypeDeclaration(ctx)
+    val identifier = vSubtypeDeclaration.id
+    val vSubtypeIndication = vSubtypeDeclaration.subtypeInd
+    typeInfo += (VSubtype(identifier), vSubtypeIndication)
   }
 
   override def exitEntity_header(ctx: Entity_headerContext): Unit = {}
@@ -464,7 +465,10 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def exitNumeric_literal(ctx: Numeric_literalContext): Unit = {}
 
-  override def enterSubprogram_body(ctx: Subprogram_bodyContext): Unit = {}
+  override def enterSubprogram_body(ctx: Subprogram_bodyContext): Unit = {
+    val vSubprogramBody = VSubprogramBody(ctx)
+    IdentifierMap.startParsingSubprogram(vSubprogramBody.getDesignator.id)
+  }
 
   override def enterUse_clause(ctx: Use_clauseContext): Unit = {}
 
@@ -757,6 +761,7 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
   override def exitSubprogram_body(ctx: Subprogram_bodyContext): Unit = {
     val subprogramBody = VSubprogramBody(ctx)
     ISubprogramComplex(subprogramBody)(defInfo)
+    IdentifierMap.finishParsingSubprogram
   }
 
   override def enterRecord_nature_definition(ctx: Record_nature_definitionContext): Unit = {}
@@ -981,13 +986,22 @@ class TListener(vInfo: Option[VInfo]) extends Keeper(vInfo) with VHDLListener {
 
   override def exitName(ctx: NameContext): Unit = {}
 
-  override def enterEnumeration_type_definition(ctx: Enumeration_type_definitionContext): Unit = {}
+  override def enterEnumeration_type_definition(ctx: Enumeration_type_definitionContext): Unit = {
+    val vEnumerationTypeDefinition = VEnumerationTypeDefinition(ctx)
+    var i = 0
+    for (vEnumerationLiteral <- vEnumerationTypeDefinition.vEnumerationLiteralList){
+      generateIVariable(vEnumerationLiteral.getValue , VIntegerLiteral(i.toString).toIExp(defInfo), VSubtypeIndication(VSelectedName("integer", Nil), None, None))
+      i += 1
+    }
+    val enumerationTypeDeclarationId = ctx.getParent.getParent.getParent.asInstanceOf[Type_declarationContext].identifier().getText
+    typeInfo += (VSubtype(enumerationTypeDeclarationId), VSubtypeIndication(VSelectedName("integer", Nil), None, None))
+  }
 
   override def exitConcurrent_signal_assignment_statement(ctx: Concurrent_signal_assignment_statementContext): Unit = {
-    val concurrentSignalAssign = VConcurrentSignalAssignmentStatement(ctx)
-    concurrentSignalAssign match {
-      case csa@VConcurrentSignalAssignmentStatementConditional(labelColon, _, condSignAssign) => conc_stmt_complexes += csa.toI(defInfo)
-      case VConcurrentSignalAssignmentStatementSelected(_, _, selectSignalAssign) =>
+    val vConcurrentSignalAssignmentStatement = VConcurrentSignalAssignmentStatement(ctx)
+    vConcurrentSignalAssignmentStatement match {
+      case vConcurrentSignalAssignmentStatementConditional@VConcurrentSignalAssignmentStatementConditional(labelColon, _, vConditionalSignalAssignment) => conc_stmt_complexes += vConcurrentSignalAssignmentStatementConditional.toI(defInfo)
+      case VConcurrentSignalAssignmentStatementSelected(_, _, vSelectedSignalAssignment) =>
     }
   }
 

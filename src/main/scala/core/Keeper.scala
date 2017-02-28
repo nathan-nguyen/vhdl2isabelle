@@ -20,15 +20,30 @@ abstract class Keeper(vInfo: Option[VInfo]) {
 
   val definedEntities = mutable.ArrayBuffer.empty[String]
 
-  def generateIVariable(id: String, vExpressionOption: Option[VExpression], vSubtypeIndication: VSubtypeIndication): Unit = {
-    val vTypeDefinition = VTypeDefinition(vSubtypeIndication.getSimpleName)
-    vTypeDefinition match {
+  def generateIVariable(id: String, iExpression: IExpression, vSubtypeIndication: VSubtypeIndication) = {
+    val vVariableType = VVariableType(vSubtypeIndication.getSimpleName)
+    vVariableType match {
+      case vBaseType: VBaseType => {
+        val iVariable = IVariable(id, vBaseType, iExpression)
+        defInfo += (id, iVariable)
+      }
+      case _ => handler(s"${vVariableType}")
+    }
+  }
+
+  def generateIVariable(id: String, vExpressionOption: Option[VExpression], vSubtypeIndication: VSubtypeIndication) = {
+    val vVariableType = VVariableType(vSubtypeIndication.getSimpleName)
+    vVariableType match {
       case vBaseType: VBaseType => {
         val iExpression = vBaseType match {
           case vScalarType: VScalarType => vScalarType.getInitialValue(vExpressionOption)(defInfo)
           case vVectorType: VVectorType => vSubtypeIndication.getExplicitRangeOption match {
-            case Some(vExplicitRange) => vVectorType.getInitialValue(vExplicitRange, vExpressionOption)
-            case None => ???
+            case Some(vExplicitRange) => vVectorType.getInitialValue(id, vExplicitRange, vExpressionOption)(typeInfo)
+            case None => {
+              // This case happens when the array variable does not have fixed sized
+              // (V2I-024)
+              vVectorType.getNullValue()
+            }
           }
         }
         val iVariable = IVariable(id, vBaseType, iExpression)
@@ -37,7 +52,7 @@ abstract class Keeper(vInfo: Option[VInfo]) {
       case vCustomizedType : VCustomizedType => vCustomizedType match{
         case vSubtype : VSubtype => {
           val vSubtypeIndication = typeInfo.subtypeDeclarationMap(vSubtype)
-          generateIDefinition(id, vExpressionOption, vSubtypeIndication, defInfo, typeInfo) match{
+          generateIDefinition(id, vExpressionOption, vSubtypeIndication)(defInfo, typeInfo) match{
             case iVariable : IVariable => defInfo += (id, iVariable)
             case iVl_Vnl : IVl_Vnl => defInfo += (id, iVl_Vnl)
             case _ => throw VIError
@@ -45,40 +60,41 @@ abstract class Keeper(vInfo: Option[VInfo]) {
         }
         case vRecordType : VRecordType => {
           val initVals = vRecordType.getInitialValue(typeInfo, vExpressionOption)(defInfo)
-          val iVl_Vnl = IVl_Vnl.gen(id, initVals)
+          val iVl_Vnl = IVl_Vnl.generate(id, initVals)(typeInfo, defInfo)
           defInfo +=(id, iVl_Vnl)
         }
         case vArrayType : VArrayType => {
-          val vSubtypeIndication = typeInfo.arrayTypeDeclarationMap(vArrayType).vSubtypeIndication
-          val iExpression = vArrayType.getInitialValue(id, typeInfo, vExpressionOption)(defInfo)
-          val iVariable = IVariable(id, VTypeDefinition.getOriginalType(vSubtypeIndication)(typeInfo), iExpression)
-          defInfo += (id, iVariable)
+          vArrayType.getInitialValue(id, typeInfo, vExpressionOption)(defInfo) match {
+            case iVariable: IVariable => defInfo += (id, iVariable)
+            case iVl_Vnl: IVl_Vnl => defInfo += (id, iVl_Vnl)
+            case _ => throw VIError
+          }
         }
       }
     }
   }
 
-  def generateIPort(id: String, expressionOption: Option[VExpression], vSubtypeIndication: VSubtypeIndication, portMode: PortMode.Value, portConnection: PortConnection.Value): Unit = {
-    val valType = VTypeDefinition(vSubtypeIndication.getSimpleName)
-    valType match {
-      case bt: VBaseType => {
-        val initVal = bt match {
-          case st: VScalarType => st.getInitialValue(expressionOption)(defInfo)
+  def generateIPort(id: String, vExpressionOption: Option[VExpression], vSubtypeIndication: VSubtypeIndication, portMode: PortMode.Value, portConnection: PortConnection.Value): Unit = {
+    val vVariableType = VVariableType(vSubtypeIndication.getSimpleName)
+    vVariableType match {
+      case vBaseType: VBaseType => {
+        val iExpression = vBaseType match {
+          case vScalarType: VScalarType => vScalarType.getInitialValue(vExpressionOption)(defInfo)
           case vVectorType: VVectorType => vSubtypeIndication.getExplicitRangeOption match {
-            case Some(r) => {
-              vVectorType.getInitialValue(r, expressionOption)
+            case Some(vExplicitRange) => {
+              vVectorType.getInitialValue(id, vExplicitRange, vExpressionOption)(typeInfo)
             }
             case None => ???
           }
         }
-        val port = Port_baseType(id, bt, initVal, portMode, portConnection)
+        val port = Port_baseType(id, vBaseType, iExpression, portMode, portConnection)
         defInfo +=(id, port)
       }
       case ct: VCustomizedType => ct match {
         case subtype : VSubtype => handler(s"${subtype}")
         case recordType : VRecordType => {
-          val initVals = recordType.getInitialValue(typeInfo, expressionOption)(defInfo)
-          val spnl = ISpl_Spnl(id, initVals, portMode, portConnection, typeInfo)
+          val initVals = recordType.getInitialValue(typeInfo, vExpressionOption)(defInfo)
+          val spnl = ISpl_Spnl(id, initVals, portMode, portConnection)(typeInfo, defInfo)
           defInfo +=(id, spnl)
         }
         case arrayType :VArrayType => handler(s"${arrayType}")
@@ -87,8 +103,8 @@ abstract class Keeper(vInfo: Option[VInfo]) {
   }
 
   def genISignal(name: String, vSubtypeIndication: VSubtypeIndication, signalKind: SignalKind.Value): Unit = {
-    val valType = VTypeDefinition(vSubtypeIndication.getSimpleName)
-    valType match {
+    val vVariableType = VVariableType(vSubtypeIndication.getSimpleName)
+    vVariableType match {
       case vBaseType: VBaseType => {
         val iExpression = vBaseType match {
           case vScalarType: VScalarType => vScalarType.guessInitialValue
@@ -115,14 +131,14 @@ abstract class Keeper(vInfo: Option[VInfo]) {
   }
 
   // [TN] This method is called when trying to get subtype definition
-  def generateIDefinition(id: String, vExpressionOption: Option[VExpression], subtypeIndication: VSubtypeIndication, defInfo: DefInfo, vTypeInfo: VTypeInfo) : V_IDef = {
-    val vTypeDefinition = VTypeDefinition(subtypeIndication.getSimpleName)
-    vTypeDefinition match {
+  def generateIDefinition(id: String, vExpressionOption: Option[VExpression], subtypeIndication: VSubtypeIndication)(defInfo: DefInfo, vTypeInfo: VTypeInfo) : V_IDef = {
+    val vVariableType = VVariableType(subtypeIndication.getSimpleName)
+    vVariableType match {
       case vBaseType: VBaseType => {
         val iExpression = vBaseType match {
           case vScalarType: VScalarType => vScalarType.getInitialValue(vExpressionOption)(defInfo)
           case vVectorType: VVectorType => subtypeIndication.getExplicitRangeOption match {
-            case Some(vExplicitRange) => vVectorType.getInitialValue(vExplicitRange, vExpressionOption)
+            case Some(vExplicitRange) => vVectorType.getInitialValue(id, vExplicitRange, vExpressionOption)(typeInfo)
             case None => ???
           }
         }
@@ -131,11 +147,11 @@ abstract class Keeper(vInfo: Option[VInfo]) {
       case vCustomizedType : VCustomizedType => vCustomizedType match{
         case subtype : VSubtype => {
           val subtypeIndication = vTypeInfo.subtypeDeclarationMap(subtype)
-          generateIDefinition(id, vExpressionOption, subtypeIndication, defInfo, vTypeInfo)
+          generateIDefinition(id, vExpressionOption, subtypeIndication)(defInfo, vTypeInfo)
         }
         case vRecordType : VRecordType => {
           val initVals = vRecordType.getInitialValue(vTypeInfo, vExpressionOption)(defInfo)
-          IVl_Vnl.gen(id, initVals)
+          IVl_Vnl.generate(id, initVals)(typeInfo, defInfo)
         }
         case vArrayType : VArrayType => handler(s"${vArrayType}")
       }

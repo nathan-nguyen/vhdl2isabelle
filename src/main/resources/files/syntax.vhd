@@ -1,23 +1,25 @@
-  stimulus : process
-    begin
-      idbits_out <= IDBITS - 1;
-    end process stimulus;
+architecture rtl of iu3 is
 
-  procedure change_tbuf(tracebuf_2p: in boolean; tbuf: out integer; tbuf_in: in integer) is
-    begin
-      if (TRACEBUF_2P) then
-        tbuf := (tbuf-64);
-      else
-        tbuf := tbuf_in;
-      end if;
-    end procedure change_tbuf;
+  function plus(a:integer; b: integer) return integer is
+  begin
+    return a+b;
+  end function plus;
 
-  function get_tbuf(tracebuf_2p: boolean; tbuf: integer) return integer is
-    begin
-      change_tbuf(true, tbuf, tbuf);
-      if (TRACEBUF_2P) then
-        return(tbuf-64);
-      else
-        return(tbuf);
-      end if;
-    end function get_tbuf;
+  function return_constant(a:integer) return integer is
+  begin
+    return a;
+  end function return_constant;
+
+  function plust(a:integer) return integer is
+  variable tmp: integer;
+  begin
+    tmp := plus(a, 1) + return_constant(a);
+    return plus(a, 1)+1;
+  end function plust;
+
+begin
+end;
+
+entity iu3 is
+
+end;

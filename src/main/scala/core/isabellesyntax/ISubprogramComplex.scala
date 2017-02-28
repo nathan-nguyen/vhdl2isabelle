@@ -15,8 +15,8 @@ case class IParameter (iv_clhs: IV_clhs, direction: IDirection.Value, parameterT
 }
 
 object IParameter {
-  def apply(parameterName: String, iDirection: IDirection.Value, subtypeIndication: VSubtypeIndication)(defInfo: DefInfo): IParameter = {
-    val parameterType = IType(subtypeIndication)
+  def apply(parameterName: String, iDirection: IDirection.Value, vSubtypeIndication: VSubtypeIndication)(defInfo: DefInfo): IParameter = {
+    val parameterType = IType(vSubtypeIndication)
     val iV_clhs = IV_clhs(defInfo.getVDef(VSelectedName(parameterName, Nil)), VSelectedName(parameterName, Nil), None)
     IParameter(iV_clhs, iDirection, parameterType)
   }
@@ -54,7 +54,12 @@ sealed abstract class ISubprogramComplex {
   val returnType : IType.Value
   val localVariableList : List[ILocalVariable]
 
-  override def toString = s"(\n\t\t''${name}'', ${designator}, ${parameterList.mkString("[", "]@[", "]")}, ${iSeq_stmt_complexList.mkString("[\n\t\t\t", "]@[\n\t\t\t", "]")}, ${returnType}, ${localVariableList.mkString("[", "]@[", "]")})"
+  override def toString = {
+    IdentifierMap.startParsingSubprogram(name)
+    val returnValue = s"(\n\t\t''${name}'', ${designator}, ${parameterList.mkString("[", "]@[", "]")}, ${iSeq_stmt_complexList.mkString("[\n\t\t\t", "]@[\n\t\t\t", "]")}, ${returnType}, ${localVariableList.mkString("[", "]@[", "]")})"
+    IdentifierMap.finishParsingSubprogram
+    returnValue
+  }
 }
 
 object ISubprogramComplex {
@@ -71,9 +76,7 @@ object ISubprogramComplex {
         case _ => ???
       }
     }
-    IdentifierMap.startParsingSubprogram(name)
     val iSeq_stmt_complexList = ISeq_stmt_complex(vSubprogramBody.vSubprogramStatementPart.vSequentialStatementList)(defInfo)
-    IdentifierMap.finishParsingSubprogram
 
     vSubprogramSpecification match {
       case vFunctionSpecification: VFunctionSpecification => {

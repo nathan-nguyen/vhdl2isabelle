@@ -18,18 +18,21 @@ object IType extends Enumeration{
   val IStd_ulogic = Value("vhdl_std_ulogic")
   val INatural = Value("vhdl_natural")
   val IArray = Value("vhdl_array")
+  val IRecord = Value("vhdl_record")
 
   def apply(subtypeIndication: VSubtypeIndication): IType ={
-    val typeDefinition = VTypeDefinition(subtypeIndication.getSimpleName)
+    val typeDefinition = VVariableType(subtypeIndication.getSimpleName)
     IType(typeDefinition)
   }
 
-  def apply(typeDefinition : VTypeDefinition): IType = {
-    typeDefinition match {
-      case scalaType : VScalarType => getScalarType(typeDefinition.s)
-      case vectorType : VVectorType => IArray
-      case arrayType : VArrayType => IArray
-      case _ => ???
+  def apply(vVariableType : VVariableType): IType = {
+    vVariableType match {
+      case vScalarType : VScalarType => getScalarType(vVariableType.s)
+      case vVectorType : VVectorType => IArray
+      case vArrayType : VArrayType => IArray
+      case vRecordType : VRecordType => IRecord
+      case vSubType : VSubtype => IType(vSubType.getOriginalType(IdentifierMap.tListener.typeInfo))
+      case _ => handler(s"${vVariableType}")
     }
   }
 

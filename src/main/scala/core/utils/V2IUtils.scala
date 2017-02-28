@@ -18,23 +18,23 @@ object V2IUtils {
   // Change valType to correct one (character/std_logic/std_ulogic)
   def refine__valType(idef: IDef, tobeRefined: IExpression): IExpression = {
     tobeRefined match {
-      case iExpression_constantBaseType: IExpression_constantBaseType => idef.getExpKind match {
-        case ExpScalarKind => IExpression_constantBaseType(idef.getVType.asInstanceOf[VBaseType], iExpression_constantBaseType.iConst, idef.getExpKind)
+      case iExpression_constantBaseType: IExpression_constantVBaseType => idef.getExpKind match {
+        case ExpScalarKind => IExpression_constantVBaseType(idef.getVType.asInstanceOf[VBaseType], iExpression_constantBaseType.iConst, idef.getExpKind)
         case expVectorKind: ExpVectorKind => {
           require(tobeRefined.expKind.isV, s"${tobeRefined.expKind}:\t${tobeRefined}")
           expVectorKind match {
             case ExpVectorKindTo => iExpression_constantBaseType.iConst match {
               case s: IConstS => handler(s"${s}")
               case c: IConstCustomized => handler(s"${c}")
-              case l: IConstL => IExpression_constantBaseType(idef.getVType.asInstanceOf[VBaseType], iExpression_constantBaseType.iConst, idef.getExpKind)
+              case l: IConstL => IExpression_constantVBaseType(idef.getVType.asInstanceOf[VBaseType], iExpression_constantBaseType.iConst, idef.getExpKind)
               case rl: IConstRL => {
                 val valType = idef.getVType.asInstanceOf[VVectorType]
                 rl match {
                   case IConstRL_raw(_, iConstList) => {
-                    IExpression_constantBaseType(valType, IConstL_raw(valType, iConstList), idef.getExpKind)
+                    IExpression_constantVBaseType(valType, IConstL_raw(valType, iConstList), idef.getExpKind)
                   }
                   case IConstRL_gen(_, length, rawVal) => {
-                    IExpression_constantBaseType(valType, IConstL_gen(valType, length, rawVal), idef.getExpKind)
+                    IExpression_constantVBaseType(valType, IConstL_gen(valType, length, rawVal), idef.getExpKind)
                   }
                 }
               }
@@ -46,14 +46,14 @@ object V2IUtils {
                 val valType = idef.getVType.asInstanceOf[VVectorType]
                 l match {
                   case IConstL_raw(_, iConstList) => {
-                    IExpression_constantBaseType(idef.getVType.asInstanceOf[VBaseType], IConstRL_raw(valType, iConstList), idef.getExpKind)
+                    IExpression_constantVBaseType(idef.getVType.asInstanceOf[VBaseType], IConstRL_raw(valType, iConstList), idef.getExpKind)
                   }
                   case IConstL_gen(_, length, rawVal) => {
-                    IExpression_constantBaseType(idef.getVType.asInstanceOf[VBaseType], IConstRL_gen(valType, length, rawVal), idef.getExpKind)
+                    IExpression_constantVBaseType(idef.getVType.asInstanceOf[VBaseType], IConstRL_gen(valType, length, rawVal), idef.getExpKind)
                   }
                 }
               }
-              case rl: IConstRL => IExpression_constantBaseType(idef.getVType.asInstanceOf[VBaseType], rl, idef.getExpKind)
+              case rl: IConstRL => IExpression_constantVBaseType(idef.getVType.asInstanceOf[VBaseType], rl, idef.getExpKind)
             }
           }
         }
@@ -82,7 +82,7 @@ object V2IUtils {
     ids.toList
   }
 
-  def selectedNameFromSubtypeInd(ctx: Subtype_indicationContext): VSelectedName = {
+  def selectedNameFromVSubtypeIndication(ctx: Subtype_indicationContext): VSelectedName = {
     val names = for {
       name <- ctx.selected_name()
     } yield VSelectedName(name)
@@ -90,5 +90,7 @@ object V2IUtils {
     require(head.suffixList.isEmpty, "selectedNameFromSubtypeInd")
     head
   }
+
+  def isAllDigits(x: String): Boolean = x forall Character.isDigit
 
 }

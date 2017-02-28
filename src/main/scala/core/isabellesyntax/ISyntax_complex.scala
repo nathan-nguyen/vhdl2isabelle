@@ -14,7 +14,7 @@ sealed abstract class ISeq_stmt_complex {
     case ISeq_stmt_complex_Ssc_va(name, iV_clhs, iAsmt_rhs) => s"(''${name}'': ${iV_clhs} := ${iAsmt_rhs})"
     case ISeq_stmt_complex_Ssc_if(name, iCondition, if_seq_stmt_complexList, elif_complexList, else_complexList) => s"(''${name}'': IF ${iCondition} THEN ${if_seq_stmt_complexList.ISABELLE} ${elif_complexList.ISABELLE} ELSE ${else_complexList.ISABELLE} END IF)"
     case ISeq_stmt_complex_Ssc_case(name, cond, when_complexList, defaultSeq_stmt_complexList) => s"(''${name}'': CASE ${cond} IS ${when_complexList.ISABELLE} WHEN OTHERS => ${defaultSeq_stmt_complexList.ISABELLE} END CASE)"
-    case ISeq_stmt_complex_Ssc_while(name, cond, bodySeq_stmt_complexList) => s"(''${name}'': WHILE ${cond} LOOP ${bodySeq_stmt_complexList.ISABELLE} END LOOP)"
+    case ISeq_stmt_complex_Ssc_while(name, cond, bodySeq_stmt_complexList) => s"(''${name}'': WHILE ${cond} LOOP ${bodySeq_stmt_complexList.mkString("[", ",", "]")} END LOOP)"
     case ISeq_stmt_complex_Ssc_for(name, cond, discrete_range, seq_stmt_complexList) => s"(''${name}'': FOR ${cond} IN ${discrete_range} LOOP ${seq_stmt_complexList.ISABELLE} END LOOP)"
     case ISeq_stmt_complex_Ssc_fn(name, iV_clhs, iSubproccall_complex) => s"(ssc_fn ''${name}'' ${iV_clhs} ${iSubproccall_complex})"
     case ISeq_stmt_complex_Ssc_rt(name, iAsmt_rhs) => s"(ssc_rt ''${name}'' ${iAsmt_rhs})"
@@ -35,11 +35,16 @@ object ISeq_stmt_complex {
           val vNamePartNameFunctionCallOrIndexedPartsList = vReturnStatement.vExpression.getVNamePartNameFunctionCallOrIndexedPartsList
           IdentifierMap.traverseVNamePartNameFunctionCallOrIndexedPartsList(vNamePartNameFunctionCallOrIndexedPartsList)
           iSeq_stmt_complexList ++= IdentifierMap.generateTemporarySequentialStatement(defInfo)
-          iSeq_stmt_complexList += vSequentialStatement.toI(defInfo)
+          iSeq_stmt_complexList += vReturnStatement.toI(defInfo)
         }
         case vIfStatement: VIfStatement => {
-          val vNamePartNameFunctionCallOrIndexedPartsList = vIfStatement.ifConditionVExpression.getVNamePartNameFunctionCallOrIndexedPartsList
           IdentifierMap.traverseVExpressionList(vIfStatement.getAllConditionVExpression)
+          iSeq_stmt_complexList ++= IdentifierMap.generateTemporarySequentialStatement(defInfo)
+          iSeq_stmt_complexList += vIfStatement.toI(defInfo)
+        }
+        case vVariableAssignmentStatement: VVariableAssignmentStatement => {
+          val vNamePartNameFunctionCallOrIndexedPartsList = vVariableAssignmentStatement.vExpression.getVNamePartNameFunctionCallOrIndexedPartsList
+          IdentifierMap.traverseVNamePartNameFunctionCallOrIndexedPartsList(vNamePartNameFunctionCallOrIndexedPartsList)
           iSeq_stmt_complexList ++= IdentifierMap.generateTemporarySequentialStatement(defInfo)
           iSeq_stmt_complexList += vSequentialStatement.toI(defInfo)
         }
@@ -59,7 +64,7 @@ case class ISeq_stmt_complex_Ssc_if(name: String, iCondition: IExpression, if_se
 
 case class ISeq_stmt_complex_Ssc_case(name: String, cond: IExpression, when_complexList: List[Ssc_when], defaultSeq_stmt_complexList: List[ISeq_stmt_complex]) extends ISeq_stmt_complex
 
-case class ISeq_stmt_complex_Ssc_while(name: String, cond: IExpression, bodySeq_stmt_complexList: List[ISeq_stmt_complex]) extends ISeq_stmt_complex
+case class ISeq_stmt_complex_Ssc_while(name: String, iCondition: IExpression, iSeq_stmt_complexList: List[ISeq_stmt_complex]) extends ISeq_stmt_complex
 
 case class ISeq_stmt_complex_Ssc_for(name: String, cond: IExpression, discrete_range: IDiscrete_range, seq_stmt_complexList: List[ISeq_stmt_complex]) extends ISeq_stmt_complex
 
